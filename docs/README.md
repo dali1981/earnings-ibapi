@@ -7,24 +7,21 @@ This system scans **ALL** upcoming earnings across the market, analyzes options 
 ## 🚀 Quick Start
 
 ```bash
-# Run earnings discovery (no API keys required)
-python -m earnings_trading.discovery
+# Run pure earnings discovery (NASDAQ-only by default)
+python -m earnings.discovery
 
-# Run comprehensive data pipeline
-python -m jobs.run_earnings_pipeline
-
-# Compare earnings data sources
+# Optional: compare sources (if enabled via env)
 python scripts/compare_earnings_sources.py
 ```
 
 ## 📊 Key Features
 
-- **Market-Wide Earnings Discovery**: Scans entire market using free NASDAQ API (1,122+ events)
+- **Market-Wide Earnings Discovery**: Scans market using the free NASDAQ API by default
 - **Options Strategy Analysis**: Optional; trading layer is decoupled and can be run later
 - **Dynamic Symbol Selection**: Opportunity-driven selection (when using trading layer)
-- **Configurable Sources (Opt-in)**: Fallback from FMP → Finnhub → NASDAQ → Yahoo Finance
-- **Priority-Based Collection**: Focuses resources on high-value opportunities (when using trading layer)
-- **Real-Time Filtering**: Market cap, timing, liquidity, and options-tradability filters
+- **Configurable Sources (Opt-in)**: Additional sources can be enabled via `EARNINGS_ALLOWED_SOURCES`
+- **Priority-Based Collection**: Available in optional trading layer
+- **Real-Time Filtering**: Basic market filters (market cap, timing, symbol hygiene)
 
 ## 🎯 System Overview
 
@@ -45,12 +42,12 @@ earnings_ibapi/
 │   ├── architecture/           # System design docs
 │   ├── guides/                # User guides  
 │   └── api/                   # API references
-├── earnings/                  # Earnings data acquisition
-│   ├── fetcher.py            # Multi-source earnings fetcher
+├── earnings/                  # Earnings data acquisition (pure discovery)
+│   ├── fetcher.py            # NASDAQ-only by default; opt-in other sources
 │   └── scheduler.py          # Priority-based scheduling
-├── earnings_trading/         # Core trading logic
-│   ├── discovery.py          # Market-wide opportunity discovery
-│   └── data_pipeline.py      # Dynamic data collection
+├── earnings_trading/         # Deprecated (shim for legacy imports)
+│   ├── discovery.py          # Compatibility shim
+│   └── data_pipeline.py      # Legacy pipeline (not used in current flow)
 ├── scripts/                  # Utility scripts
 │   └── compare_earnings_sources.py  # Data source comparison
 ├── examples/                 # Usage examples
@@ -77,22 +74,15 @@ earnings_ibapi/
 - **Analyzer**: `trading/strategy_analyzer.py` (not required for discovery)
 - **Pipelines**: Deferred until trading is enabled
 
-## 🎯 Recent Test Results
+## 🎯 Recent Discovery Results
 
 ```
 🔍 EARNINGS DISCOVERY SYSTEM TEST
 ============================================================
 
-✅ Found 1,122 total earnings events
-📊 229 candidates passed basic filters  
-🎯 229 high-quality opportunities identified
-
-TOP OPPORTUNITIES:
-1. HD     - 2025-08-19 (+7 days) - 100 pts - strangle
-2. MDT    - 2025-08-19 (+7 days) - 100 pts - strangle  
-3. PANW   - 2025-08-18 (+6 days) - 100 pts - strangle
-4. WMT    - 2025-08-21 (+9 days) - 80 pts - calendar_spread
-5. NVDA   - 2025-08-28 (+16 days) - 60 pts - calendar_spread
+✅ Collected 2,800+ raw events (NASDAQ)
+📊 1,000+ discoveries after basic market filters
+💾 Exported to data/exports/earnings_discoveries_YYYY-MM-DD.csv
 ```
 
 ## 📦 What Happens to Discovered Earnings
@@ -118,7 +108,10 @@ TOP OPPORTUNITIES:
 
 ### Environment Variables
 ```bash
-# Optional API keys (system works without them using NASDAQ fallback)
+# Default: NASDAQ-only (no keys required)
+export EARNINGS_ALLOWED_SOURCES=nasdaq
+
+# Optional: enable extra sources (set keys if you opt in)
 export FMP_API_KEY=your_fmp_key
 export FINNHUB_API_KEY=your_finnhub_key
 
@@ -134,18 +127,15 @@ export CACHE_PATH=/path/to/cache
 
 ## 🎯 Usage Examples
 
-### Basic Earnings Discovery
+### Basic Earnings Discovery (pure)
 ```python
-from earnings_trading.discovery import EarningsDiscoveryEngine
+from earnings.discovery import EarningsDiscoveryEngine
 
 engine = EarningsDiscoveryEngine()
-opportunities = engine.discover_earnings_opportunities(
-    days_ahead=21,
-    min_score=60.0
-)
+discoveries = engine.discover_and_store_earnings(days_ahead=21, days_back=0)
 
-for opp in opportunities[:5]:
-    print(f"{opp.symbol}: {opp.best_strategy} - {opp.total_score:.0f} pts")
+df = engine.get_recent_discoveries(max_age_days=1)
+print(df.head())
 ```
 
 ### Data Source Comparison
@@ -171,20 +161,24 @@ python scripts/compare_earnings_sources.py --days-ahead 14 --compare-historical 
 ## 🧪 Testing & Validation
 
 ```bash
-# Run discovery system test
-python -m earnings_trading.discovery
+# Run discovery system test (pure)
+python -m earnings.discovery
 
 # Test earnings data fetcher
 python -m earnings.fetcher
 
-# Run data source comparison
+# Optional: run data source comparison (if extra sources enabled)
 python scripts/compare_earnings_sources.py
 
 # Full test suite
 pytest tests/
 ```
 
-## 🔧 Troubleshooting
+## 🔧 CI & Troubleshooting
+
+### CI
+- Smoke tests: GitHub Actions runs a fast smoke (`python tests/test_runner.py --smoke`).
+- Guard rails: CI fails if new code imports the deprecated `earnings_trading` package.
 
 ### Common Issues
 

@@ -29,8 +29,9 @@ export FINNHUB_API_KEY=your_finnhub_key
 python -m earnings.discovery
 ```
 
-**Expected Output:**
-```
+Expected output highlights:
+- Raw events stored under `data/earnings/collection_date=YYYY-MM-DD/source=nasdaq/...`
+- Discoveries exported to `data/exports/earnings_discoveries_YYYY-MM-DD.csv`
 🔍 EARNINGS DISCOVERY SYSTEM TEST
 ============================================================
 
@@ -56,20 +57,24 @@ python -m earnings.fetcher
 python scripts/compare_earnings_sources.py
 ```
 
-## 📊 Understanding the Results
+## 📊 Understanding the Results (pure discovery)
 
-### Opportunity Scoring
+- CSV columns: `symbol`, `company_name`, `earnings_date`, `time`, `days_until`, `market_cap`, `eps_estimate`, `quality_score`, `discovery_date`, `source`.
+- Sorting: by `days_until` asc and `market_cap` desc.
+- Recent data: use `EarningsDiscoveryEngine.get_recent_discoveries(max_age_days=1)`
+
+### (removed)
 - **100 pts**: Excellent opportunity, earnings within 7 days
 - **80 pts**: Very good opportunity, good timing
 - **60 pts**: Good opportunity, reasonable timing
 - **50 pts**: Consider opportunity, adequate timing
 
-### Strategy Recommendations
+### (removed)
 - **strangle**: High volatility expected, suitable for directional moves
 - **calendar_spread**: Time decay play, good for range-bound movement
 - **straddle**: Maximum volatility play, best for binary events
 
-### Priority Classifications
+### (removed)
 - **HIGH**: Earnings within 7 days, score 75+
 - **MEDIUM**: Earnings within 14 days, score 60+
 - **LOW**: Earnings >14 days, score 50+
@@ -95,45 +100,35 @@ print(df.head())
 ```python
 # Filter for specific market cap range
 engine.min_market_cap = 5e9  # $5B minimum
-engine.max_days_ahead = 14   # Only next 2 weeks
+engine.discovery_max_days = 14   # Only next 2 weeks
 
-opportunities = engine.discover_earnings_opportunities()
+discoveries = engine.discover_and_store_earnings(days_ahead=14)
+df = engine.get_recent_discoveries(max_age_days=1)
 ```
 
 ### Export to CSV
-```python
-# Export with custom filename
-export_file = engine.export_opportunities(
-    opportunities,
-    output_file=Path("my_opportunities.csv")
-)
-```
+Discovery automatically exports a daily CSV to `data/exports/earnings_discoveries_YYYY-MM-DD.csv`.
 
 ## 🔍 Exploring Results
 
 ### View Exported CSV
 ```bash
 # Open exported opportunities
-open data/exports/earnings_opportunities_2025-08-12.csv
+open data/exports/earnings_discoveries_2025-08-12.csv
 
 # Or view in terminal
 head -10 data/exports/earnings_opportunities_2025-08-12.csv
 ```
 
-**CSV Structure:**
+CSV sample columns:
 ```
-Symbol,Company,Earnings_Date,Time,Days_Until,Best_Strategy,Total_Score,Calendar_Score,Straddle_Score,Strangle_Score,Priority,Action_Needed
-HD,"Home Depot, Inc. (The)",2025-08-19,bmo,7,strangle,100.0,80.0,90.0,100.0,🔥 EXCELLENT,GET_OPTION_CHAIN | GET_IV_DATA | ANALYZE_STRANGLE
+symbol,company_name,earnings_date,time,days_until,market_cap,eps_estimate,quality_score,discovery_date,source
+AAPL,Apple Inc.,2025-08-20,amc,8,3.2e12,2.50,80.0,2025-08-12,nasdaq
 ```
-
-### Understanding Action Items
-- **GET_OPTION_CHAIN**: Need to collect options data for this symbol
-- **GET_IV_DATA**: Need implied volatility historical data
-- **ANALYZE_STRANGLE**: Perform detailed strangle analysis
 
 ## 🛠️ Configuration
 
-### Basic Settings (earnings_trading/discovery.py)
+### Basic Settings (earnings/discovery.py)
 ```python
 # Market filters
 self.min_market_cap = 1e9      # $1B minimum
@@ -142,41 +137,32 @@ self.min_price = 10.0          # $10 minimum stock price
 self.max_price = 1000.0        # $1000 maximum stock price
 
 # Timing windows  
-self.min_days_ahead = 1        # At least 1 day ahead
-self.max_days_ahead = 60       # Within 2 months
+self.discovery_min_days = 1        # At least 1 day ahead
+self.discovery_max_days = 60       # Within 2 months
 ```
 
-### Strategy Scoring Weights
-```python
-# Modify strategy multipliers for different preferences
-def _strangle_multiplier(self, candidate) -> float:
-    if candidate.days_until_earnings <= 7:
-        return 1.0  # Perfect timing
-    elif candidate.days_until_earnings <= 14:
-        return 0.8  # Good timing
-    else:
-        return 0.6  # Adequate timing
-```
-
-## 📈 Next Steps
+## 📈 Next Steps (optional)
 
 ### 1. Data Collection Setup
 Once you have identified opportunities, set up data collection:
 ```bash
 # Run comprehensive data pipeline
-python -m jobs.run_earnings_pipeline
+# optional later when trading is enabled
+# python -m jobs.run_earnings_pipeline
 ```
 
 ### 2. Options Chain Analysis
 For detailed options analysis:
 ```bash
 # Get option chains for top opportunities
-python examples/complete_workflow_example.py
+# optional later when trading is enabled
+# python examples/complete_workflow_example.py
 ```
 
 ### 3. Historical Analysis
 Compare current opportunities with historical patterns:
 ```bash
+# requires enabling extra sources via EARNINGS_ALLOWED_SOURCES
 python scripts/compare_earnings_sources.py --compare-historical 30
 ```
 
