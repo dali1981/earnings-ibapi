@@ -27,6 +27,9 @@ from typing import List, Optional
 
 import pandas as pd
 
+# Add project root to path
+sys.path.append(str(Path(__file__).parent.parent))
+
 from config import DATA_ROOT, OPTION_CHAINS_PATH, CONTRACTS_PATH, IB_HOST, IB_PORT, IB_CLIENT_ID
 from earnings.discovery import EarningsDiscoveryEngine
 from jobs.tasks import BackfillEquityBarsTask, BackfillOptionBarsTask
