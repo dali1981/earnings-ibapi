@@ -18,7 +18,8 @@ from earnings.fetcher import EarningsCalendarFetcher, EarningsEvent
 from earnings_trading.discovery import EarningsDiscoveryEngine, EarningsCandidate
 
 # Setup logging
-logging.basicConfig(level=logging.INFO)
+from utils.logging_setup import setup_logging
+setup_logging()
 logger = logging.getLogger(__name__)
 
 

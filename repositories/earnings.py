@@ -508,7 +508,8 @@ class EarningsRepository(BaseRepository):
 
 def main():
     """Test the earnings repository."""
-    logging.basicConfig(level=logging.INFO)
+    from utils.logging_setup import setup_logging
+    setup_logging()
     
     print("🗄️ EARNINGS REPOSITORY TEST")
     print("=" * 50)

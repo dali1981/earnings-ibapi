@@ -13,7 +13,6 @@ This is the first step in the earnings options trading workflow:
 4. Execute data collection for selected symbols
 """
 
-import logging
 import pandas as pd
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -25,11 +24,12 @@ from enum import Enum
 import sys
 sys.path.append(str(Path(__file__).parent.parent))
 from config import DISCOVERY_CONFIG, EARNINGS_CONFIG, EARNINGS_PATH
+from utils.logging_setup import get_logger
 
 # Import our earnings fetcher
 from earnings.fetcher import EarningsCalendarFetcher, EarningsEvent
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class OptionsStrategy(Enum):
@@ -421,7 +421,8 @@ class EarningsDiscoveryEngine:
 
 def main():
     """Test the earnings discovery system."""
-    logging.basicConfig(level=logging.INFO)
+    from utils.logging_setup import setup_logging
+    setup_logging()
     
     print("🔍 EARNINGS DISCOVERY SYSTEM TEST")
     print("=" * 60)

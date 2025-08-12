@@ -17,7 +17,6 @@ Usage:
 """
 
 import json
-import logging
 import requests
 import pandas as pd
 from datetime import datetime, date, timedelta
@@ -25,8 +24,13 @@ from pathlib import Path
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
 from enum import Enum
+import sys
 
-logger = logging.getLogger(__name__)
+# Add path for centralized logging
+sys.path.append(str(Path(__file__).parent.parent))
+from utils.logging_setup import get_logger
+
+logger = get_logger(__name__)
 
 
 class EarningsSource(Enum):
@@ -544,7 +548,8 @@ class EarningsCalendarFetcher:
 
 def main():
     """Test the earnings fetcher."""
-    logging.basicConfig(level=logging.INFO)
+    from utils.logging_setup import setup_logging
+    setup_logging()
     
     fetcher = EarningsCalendarFetcher()
     

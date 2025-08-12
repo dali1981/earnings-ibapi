@@ -478,12 +478,10 @@ def main():
     
     args = parser.parse_args()
     
-    # Setup logging
-    log_level = logging.DEBUG if args.verbose else logging.INFO
-    logging.basicConfig(
-        level=log_level,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-    )
+    # Setup centralized logging
+    from utils.logging_setup import setup_logging
+    log_level = "DEBUG" if args.verbose else "INFO"
+    setup_logging(level=log_level)
     
     # Parse symbols
     symbols = None

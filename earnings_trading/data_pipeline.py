@@ -12,17 +12,21 @@ Workflow:
 4. Execution system implements trades
 """
 
-import logging
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Dict, List, Optional, Set, Tuple, Any
 from dataclasses import dataclass
+import sys
+
+# Add path for centralized logging
+sys.path.append(str(Path(__file__).parent.parent))
+from utils.logging_setup import get_logger
 
 # Import existing components
 from jobs.orchestrator import DataPipelineOrchestrator, DataValidation, JobResult, JobType
 from earnings_trading.discovery import EarningsDiscoveryEngine, EarningsCandidate, OptionsStrategy
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 @dataclass
@@ -340,7 +344,8 @@ class EarningsDataPipeline:
 
 def main():
     """Test the earnings-driven data pipeline."""
-    logging.basicConfig(level=logging.INFO)
+    from utils.logging_setup import setup_logging
+    setup_logging()
     
     print("🎯 EARNINGS-DRIVEN OPTIONS DATA PIPELINE")
     print("=" * 60)

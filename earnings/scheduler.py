@@ -434,7 +434,9 @@ class EarningsPriorityScheduler:
 
 def main():
     """Test the earnings scheduler."""
-    logging.basicConfig(level=logging.INFO)
+    from utils.logging_setup import setup_logging
+
+    setup_logging()
     
     # Test symbols with known earnings
     test_symbols = ["AAPL", "GOOGL", "MSFT", "TSLA", "AMZN", "META", "NVDA"]

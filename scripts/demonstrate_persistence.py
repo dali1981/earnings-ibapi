@@ -24,7 +24,9 @@ from jobs.daily_earnings_collection import DailyEarningsCollector
 def demonstrate_persistence():
     """Demonstrate the complete persistence system."""
     
-    logging.basicConfig(level=logging.INFO)
+    from utils.logging_setup import setup_logging
+    
+    setup_logging()
     
     print("🗄️ NASDAQ EARNINGS DATA PERSISTENCE DEMONSTRATION")
     print("=" * 70)

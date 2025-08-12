@@ -156,5 +156,6 @@ def test_enhanced_fetcher():
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
+    from utils.logging_setup import setup_logging
+    setup_logging()
     test_enhanced_fetcher()

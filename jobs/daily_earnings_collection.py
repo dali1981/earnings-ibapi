@@ -20,7 +20,6 @@ Usage:
 """
 
 import sys
-import logging
 import argparse
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -30,13 +29,14 @@ import json
 # Add project root to path
 sys.path.append(str(Path(__file__).parent.parent))
 
+from utils.logging_setup import get_logger
 from earnings.fetcher import EarningsCalendarFetcher, EarningsSource
 from repositories.earnings import EarningsRepository
 from reliability.circuit_breaker import CircuitBreaker, CircuitBreakerConfig
 from reliability.retry import retry
 from lineage.decorators import track_lineage
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class DailyEarningsCollector:
@@ -508,12 +508,10 @@ def main():
     
     args = parser.parse_args()
     
-    # Setup logging
-    log_level = logging.DEBUG if args.verbose else logging.INFO
-    logging.basicConfig(
-        level=log_level,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-    )
+    # Setup centralized logging
+    from utils.logging_setup import setup_logging
+    log_level = "DEBUG" if args.verbose else "INFO"
+    setup_logging(level=log_level)
     
     print("🚀 DAILY EARNINGS DATA COLLECTION")
     print("=" * 50)

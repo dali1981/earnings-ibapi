@@ -19,7 +19,8 @@ from earnings.scheduler import EarningsPriorityScheduler, SchedulePriority
 from jobs.orchestrator import DataPipelineOrchestrator
 
 # Setup logging
-logging.basicConfig(level=logging.INFO)
+from utils.logging_setup import setup_logging
+setup_logging()
 logger = logging.getLogger(__name__)
 
 
