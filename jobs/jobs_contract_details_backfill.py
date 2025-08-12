@@ -30,16 +30,18 @@ def make_contract_by_conid(conid: int):
 
 from contract_descriptions_repo import ContractDescriptionsRepo
 from contract_details_repo import ContractDetailsRepo
+from config import IB_HOST, IB_PORT, IB_CLIENT_IDS, DATA_ROOT
 
 log = logging.getLogger("jobs.contract_details_backfill")
 
+
 @dataclass
 class Config:
-    host: str = "127.0.0.1"
-    port: int = 7497
-    client_id: int = 8
-    desc_path: str = "data/contract_descriptions"
-    out_path: str = "data/contract_details"
+    host: str = IB_HOST
+    port: int = IB_PORT
+    client_id: int = IB_CLIENT_IDS["contract_details_backfill"]
+    desc_path: str = str(DATA_ROOT / "contract_descriptions")
+    out_path: str = str(DATA_ROOT / "contract_details")
     timeout: float = 20.0
     as_of: dt.date = dt.date.today()
     queries: List[str] | None = None
@@ -70,11 +72,11 @@ def map_detail_row(cd: Any, as_of: dt.date) -> Dict[str, Any]:
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--host", default="127.0.0.1")
-    ap.add_argument("--port", type=int, default=7497)
-    ap.add_argument("--client-id", type=int, default=8)
-    ap.add_argument("--desc-path", default="data/contract_descriptions")
-    ap.add_argument("--out", default="data/contract_details")
+    ap.add_argument("--host", default=IB_HOST)
+    ap.add_argument("--port", type=int, default=IB_PORT)
+    ap.add_argument("--client-id", type=int, default=IB_CLIENT_IDS["contract_details_backfill"])
+    ap.add_argument("--desc-path", default=str(DATA_ROOT / "contract_descriptions"))
+    ap.add_argument("--out", default=str(DATA_ROOT / "contract_details"))
     ap.add_argument("--timeout", type=float, default=20.0)
     ap.add_argument("--queries", default="")
     ap.add_argument("--sec-types", default="")

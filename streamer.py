@@ -13,18 +13,19 @@ from request_sequencer import RequestSequencer
 from response_sequencer import ResponseSequencer
 from sink import Sink, EquityBarSink
 from utils import RateLimiter, make_stock, make_option
+from config import IB_HOST, IB_PORT, IB_CLIENT_IDS, DATA_ROOT
 
 
 @dataclass
 class Config:
     symbol: str
     date: dt.date
-    host: str = "127.0.0.1"
-    port: int = 7497
-    client_id: int = 17
+    host: str = IB_HOST
+    port: int = IB_PORT
+    client_id: int = IB_CLIENT_IDS["streamer"]
     days_before: int = 30
     days_after: int = 5
-    out_dir: Path = Path("./earnings_data")
+    out_dir: Path = DATA_ROOT
 
 class EarningsStreamer:
     # symbol: str

@@ -12,6 +12,7 @@ except Exception:
     from ibx.runtime import IBRuntime  # type: ignore
     from ibx.services import ContractDetailsService, SecDefService, HistoricalService  # type: ignore
     from ibx.contracts import make_stock, make_option  # type: ignore
+from config import IB_HOST, IB_PORT, IB_CLIENT_IDS
 
 def _duration_for(start: date, end: date, bar_size: str) -> str:
     days = max(1, (end - start).days + 1)
@@ -51,9 +52,9 @@ class _Pacer:
 
 @dataclass
 class IBSource:
-    host: str = "127.0.0.1"
-    port: int = 7497
-    client_id: int = 101
+    host: str = IB_HOST
+    port: int = IB_PORT
+    client_id: int = IB_CLIENT_IDS["ib_source"]
     max_hist_per_min: int = 40
 
     def __post_init__(self):
