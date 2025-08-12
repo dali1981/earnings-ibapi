@@ -85,9 +85,9 @@ EARNINGS_CONFIG = {
     }
 }
 
-# --- Earnings Discovery/Filtering Settings ---
+# --- Pure Earnings Discovery Settings ---
 DISCOVERY_CONFIG = {
-    # Basic filters for options trading suitability
+    # Basic market filters (NO trading-specific filters)
     "min_market_cap": 1_000_000_000,   # $1B minimum market cap
     "max_market_cap": 2_000_000_000_000, # $2T maximum (exclude mega caps)
     "min_avg_volume": 1_000_000,       # 1M shares average volume
@@ -97,13 +97,6 @@ DISCOVERY_CONFIG = {
     # Discovery timing windows (how far ahead to look for earnings)
     "discovery_min_days": 1,           # At least 1 day ahead
     "discovery_max_days": 60,          # Within 2 months (discovery scope)
-    "strategy_optimal_start": 7,       # Strategy works best 7+ days before earnings
-    "strategy_optimal_end": 14,        # Strategy works best up to 14 days before
-    
-    # Options requirements
-    "require_weekly_options": False,    # Don't require weekly options
-    "require_liquid_options": False,    # Don't require liquid options
-    "min_iv_rank": 20,                 # Minimum IV rank (when available)
     
     # Data collection windows (when to collect price/IV data around earnings date)
     "data_collection": {
@@ -113,7 +106,16 @@ DISCOVERY_CONFIG = {
         "iv_history_days": 90          # IV historical analysis (90 days back)
     },
     
-    # Strategy scoring weights
+    # Trading strategy analysis settings (moved here for compatibility)
+    "strategy_optimal_start": 7,       # Strategy works best 7+ days before earnings
+    "strategy_optimal_end": 14,        # Strategy works best up to 14 days before
+    
+    # Options requirements (for trading analysis)
+    "require_weekly_options": False,    # Don't require weekly options
+    "require_liquid_options": False,    # Don't require liquid options
+    "min_iv_rank": 20,                 # Minimum IV rank (when available)
+    
+    # Strategy scoring weights (for trading analysis)
     "timing_weights": {
         "optimal": 100.0,              # 7-14 days = 100 points
         "good": 80.0,                  # 3-21 days = 80 points  
@@ -121,7 +123,7 @@ DISCOVERY_CONFIG = {
         "poor": 40.0                   # Outside ranges = 40 points
     },
     
-    # Strategy multipliers
+    # Strategy multipliers (for trading analysis)
     "strategy_multipliers": {
         "calendar_spread": {
             "14_plus_days": 1.0,
@@ -140,7 +142,7 @@ DISCOVERY_CONFIG = {
         }
     },
     
-    # Quality thresholds
+    # Quality thresholds (for trading analysis)
     "min_opportunity_score": 50.0,     # Minimum score to be considered
     "excellent_threshold": 90.0,       # Excellent opportunity threshold
     "good_threshold": 75.0             # Good opportunity threshold
