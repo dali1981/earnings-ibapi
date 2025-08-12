@@ -1,0 +1,49 @@
+name: CI Smoke
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  guard-imports:
+    name: Guard deprecated imports
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fail on new uses of earnings_trading
+        run: |
+          set -euo pipefail
+          echo "Scanning for deprecated 'earnings_trading' imports..."
+          # Find python files excluding deprecated package, tests, examples, and docs
+          mapfile -t PYFILES < <(find . -type f -name "*.py" \
+            -not -path "./earnings_trading/*" \
+            -not -path "./tests/*" \
+            -not -path "./examples/*" \
+            -not -path "./docs/*")
+          if [ ${#PYFILES[@]} -eq 0 ]; then exit 0; fi
+          # Look for direct imports of the deprecated package
+          if grep -nE "(^|[^.])\bfrom\s+earnings_trading\b|(^|[^.])\bimport\s+earnings_trading\b" "${PYFILES[@]}"; then
+            echo "\nDeprecated 'earnings_trading' import detected."
+            echo "Use 'earnings.discovery' (pure discovery) or 'trading.strategy_analyzer' (optional) instead."
+            exit 1
+          fi
+          echo "No deprecated imports found."
+
+  smoke-tests:
+    name: Smoke tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements-test.txt ]; then pip install -r requirements-test.txt; else pip install pytest; fi
+      - name: Run smoke
+        run: |
+          python tests/test_runner.py --smoke
+
