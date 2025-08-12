@@ -17,6 +17,7 @@ from pathlib import Path
 # Add project root to path
 sys.path.append(str(Path(__file__).parent.parent))
 
+from config import EARNINGS_PATH
 from earnings.fetcher import EarningsCalendarFetcher, EarningsSource
 from repositories.earnings import EarningsRepository
 from jobs.daily_earnings_collection import DailyEarningsCollector
@@ -101,8 +102,8 @@ def demonstrate_persistence():
     print("\n5. 📁 STORAGE STRUCTURE")
     print("-" * 40)
     
-    # Show directory structure
-    data_path = Path("data/earnings/earnings")
+    # Show directory structure using configured path
+    data_path = EARNINGS_PATH
     if data_path.exists():
         print(f"   Storage path: {data_path}")
         

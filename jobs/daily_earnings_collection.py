@@ -29,6 +29,7 @@ import json
 # Add project root to path
 sys.path.append(str(Path(__file__).parent.parent))
 
+from config import EARNINGS_PATH
 from utils.logging_setup import get_logger
 from earnings.fetcher import EarningsCalendarFetcher, EarningsSource
 from repositories.earnings import EarningsRepository
@@ -43,9 +44,13 @@ class DailyEarningsCollector:
     """Daily earnings data collection and persistence manager."""
     
     def __init__(self, 
-                 data_path: Path = Path("data/earnings"),
+                 data_path: Path = None,
                  max_retries: int = 3):
         self.fetcher = EarningsCalendarFetcher()
+        # Use configured path if not provided
+        if data_path is None:
+            data_path = EARNINGS_PATH.parent
+            logger.info(f"📁 Using configured earnings path: {EARNINGS_PATH}")
         self.repository = EarningsRepository(data_path)
         self.max_retries = max_retries
         
@@ -499,8 +504,8 @@ def main():
                        help='Force collection even if recent data exists')
     parser.add_argument('--validate-only', action='store_true',
                        help='Only validate existing data, don\'t collect new')
-    parser.add_argument('--data-path', type=str, default='data/earnings',
-                       help='Path for earnings data storage')
+    parser.add_argument('--data-path', type=str, default=None,
+                       help='Path for earnings data storage (uses config default if not provided)')
     parser.add_argument('--verbose', '-v', action='store_true',
                        help='Enable verbose logging')
     parser.add_argument('--output-report', type=str,
@@ -517,7 +522,8 @@ def main():
     print("=" * 50)
     
     # Initialize collector
-    collector = DailyEarningsCollector(data_path=Path(args.data_path))
+    data_path = Path(args.data_path) if args.data_path else None
+    collector = DailyEarningsCollector(data_path=data_path)
     
     # Run collection
     results = collector.run_daily_collection(

@@ -150,9 +150,13 @@ class ComprehensiveUpdater:
     """Comprehensive daily update orchestrator."""
     
     def __init__(self, 
-                 data_path: Path = Path("data"),
+                 data_path: Path = None,
                  config_path: Path = None):
         
+        # Use configured path if not provided
+        if data_path is None:
+            from config import DATA_ROOT
+            data_path = DATA_ROOT
         self.data_path = data_path
         self.portfolio_manager = PortfolioManager(config_path)
         
@@ -427,8 +431,8 @@ Examples:
     parser.add_argument(
         "--data-path",
         type=Path,
-        default=Path("data"),
-        help="Base path for data storage (default: data)"
+        default=None,
+        help="Base path for data storage (uses config default if not provided)"
     )
     
     # Symbol specification

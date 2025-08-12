@@ -26,7 +26,11 @@ logger = logging.getLogger(__name__)
 class DemoEarningsDiscoveryEngine(EarningsDiscoveryEngine):
     """Demo earnings discovery with realistic market data."""
     
-    def __init__(self, data_path: Path = Path("data")):
+    def __init__(self, data_path: Path = None):
+        # Use configured path if not provided
+        if data_path is None:
+            from config import DATA_ROOT
+            data_path = DATA_ROOT
         super().__init__(data_path)
         self.demo_earnings = self._create_realistic_earnings_data()
     
