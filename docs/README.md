@@ -93,6 +93,10 @@ earnings_ibapi/
 - **Programmatic Access**: `EarningsDiscoveryEngine.get_recent_discoveries(max_age_days=1)` returns the latest as a DataFrame.
 - **Downstream Use**: Other systems can consume the daily CSV or query raw parquet directly; any filtering/analysis happens later.
 
+Time field
+- Recognized values are normalized to `bmo` (before market open) or `amc` (after market close).
+- Otherwise the provider label is preserved (e.g., `dmt`, `during market`); if absent, `unknown`.
+
 ## 📚 Documentation
 
 | Category | Documents |
@@ -119,6 +123,29 @@ export FINNHUB_API_KEY=your_finnhub_key
 export DATA_PATH=/path/to/trading/data
 export CACHE_PATH=/path/to/cache
 ```
+
+## 🔧 Bootstrap From Earnings
+
+- Purpose: Backfill contracts, option chains, equity history, and option history for symbols with earning dates.
+- Requirements: IB Gateway/TWS running and reachable (uses `IB_HOST/IB_PORT/IB_CLIENT_ID`).
+
+Make targets
+- `make from-earnings`: Processes up to 20 upcoming symbols from the latest earning-date CSV and runs:
+  - Contracts (targeted backfill if missing)
+  - Option chain snapshot (refresh if >24h old)
+  - Equity bars backfill (`1 day`)
+  - Option bars backfill (`1 min` default)
+- `make from-earnings-dry`: Prints the plan only (no IB calls, no writes).
+
+Script usage
+- `python jobs/run_from_earnings.py --dry-run --max-symbols 10 --lookback-days 365 --option-bar-size "1 min"`
+- `python jobs/run_from_earnings.py --symbols AAPL,MSFT --lookback-days 180 --option-bar-size "1 min"`
+
+Data sinks
+- Contracts: `data/contracts`
+- Chains: `data/option_chains`
+- Equity bars: `data/equity_bars`
+- Option bars: `data/option_bars`
 
 ### Key Settings
 - **Min Market Cap**: $1B (configurable in `earnings/discovery.py`)

@@ -19,6 +19,8 @@ help:
 	@echo "  format         Format code"
 	@echo "  clean          Clean up artifacts"
 	@echo "  docs           Generate documentation"
+	@echo "  from-earnings  Bootstrap data for symbols with earning dates"
+	@echo "  from-earnings-dry  Show planned actions without execution"
 
 # Installation targets
 install:
@@ -79,6 +81,13 @@ clean:
 # Documentation
 docs:
 	sphinx-build -b html docs/ docs/_build/html
+
+# Bootstrap from earnings CSV
+from-earnings:
+	python jobs/run_from_earnings.py --max-symbols 20 --min-days-until 0 --lookback-days 365
+
+from-earnings-dry:
+	python jobs/run_from_earnings.py --max-symbols 20 --min-days-until 0 --lookback-days 365 --dry-run
 
 # Development workflow
 dev-setup: install-dev test-setup

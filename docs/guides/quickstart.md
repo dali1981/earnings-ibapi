@@ -50,6 +50,10 @@ python scripts/compare_earnings_sources.py
 - No filtering: everything collected is stored (parquet) and exported (CSV).
 - Recent data: use `EarningsDiscoveryEngine.get_recent_discoveries(max_age_days=1)`.
 
+Time field
+- Normalization: Recognized values are normalized to `bmo` (before market open) or `amc` (after market close).
+- Preservation: Otherwise the provider label is preserved (e.g., `dmt`, `during market`); if missing, `unknown`.
+
 ### (removed)
 - **100 pts**: Excellent opportunity, earnings within 7 days
 - **80 pts**: Very good opportunity, good timing
