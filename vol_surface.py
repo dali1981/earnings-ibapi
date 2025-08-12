@@ -18,6 +18,7 @@ from ib_client import IBClient
 from sink import Sink
 from streamer import Config
 from utils import RateLimiter, make_option
+from ibx_time import ib_end_datetime
 
 
 def parse_args() -> argparse.Namespace:
@@ -74,7 +75,7 @@ def main():
                 # rid_iv = requests.next(f"iv_{expiry}_{strike}")
                 # client.reqMktData(rid_iv, opt_contract, "106", False, False, [])
                 # Historical volatility (1 month daily bars)
-                end_ts = dt.datetime.now().strftime("%Y%m%d %H:%M:%S")
+                end_ts = ib_end_datetime(dt.datetime.now(dt.timezone.utc))
                 rid_hv = sequencer.next(f"hv_{expiry}_{strike}")
                 client.reqHistoricalData(
                     rid_hv,

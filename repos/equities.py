@@ -6,6 +6,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 import pyarrow.dataset as ds
 import pandas as pd
+from ibx_time import parse_ib_datetime_series
 
 
 
@@ -51,15 +52,17 @@ class EquityBarRepository:
                 raise ValueError("Daily bars require 'date' column")
             # normalize
             # if pd.api.types.is_datetime64_any_dtype(out['datetime']):
-            out['date'] = pd.to_datetime(out['datetime']).dt.date
+            ts = parse_ib_datetime_series(out['datetime'])
+            out['date'] = ts.dt.date
             # set a dummy time at midnight
-            out['time'] = pd.to_datetime(out['datetime'])
+            out['time'] = ts
         else:
             # Intraday bars
-            if 'datetime' not in out.columns:
-                raise ValueError("Intraday bars require 'time' column")
-            out['time'] = pd.to_datetime(out['datetime'])
-            out['date'] = pd.to_datetime(out['datetime']).dt.date
+            if "datetime" not in out.columns:
+                raise ValueError("Intraday bars require "time" column")
+            ts = parse_ib_datetime_series(out["datetime"])
+            out["time"] = ts
+            out["date"] = ts.dt.date
 
         out.rename(columns={'what_to_show': 'data_type'}, inplace=True)
         # out['symbol'] = out.attrs.get('symbol').astype(str)
