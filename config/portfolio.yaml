@@ -1,0 +1,155 @@
+portfolios:
+  main:
+    description: 'Main trading portfolio - Large cap tech and growth stocks'
+    symbols:
+      - AAPL    # Apple Inc.
+      - GOOGL   # Alphabet Inc.
+      - MSFT    # Microsoft Corp.
+      - AMZN    # Amazon.com Inc.
+      - TSLA    # Tesla Inc.
+      - META    # Meta Platforms Inc.
+      - NVDA    # NVIDIA Corp.
+      - NFLX    # Netflix Inc.
+      - AMD     # Advanced Micro Devices
+      - CRM     # Salesforce Inc.
+    enabled: true
+
+  earnings_focus:
+    description: 'High-volume earnings plays and sector ETFs'
+    symbols:
+      - SPY     # SPDR S&P 500 ETF
+      - QQQ     # Invesco QQQ Trust
+      - IWM     # iShares Russell 2000 ETF
+      - ARKK    # ARK Innovation ETF
+      - XLF     # Financial Select Sector SPDR
+      - XLE     # Energy Select Sector SPDR
+      - XLK     # Technology Select Sector SPDR
+      - XLV     # Health Care Select Sector SPDR
+      - GLD     # SPDR Gold Shares
+      - TLT     # iShares 20+ Year Treasury Bond ETF
+    enabled: true
+
+  banking:
+    description: 'Banking and financial services'
+    symbols:
+      - JPM     # JPMorgan Chase & Co.
+      - BAC     # Bank of America Corp.
+      - WFC     # Wells Fargo & Co.
+      - GS      # Goldman Sachs Group Inc.
+      - MS      # Morgan Stanley
+      - C       # Citigroup Inc.
+    enabled: false  # Enable during earnings season
+
+  growth_tech:
+    description: 'High-growth technology companies'
+    symbols:
+      - SHOP    # Shopify Inc.
+      - ROKU    # Roku Inc.
+      - TWLO    # Twilio Inc.
+      - SNOW    # Snowflake Inc.
+      - PLTR    # Palantir Technologies Inc.
+      - SQ      # Block Inc. (formerly Square)
+      - PYPL    # PayPal Holdings Inc.
+      - ADBE    # Adobe Inc.
+      - NOW     # ServiceNow Inc.
+      - DDOG    # Datadog Inc.
+    enabled: false  # Enable for specific high-volatility periods
+
+  earnings_heavy:
+    description: 'Stocks with frequent earnings events and high option volume'
+    symbols:
+      - COST    # Costco Wholesale Corp.
+      - WMT     # Walmart Inc.
+      - TGT     # Target Corp.
+      - HD      # Home Depot Inc.
+      - LOW     # Lowe's Companies Inc.
+      - DIS     # Walt Disney Co.
+      - KO      # Coca-Cola Co.
+      - PEP     # PepsiCo Inc.
+      - MCD     # McDonald's Corp.
+      - SBUX    # Starbucks Corp.
+    enabled: true
+
+settings:
+  # Resource limits
+  max_daily_symbols: 150
+  max_concurrent_jobs: 5
+  
+  # Earnings and priority settings
+  enable_earnings_priority: true
+  earnings_lookbehind_days: 7
+  earnings_lookahead_days: 30
+  
+  # Circuit breaker and reliability
+  circuit_breaker_enabled: true
+  max_retries_per_symbol: 3
+  api_rate_limit_buffer: 0.8  # Use 80% of rate limits
+  
+  # Data storage and caching
+  default_data_path: 'data'
+  earnings_cache_hours: 6
+  option_chain_max_age_hours: 24
+  
+  # Performance optimization
+  batch_size_critical: 5
+  batch_size_high: 10
+  batch_size_medium: 15
+  batch_size_low: 20
+  batch_size_maintenance: 50
+  
+  # API configurations (set via environment variables)
+  fmp_api_key: null  # Set FMP_API_KEY environment variable
+  finnhub_api_key: null  # Set FINNHUB_API_KEY environment variable
+
+schedule:
+  # Market hours (ET)
+  market_hours_start: '09:30'
+  market_hours_end: '16:00'
+  
+  # Update timing
+  pre_market_update_time: '08:00'
+  post_market_update_time: '17:00'
+  weekend_maintenance_time: '10:00'
+  
+  # Priority update frequencies (hours)
+  critical_update_frequency: 4    # 6x per day for earnings today/tomorrow
+  high_update_frequency: 8        # 3x per day for earnings this week
+  medium_update_frequency: 12     # 2x per day for earnings next week
+  low_update_frequency: 24        # Daily for no immediate earnings
+  maintenance_update_frequency: 72  # Every 3 days for background updates
+
+notifications:
+  # Notification settings (implement as needed)
+  enable_notifications: false
+  notification_channels:
+    - email
+    - slack
+  
+  # Alert thresholds
+  failure_rate_threshold: 0.1  # Alert if >10% failures
+  circuit_breaker_threshold: 3  # Alert if 3+ symbols circuit broken
+  
+  # Status reporting
+  daily_summary_enabled: true
+  weekly_report_enabled: true
+
+logging:
+  # Logging configuration
+  level: 'INFO'
+  max_log_files: 30
+  max_log_size_mb: 100
+  
+  # Log what to track
+  track_performance: true
+  track_api_usage: true
+  track_earnings_accuracy: true
+
+# Example cron schedule for automation:
+# # Daily comprehensive update at 6 PM ET (after market close)
+# 0 18 * * 1-5 cd /path/to/trading_project/earnings_ibapi && python jobs/run_daily_comprehensive.py
+# 
+# # Weekend maintenance at 10 AM ET
+# 0 10 * * 6 cd /path/to/trading_project/earnings_ibapi && python jobs/run_daily_comprehensive.py --dry-run
+#
+# # Priority refresh every 6 hours during market days
+# 0 */6 * * 1-5 cd /path/to/trading_project/earnings_ibapi && python jobs/run_daily_comprehensive.py --refresh-priorities-only

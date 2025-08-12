@@ -1,0 +1,53 @@
+{
+  "analysis_timestamp": "2025-08-12T16:04:27.968634",
+  "api_endpoint": "https://api.nasdaq.com/api/calendar/earnings",
+  "documentation_links": [
+    "https://www.nasdaq.com/market-activity/earnings",
+    "https://api.nasdaq.com/api/calendar/earnings"
+  ],
+  "total_days_analyzed": 8,
+  "days_with_data": 8,
+  "total_companies_found": 979,
+  "daily_breakdown": [
+    {
+      "date": "2025-08-12",
+      "companies": 246,
+      "has_error": false
+    },
+    {
+      "date": "2025-08-13",
+      "companies": 330,
+      "has_error": false
+    },
+    {
+      "date": "2025-08-14",
+      "companies": 170,
+      "has_error": false
+    },
+    {
+      "date": "2025-08-15",
+      "companies": 55,
+      "has_error": false
+    },
+    {
+      "date": "2025-08-18",
+      "companies": 52,
+      "has_error": false
+    },
+    {
+      "date": "2025-08-19",
+      "companies": 39,
+      "has_error": false
+    },
+    {
+      "date": "2025-08-20",
+      "companies": 29,
+      "has_error": false
+    },
+    {
+      "date": "2025-08-21",
+      "companies": 58,
+      "has_error": false
+    }
+  ]
+}

@@ -220,10 +220,19 @@ class DataPipelineOrchestrator:
             self._setup_lineage_tracking()
         
         # Circuit breakers for API protection
-        self.api_circuit_breaker = CircuitBreaker(
-            failure_threshold=5,
-            recovery_timeout=300  # 5 minutes
-        )
+        try:
+            from reliability.circuit_breaker import CircuitBreakerConfig
+            breaker_config = CircuitBreakerConfig(
+                failure_threshold=5,
+                timeout_duration=300.0  # 5 minutes
+            )
+            self.api_circuit_breaker = CircuitBreaker(
+                name="api_circuit_breaker", 
+                config=breaker_config
+            )
+        except ImportError:
+            # Fallback to dummy circuit breaker if reliability module not available
+            self.api_circuit_breaker = CircuitBreaker()
         
         self.logger = get_trading_logger("DataPipelineOrchestrator")
     
