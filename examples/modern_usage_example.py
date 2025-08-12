@@ -23,6 +23,7 @@ from pathlib import Path
 
 # Core system components
 from jobs.orchestrator import DataPipelineOrchestrator, DataValidation, PrerequisiteError
+from config import DATA_ROOT
 
 # Repository imports - new unified system
 from repositories import (
@@ -48,9 +49,9 @@ logger = logging.getLogger(__name__)
 class ModernUsageExample:
     """Modern usage patterns for the trading data system."""
     
-    def __init__(self, data_path: str = "example_data"):
-        self.data_path = Path(data_path)
-        self.data_path.mkdir(exist_ok=True)
+    def __init__(self, data_path: Path = None):
+        # Examples use configured data root (read-only)
+        self.data_path = data_path or DATA_ROOT
         
         # Initialize orchestrator - handles all dependency management
         self.orchestrator = DataPipelineOrchestrator(

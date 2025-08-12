@@ -20,6 +20,9 @@ import pandas as pd
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Dict, List, Any, Optional
+import sys
+sys.path.append(str(Path(__file__).parent.parent))
+from config import EXPORTS_PATH
 
 class NASDAQEarningsAPI:
     """
@@ -225,10 +228,11 @@ class NASDAQEarningsAPI:
         
         return results
     
-    def export_detailed_analysis(self, results: List[Dict[str, Any]], output_dir: Path = Path("nasdaq_analysis")):
+    def export_detailed_analysis(self, results: List[Dict[str, Any]], output_dir: Path = None):
         """Export detailed analysis of NASDAQ API data."""
         
-        output_dir.mkdir(exist_ok=True)
+        output_dir = output_dir or EXPORTS_PATH
+        # Examples use existing configured export directory
         
         # 1. Summary report
         summary_file = output_dir / "nasdaq_api_summary.json"

@@ -13,6 +13,7 @@ IB_CLIENT_IDS = {
     "contract_details_backfill": 8,
     "ib_source": 101,
     "contracts_backfill": 1,
+    "fundamental_data": 200,
 }
 
 # Fallback client id

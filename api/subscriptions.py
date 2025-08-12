@@ -1,14 +1,16 @@
 # --- NEW: subscriptions ---
+import logging
 import queue
 import threading
-from typing import Callable, Optional
+from typing import Callable, Optional, Dict, TYPE_CHECKING
 
 from ibapi.client import EClient
 from ibapi.wrapper import EWrapper
 from ibapi.contract import Contract
 from ibapi.ticktype import TickTypeEnum
 
-from api.ib_core import IBRuntime, RequestIdSequencer, FutureRegistry
+if TYPE_CHECKING:  # avoid runtime circular imports
+    from api.ib_core import IBRuntime, RequestIdSequencer, FutureRegistry
 
 
 class Subscription:
@@ -131,7 +133,7 @@ class SubscriptionHandle:
 
 # --- MODIFY: IBWrapperBridge to accept subscriptions and route streaming ticks ---
 class IBWrapperBridge(EWrapper):
-    def __init__(self, sequencer: RequestIdSequencer, registry: FutureRegistry, subs: SubscriptionRegistry):
+    def __init__(self, sequencer, registry, subs):
         super().__init__()
         self._seq = sequencer
         self._reg = registry
@@ -141,7 +143,9 @@ class IBWrapperBridge(EWrapper):
     # tweak error() to also route to subscriptions:
     def error(self, reqId: int, errorCode: int, errorString: str, advancedOrderRejectJson: str = ""):
         if reqId in (-1, 0):
-            log.warning("IB error (no reqId) code=%s msg=%s", errorCode, errorString)
+            logging.getLogger("api.subscriptions").warning(
+                "IB error (no reqId) code=%s msg=%s", errorCode, errorString
+            )
             return
         # first try futures; if none, try subscriptions
         if not self._try_future_error(reqId, errorCode, errorString):

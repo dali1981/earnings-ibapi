@@ -27,6 +27,9 @@ from repositories import (
     OptionChainSnapshotRepository
 )
 
+# Configuration
+from config import DATA_ROOT, EXPORTS_PATH
+
 # Job orchestration
 from jobs.orchestrator import DataPipelineOrchestrator, DataValidation, PrerequisiteError
 
@@ -52,9 +55,10 @@ class TradingDataWorkflow:
     Demonstrates proper usage patterns and best practices for the trading data system.
     """
     
-    def __init__(self, base_path: str = "data"):
-        self.base_path = Path(base_path)
-        self.base_path.mkdir(exist_ok=True)
+    def __init__(self, base_path: Path = None):
+        # Use configured data root (read-only for examples)
+        self.base_path = base_path or DATA_ROOT
+        # Examples don't create directories - use existing production paths
         
         # Initialize orchestrator with lineage tracking
         self.orchestrator = DataPipelineOrchestrator(
