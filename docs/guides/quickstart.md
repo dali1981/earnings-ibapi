@@ -24,9 +24,9 @@ export FINNHUB_API_KEY=your_finnhub_key
 
 ## ⚡ Quick Start - 3 Commands
 
-### 1. Discover Earnings Opportunities
+### 1. Discover Earnings (Pure Discovery)
 ```bash
-python -m earnings_trading.discovery
+python -m earnings.discovery
 ```
 
 **Expected Output:**
@@ -78,20 +78,17 @@ python scripts/compare_earnings_sources.py
 
 ### Programmatic Discovery
 ```python
-from earnings_trading.discovery import EarningsDiscoveryEngine
+from earnings.discovery import EarningsDiscoveryEngine
 
 # Initialize engine
 engine = EarningsDiscoveryEngine()
 
-# Discover opportunities for next 21 days
-opportunities = engine.discover_earnings_opportunities(
-    days_ahead=21,
-    min_score=60.0  # Only high-quality opportunities
-)
+# Discover and store earnings (pure discovery)
+discoveries = engine.discover_and_store_earnings(days_ahead=21, days_back=0)
 
-# Show top 5 opportunities
-for opp in opportunities[:5]:
-    print(f"{opp.symbol}: {opp.best_strategy.value} - {opp.total_score:.0f} pts")
+# Load recent discoveries as a DataFrame
+df = engine.get_recent_discoveries(max_age_days=1)
+print(df.head())
 ```
 
 ### Custom Filtering

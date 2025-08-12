@@ -62,11 +62,10 @@ earnings_ibapi/
 
 ## 🔍 Core Components
 
-### 1. Earnings Discovery Engine (`earnings_trading/discovery.py`)
-- **Market-wide scanning**: Discovers ALL earnings events (no fixed portfolios)
-- **Strategy scoring**: Evaluates calendar spreads, strangles, straddles
-- **Intelligent filtering**: Market cap, timing, options liquidity requirements
-- **Priority classification**: HIGH/MEDIUM/LOW opportunity groups
+### 1. Earnings Discovery (`earnings/discovery.py`)
+- **Market-wide scanning**: Discovers earnings events (no fixed portfolios)
+- **Basic filtering**: Market cap, timing, symbol hygiene
+- **Exports**: Daily CSV of discoveries for downstream consumers
 
 ### 2. Configurable Sources (Opt-in) Fetcher (`earnings/fetcher.py`)
 - **Default**: NASDAQ-only (no API keys required)
@@ -74,10 +73,9 @@ earnings_ibapi/
 - 
 - 
 
-### 3. Dynamic Data Pipeline (`earnings_trading/data_pipeline.py`)
-- **Opportunity-driven**: Collects data based on discovered opportunities
-- **Priority scheduling**: Focuses on highest-value symbols first
-- **Adaptive resource allocation**: Scales collection based on earnings proximity
+### 3. Trading Layer (optional)
+- **Analyzer**: `trading/strategy_analyzer.py` (not required for discovery)
+- **Pipelines**: Deferred until trading is enabled
 
 ## 🎯 Recent Test Results
 
