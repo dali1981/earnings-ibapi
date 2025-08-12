@@ -7,9 +7,8 @@ from typing import Optional
 
 from ibx_flows.backfill import BackfillConfig, backfill_equity_bars, backfill_option_bars
 from ibx_flows.source_ib import IBSource
-from ibx_repos.equity_bars import EquityBarRepository
-from ibx_repos.option_bars import OptionBarRepository
-from option_repositories import ChainRepository
+# Use new unified repository system
+from repositories import EquityBarRepository, OptionBarRepository, OptionChainSnapshotRepository
 
 
 class Task:

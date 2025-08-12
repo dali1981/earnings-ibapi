@@ -2,9 +2,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date
 import pandas as pd
-from ibx_repos.equity_bars import EquityBarRepository
-from ibx_repos import OptionChainSnapshotRepository
-from ibx_repos.option_bars import OptionBarRepository
+# Use new unified repository system
+from repositories import EquityBarRepository, OptionChainSnapshotRepository, OptionBarRepository
 from .source_interface import MarketDataSource
 from .select_strikes import StrikeSelectionConfig, select_contracts
 from .windows import missing_windows
@@ -20,13 +19,15 @@ class BackfillConfig:
     selection_mode: str = "k_around_atm"
 
 def backfill_equity_bars(src: MarketDataSource, repo: EquityBarRepository, cfg: BackfillConfig) -> None:
-    present = repo.present_dates(cfg.underlying, cfg.bar_size, pd.to_datetime(cfg.start), pd.to_datetime(cfg.end))
+    # Use new repository interface for present_dates
+    present = repo.present_dates(cfg.underlying, cfg.bar_size, cfg.start, cfg.end)
     windows = missing_windows(present, cfg.start, cfg.end)
     if not windows: return
     frames = []
     for ws, we in windows:
         df = src.get_equity_bars(cfg.underlying, ws, we, cfg.bar_size)
         if not df.empty: frames.append(df)
+    # The new repository can infer symbol and bar_size from the DataFrame
     if frames: repo.save(pd.concat(frames, ignore_index=True))
 
 def backfill_option_chain_daily(src: MarketDataSource, repo: OptionChainSnapshotRepository, cfg: BackfillConfig) -> None:

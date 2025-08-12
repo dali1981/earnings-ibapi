@@ -101,7 +101,8 @@ class EarningsStreamer:
         stk = make_stock(self.cfg.symbol)
         rid = self.sequencer.next("earn1m")
         end_dt = dt.datetime.combine(self.cfg.date, dt.time(23,59,59))
-        end = ib_end_datetime(end_dt, tz="UTC", hyphen=True)
+        # FIXED: Remove hyphen=True - IB API requires space separator
+        end = ib_end_datetime(end_dt, tz="UTC")
         self._client.reqHistoricalData(rid, stk, end, "1 D", "1 min", "TRADES", 0, 1, False, [])
 
     def send_secdef_pre(self, _first_id: int):
@@ -129,12 +130,14 @@ class EarningsStreamer:
         # daily bars
         rid = self.sequencer.next("daily");
         end_dt = dt.datetime.combine(self.cfg.date + dt.timedelta(days=self.cfg.days_after), dt.time(0,0,0))
-        end = ib_end_datetime(end_dt, tz="UTC", hyphen=True)
+        # FIXED: Remove hyphen=True - IB API requires space separator
+        end = ib_end_datetime(end_dt, tz="UTC")
         dur = f"{self.cfg.days_before + self.cfg.days_after} D"
         self._client.reqHistoricalData(rid, stk, end, dur, "1 day", "TRADES", 0, 1, False, [])
         # minute bars earnings day
         rid = self.sequencer.next("earn1m");
-        end_intraday = ib_end_datetime(dt.datetime.combine(self.cfg.date, dt.time(23,59,59)), tz="UTC", hyphen=True)
+        # FIXED: Remove hyphen=True - IB API requires space separator
+        end_intraday = ib_end_datetime(dt.datetime.combine(self.cfg.date, dt.time(23,59,59)), tz="UTC")
         self._client.reqHistoricalData(rid, stk, end_intraday, "1 D", "1 min", "TRADES", 0, 1, False, [])
         # option secdef pre / post
         for off, tag in [(-1, "pre"), (1, "post")]:
@@ -202,7 +205,8 @@ class EarningsStreamer:
         # Register callback and metadata
         self._resp.add(req_id, callback, meta)
         # Format end datetime string
-        end_str = ib_end_datetime(end_datetime, tz='UTC', hyphen=True) if end_datetime else ''
+        # FIXED: Remove hyphen=True - IB API requires space separator
+        end_str = ib_end_datetime(end_datetime, tz='UTC') if end_datetime else ''
         # Issue the IB request
         self._client.reqHistoricalData(
             req_id,

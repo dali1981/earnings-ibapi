@@ -59,7 +59,7 @@ class EquityBarRepository:
         else:
             # Intraday bars
             if "datetime" not in out.columns:
-                raise ValueError("Intraday bars require "time" column")
+                raise ValueError("Intraday bars require 'time' column")
             ts = parse_ib_datetime_series(out["datetime"])
             out["time"] = ts
             out["date"] = ts.dt.date

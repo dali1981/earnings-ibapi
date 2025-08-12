@@ -62,7 +62,8 @@ class IBSource:
         stk = make_stock(symbol)
         duration = _duration_for(start, end, bar_size)
         end_dt = datetime.combine(end, datetime.min.time())
-        end_str = ib_end_datetime_instrument(self.rt, stk, end_dt, hyphen=True)
+        # FIXED: Remove hyphen=True - IB API requires space separator for endDateTime
+        end_str = ib_end_datetime_instrument(self.rt, stk, end_dt)
         self._pacer.wait()
         rows = self.hist.bars(stk, endDateTime=end_str, durationStr=duration, barSizeSetting=bar_size, whatToShow="TRADES", useRTH=0, timeout=90.0)
         df = _canon_bars(pd.DataFrame(rows), bar_size)
@@ -99,7 +100,8 @@ class IBSource:
         for _, row in contracts.iterrows():
             expd = pd.to_datetime(row["expiry"]).date(); exp_str = pd.Timestamp(expd).strftime("%Y%m%d")
             opt = make_option(row["underlying"], exp_str, float(row["strike"]), row["right"])
-            end_str = ib_end_datetime_instrument(self.rt, opt, end_dt, hyphen=True)
+            # FIXED: Remove hyphen=True - IB API requires space separator for endDateTime
+            end_str = ib_end_datetime_instrument(self.rt, opt, end_dt)
             self._pacer.wait()
             rows = self.hist.bars(opt, endDateTime=end_str, durationStr=duration, barSizeSetting=bar_size, whatToShow="TRADES", useRTH=0, timeout=90.0)
             df = _canon_bars(pd.DataFrame(rows), bar_size)

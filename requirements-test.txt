@@ -1,0 +1,25 @@
+# Testing dependencies for the trading project
+pytest>=7.0.0
+pytest-cov>=4.0.0
+pytest-mock>=3.10.0
+pytest-xdist>=3.0.0
+pytest-timeout>=2.1.0
+pytest-html>=3.1.0
+pytest-asyncio>=0.21.0
+pytest-benchmark>=4.0.0
+
+# Data validation
+pandera>=0.15.0
+
+# Test utilities
+factory-boy>=3.2.0
+freezegun>=1.2.0
+responses>=0.23.0
+
+# Memory profiling for performance tests
+memory-profiler>=0.60.0
+psutil>=5.9.0
+
+# Additional testing utilities
+hypothesis>=6.68.0
+faker>=18.0.0
