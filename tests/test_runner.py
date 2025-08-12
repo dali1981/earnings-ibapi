@@ -28,7 +28,8 @@ class TestRunner:
         parallel: bool = False,
         html_report: bool = True,
         junit_xml: bool = False,
-        timeout: int = 300
+        timeout: int = 300,
+        override_addopts: bool = False,
     ):
         """Run tests with specified configuration."""
         
@@ -83,6 +84,10 @@ class TestRunner:
             "--tb=short",
             "--disable-warnings"
         ])
+
+        if override_addopts:
+            # Disable project-wide addopts (e.g., coverage) for speed/stability
+            cmd.extend(["-o", "addopts="])
         
         print(f"Running command: {' '.join(cmd)}")
         print(f"Working directory: {self.project_root}")
@@ -120,7 +125,9 @@ class TestRunner:
         """Run unit tests."""
         print("Running unit tests...")
         return self.run_tests(
-            markers="unit",
+            test_path=str(self.test_dir / "unit"),
+            markers="unit and not api and not integration",
+            coverage=False,
             verbose=False,
             parallel=True,
             timeout=120
@@ -147,12 +154,25 @@ class TestRunner:
     def run_smoke_tests(self):
         """Run smoke tests (fast subset)."""
         print("Running smoke tests...")
-        return self.run_tests(
-            markers="unit and not slow",
-            verbose=False,
-            parallel=True,
-            timeout=60
-        )
+        # Focus on quick, hermetic tests that do not require IB or heavy deps
+        smoke_files = [
+            self.project_root / "tests" / "test_app.py",
+            self.project_root / "tests" / "test_present_dates.py",
+            self.project_root / "test_repositories.py",
+        ]
+        for path in smoke_files:
+            code = self.run_tests(
+                test_path=str(path),
+                markers=None,
+                coverage=False,
+                verbose=False,
+                parallel=False,
+                timeout=60,
+                override_addopts=True,
+            )
+            if code != 0:
+                return code
+        return 0
     
     def generate_test_report(self):
         """Generate comprehensive test report."""

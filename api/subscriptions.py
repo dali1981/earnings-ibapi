@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 # --- NEW: subscriptions ---
 import logging
 import queue
@@ -26,7 +28,9 @@ class Subscription:
             try:
                 self._on_event(event)
             except Exception:
-                log.exception("Subscription on_event handler raised")
+                logging.getLogger("api.subscriptions").exception(
+                    "Subscription on_event handler raised"
+                )
         # enqueue (drop oldest if full)
         try:
             self._q.put_nowait(event)
