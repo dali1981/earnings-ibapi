@@ -2,7 +2,7 @@
 from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, Union, List
+from typing import Optional, Union, List, Set
 from datetime import date
 import pathlib
 import pandas as pd
@@ -318,3 +318,43 @@ class OptionBarRepository:
             except Exception:
                 pass
         return df
+
+    def present_dates_for_contract(
+        self,
+        underlying: str,
+        expiry: Union[str, date],
+        right: str,
+        strike: float,
+        bar_size: str,
+        start: pd.Timestamp,
+        end: pd.Timestamp,
+    ) -> Set[date]:
+        """Return set of trade dates already stored for a contract."""
+        filters = {
+            "underlying": underlying,
+            "expiry": self._norm_expiry(expiry),
+            "right": right,
+            "strike": float(strike),
+            "bar_size": bar_size,
+        }
+        dataset = _dataset_hive(str(self.base_path))
+        table = dataset.to_table(columns=["trade_date", "underlying", "expiry", "right", "strike", "bar_size"])
+        df = table.to_pandas()
+        if df.empty:
+            return set()
+        df["strike"] = pd.to_numeric(df["strike"], errors="coerce")
+        df["expiry"] = df["expiry"].astype(str)
+        df = df[
+            (df["underlying"] == filters["underlying"]) &
+            (df["expiry"] == filters["expiry"]) &
+            (df["right"] == filters["right"]) &
+            (df["strike"] == filters["strike"]) &
+            (df["bar_size"] == filters["bar_size"])
+        ]
+        if df.empty:
+            return set()
+        s = pd.to_datetime(df["trade_date"])
+        mask = (
+            s >= pd.to_datetime(start).normalize()
+        ) & (s <= pd.to_datetime(end).normalize())
+        return set(s[mask].dt.date)

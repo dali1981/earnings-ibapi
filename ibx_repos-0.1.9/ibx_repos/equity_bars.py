@@ -1,7 +1,7 @@
 
 from __future__ import annotations
 from pathlib import Path
-from typing import Optional, Union, List, Iterable, Dict
+from typing import Optional, Union, List, Iterable, Dict, Set
 from datetime import date, datetime
 import pandas as pd
 import pyarrow as pa
@@ -222,3 +222,23 @@ class EquityBarRepository:
             except Exception:
                 pass
         return df
+
+    def present_dates(
+        self,
+        symbol: str,
+        bar_size: str,
+        start: pd.Timestamp,
+        end: pd.Timestamp,
+    ) -> Set[date]:
+        """Return set of trade dates already stored for the window."""
+        dataset = _dataset_hive(str(self.base_path))
+        expr = _build_filter(symbol=symbol, bar_size=bar_size)
+        table = dataset.to_table(columns=["trade_date"], filter=expr)
+        df = table.to_pandas()
+        if df.empty:
+            return set()
+        s = pd.to_datetime(df["trade_date"])
+        mask = (
+            s >= pd.to_datetime(start).normalize()
+        ) & (s <= pd.to_datetime(end).normalize())
+        return set(s[mask].dt.date)
