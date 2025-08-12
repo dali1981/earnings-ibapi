@@ -15,8 +15,10 @@ import pandas as pd
 from datetime import date
 import pathlib, datetime
 
-def _dataset_hive(path: str):
-    return ds.dataset(path, format="parquet", partitioning="hive")
+from ._util import _write_empty_dataset
+
+def _dataset_hive(path: str, schema: pa.Schema | None = None):
+    return ds.dataset(path, format="parquet", partitioning="hive", schema=schema)
 
 def _build_filter(**kwargs):
     """
@@ -51,8 +53,8 @@ import pandas as pd
 from datetime import date
 import pathlib, datetime
 
-def _dataset_hive(path: str):
-    return ds.dataset(path, format="parquet", partitioning="hive")
+def _dataset_hive(path: str, schema: pa.Schema | None = None):
+    return ds.dataset(path, format="parquet", partitioning="hive", schema=schema)
 
 def _build_filter(**kwargs):
     """
@@ -200,6 +202,8 @@ class OptionBarRepository:
             pa.field('bar_count', pa.int64()).with_nullable(True),
             pa.field('what_to_show', pa.string()).with_nullable(True),
         ])
+        if not any(self.base_path.rglob("*.parquet")):
+            _write_empty_dataset(self.base_path, self.schema)
 
     @staticmethod
     def _norm_expiry(expiry: Union[str, date]) -> str:
@@ -283,7 +287,7 @@ class OptionBarRepository:
             path = path / f'right={right}'
         # If the path doesn't exist yet, fall back to the base dataset
         ds_path = str(path if path.exists() else self.base_path)
-        dataset = _dataset_hive(ds_path)
+        dataset = _dataset_hive(ds_path, self.schema)
         table = dataset.to_table()
         df = table.to_pandas()
 
@@ -337,7 +341,7 @@ class OptionBarRepository:
             "strike": float(strike),
             "bar_size": bar_size,
         }
-        dataset = _dataset_hive(str(self.base_path))
+        dataset = _dataset_hive(str(self.base_path), self.schema)
         table = dataset.to_table(columns=["trade_date", "underlying", "expiry", "right", "strike", "bar_size"])
         df = table.to_pandas()
         if df.empty:

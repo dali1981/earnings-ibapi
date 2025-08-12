@@ -23,6 +23,14 @@ def test_equity_present_dates(tmp_path):
     assert present == {date(2023, 1, 1), date(2023, 1, 2)}
 
 
+def test_equity_present_dates_empty(tmp_path):
+    repo = EquityBarRepository(tmp_path)
+    present = repo.present_dates(
+        "AAPL", "1 day", pd.Timestamp("2023-01-01"), pd.Timestamp("2023-01-03")
+    )
+    assert present == set()
+
+
 def test_option_present_dates(tmp_path):
     repo = OptionBarRepository(tmp_path)
     meta = OptionMeta(
@@ -53,3 +61,17 @@ def test_option_present_dates(tmp_path):
         pd.Timestamp("2023-01-03"),
     )
     assert present == {date(2023, 1, 1), date(2023, 1, 2)}
+
+
+def test_option_present_dates_empty(tmp_path):
+    repo = OptionBarRepository(tmp_path)
+    present = repo.present_dates_for_contract(
+        "AAPL",
+        date(2023, 1, 20),
+        "C",
+        100.0,
+        "1 day",
+        pd.Timestamp("2023-01-01"),
+        pd.Timestamp("2023-01-03"),
+    )
+    assert present == set()

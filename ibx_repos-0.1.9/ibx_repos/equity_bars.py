@@ -11,8 +11,10 @@ import pyarrow.dataset as ds
 import pandas as pd
 from datetime import date, datetime
 
-def _dataset_hive(path: str):
-    return ds.dataset(path, format="parquet", partitioning="hive")
+from ._util import _write_empty_dataset
+
+def _dataset_hive(path: str, schema: pa.Schema | None = None):
+    return ds.dataset(path, format="parquet", partitioning="hive", schema=schema)
 
 def _build_filter(**kwargs):
     """
@@ -153,6 +155,8 @@ class EquityBarRepository:
             pa.field('bar_count', pa.int64()).with_nullable(True),
             pa.field('what_to_show', pa.string()).with_nullable(True),
         ])
+        if not any(self.base_path.rglob("*.parquet")):
+            _write_empty_dataset(self.base_path, self.schema)
 
     def _normalize(self, df: pd.DataFrame, symbol: str, bar_size: str, what_to_show: Optional[str]) -> pd.DataFrame:
         out = df.copy()
@@ -210,7 +214,7 @@ class EquityBarRepository:
         )
 
     def load(self, symbol: Optional[str] = None, trade_date: Optional[Union[str,date]] = None) -> pd.DataFrame:
-        dataset = _dataset_hive(str(self.base_path))
+        dataset = _dataset_hive(str(self.base_path), self.schema)
         expr = _build_filter(symbol=symbol)
         table = dataset.to_table(filter=expr)
         df = table.to_pandas()
@@ -231,7 +235,7 @@ class EquityBarRepository:
         end: pd.Timestamp,
     ) -> Set[date]:
         """Return set of trade dates already stored for the window."""
-        dataset = _dataset_hive(str(self.base_path))
+        dataset = _dataset_hive(str(self.base_path), self.schema)
         expr = _build_filter(symbol=symbol, bar_size=bar_size)
         table = dataset.to_table(columns=["trade_date"], filter=expr)
         df = table.to_pandas()
