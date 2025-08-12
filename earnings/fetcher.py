@@ -13,6 +13,7 @@ Usage:
 """
 
 import json
+import os
 import requests
 import pandas as pd
 from datetime import datetime, date, timedelta
@@ -76,6 +77,22 @@ class EarningsEvent:
 
 
 class EarningsCalendarFetcher:
+    def _allowed_sources(self) -> list:
+        """Resolve allowed sources from env var EARNINGS_ALLOWED_SOURCES.
+
+        Defaults to NASDAQ-only. Accepts comma-separated names, e.g.
+        "nasdaq,fmp,finnhub". Unknown names are ignored.
+        """
+        raw = os.getenv("EARNINGS_ALLOWED_SOURCES", "nasdaq")
+        allowed = set(s.strip().lower() for s in raw.split(",") if s.strip())
+        mapping = {
+            "nasdaq": EarningsSource.NASDAQ,
+            "fmp": EarningsSource.FMP,
+            "finnhub": EarningsSource.FINNHUB,
+            "yahoo": EarningsSource.YAHOO,
+        }
+        return [mapping[k] for k in mapping.keys() if k in allowed]
+
     """Multi-source earnings calendar data fetcher."""
     
     def __init__(self, cache_dir: Path = Path("cache/earnings")):
@@ -122,6 +139,17 @@ class EarningsCalendarFetcher:
         # Default to NASDAQ-only unless explicit sources are provided
         if sources is None:
             sources = [EarningsSource.NASDAQ]
+
+        # Enforce allowed sources via env var
+        allowed = set(self._allowed_sources())
+        filtered = [s for s in sources if s in allowed]
+        disallowed = [s for s in sources if s not in allowed]
+        if disallowed:
+            logger.warning(
+                "Skipping disallowed sources: %s (allowed: %s)",
+                [s.value for s in disallowed], [s.value for s in allowed]
+            )
+        sources = filtered or [EarningsSource.NASDAQ]
         
         all_earnings = []
         successful_sources = []
