@@ -30,38 +30,25 @@ python -m earnings.discovery
 ```
 
 Expected output highlights:
-- Raw events stored under `data/earnings/collection_date=YYYY-MM-DD/source=nasdaq/...`
-- Discoveries exported to `data/exports/earnings_discoveries_YYYY-MM-DD.csv`
-🔍 EARNINGS DISCOVERY SYSTEM TEST
-============================================================
-
-✅ Found 1,122 total earnings events
-📊 229 candidates passed basic filters
-🎯 229 high-quality opportunities identified
-
-TOP OPPORTUNITIES:
- 1. HD     - 2025-08-19 (+7 days) - 100 pts - strangle
- 2. MDT    - 2025-08-19 (+7 days) - 100 pts - strangle
- 3. PANW   - 2025-08-18 (+6 days) - 100 pts - strangle
-
-💾 Opportunities exported to: data/exports/earnings_opportunities_2025-08-12.csv
-```
+- Raw events stored under `data/earnings/collection_date=YYYY-MM-DD/source=<provider>/earnings_*.parquet`
+- Earning-date CSV exported to `data/exports/earnings_discoveries_YYYY-MM-DD.csv`
 
 ### 2. Test Earnings Data Fetcher
 ```bash
 python -m earnings.fetcher
 ```
 
-### 3. Compare Data Sources
+### 3. Compare Data Sources (optional)
 ```bash
 python scripts/compare_earnings_sources.py
 ```
 
-## 📊 Understanding the Results (pure discovery)
+## 📊 Understanding the Results (pure collection)
 
 - CSV columns: `symbol`, `company_name`, `earnings_date`, `time`, `days_until`, `market_cap`, `eps_estimate`, `quality_score`, `discovery_date`, `source`.
 - Sorting: by `days_until` asc and `market_cap` desc.
-- Recent data: use `EarningsDiscoveryEngine.get_recent_discoveries(max_age_days=1)`
+- No filtering: everything collected is stored (parquet) and exported (CSV).
+- Recent data: use `EarningsDiscoveryEngine.get_recent_discoveries(max_age_days=1)`.
 
 ### (removed)
 - **100 pts**: Excellent opportunity, earnings within 7 days
@@ -113,11 +100,11 @@ Discovery automatically exports a daily CSV to `data/exports/earnings_discoverie
 
 ### View Exported CSV
 ```bash
-# Open exported opportunities
+# Open exported CSV
 open data/exports/earnings_discoveries_2025-08-12.csv
 
 # Or view in terminal
-head -10 data/exports/earnings_opportunities_2025-08-12.csv
+head -10 data/exports/earnings_discoveries_2025-08-12.csv
 ```
 
 CSV sample columns:

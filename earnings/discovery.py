@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-Pure Earnings Discovery System
+Earnings Discovery
 
-Discovers ALL upcoming earnings across the market and stores them for other
-systems to use. This module does NO trading analysis - just pure earnings
-data discovery, filtering, and storage.
+Discovers upcoming earnings across the market and stores them for other
+systems to use. This module focuses on earnings-date collection and storage
+only — no filtering is performed at this stage.
 
 Responsibilities:
 1. Discover ALL market earnings events
@@ -40,7 +40,7 @@ logger = get_logger(__name__)
 
 @dataclass
 class EarningsDiscovery:
-    """Pure earnings discovery data - no trading analysis."""
+    """Earnings discovery data."""
     symbol: str
     company_name: str
     earnings_date: date
@@ -64,11 +64,11 @@ class EarningsDiscovery:
 
 
 class EarningsDiscoveryEngine:
-    """Pure earnings discovery engine - finds and stores ALL market earnings."""
+    """Earnings discovery engine - finds and stores market earnings."""
     
     def __init__(self, config: dict = None):
         """
-        Initialize pure earnings discovery engine.
+        Initialize earnings discovery engine.
         
         Args:
             config: Configuration dictionary (uses DISCOVERY_CONFIG if None)
@@ -89,12 +89,12 @@ class EarningsDiscoveryEngine:
         self.discovery_min_days = self.config["discovery_min_days"]
         self.discovery_max_days = self.config["discovery_max_days"]
         
-        logger.info(f"📊 Initialized PURE earnings discovery engine:")
+        logger.info(f"📊 Initialized earnings discovery engine:")
         logger.info(f"   Market cap filter: ${self.min_market_cap/1e9:.1f}B - ${self.max_market_cap/1e12:.1f}T")
         logger.info(f"   Volume filter: {self.min_avg_volume/1e6:.1f}M+ shares")
         logger.info(f"   Price filter: ${self.min_price} - ${self.max_price}")
         logger.info(f"   Discovery window: {self.discovery_min_days}-{self.discovery_max_days} days")
-        logger.info(f"   NO TRADING ANALYSIS - Pure discovery only")
+        # Discovery-focused module
     
     def discover_and_store_earnings(self, 
                                   days_ahead: int = None,
@@ -119,11 +119,10 @@ class EarningsDiscoveryEngine:
             days_back = EARNINGS_CONFIG.get("default_days_back", 0)
             
         if days_back > 0:
-            logger.info(f"🔍 PURE EARNINGS DISCOVERY: {days_back} days back + {days_ahead} days ahead")
-            logger.info(f"📊 INCLUDES HISTORICAL DATA - No trading analysis")
+            logger.info(f"🔍 Earnings discovery: {days_back} days back + {days_ahead} days ahead")
+            logger.info(f"📊 Includes historical data")
         else:
-            logger.info(f"🔍 PURE EARNINGS DISCOVERY for next {days_ahead} days")
-            logger.info(f"📊 NO trading analysis - just discovery and storage")
+            logger.info(f"🔍 Earnings discovery for next {days_ahead} days")
         
         # Step 1: Get ALL earnings events (no symbol filter) including historical
         all_earnings = self.earnings_fetcher.get_earnings_range(
@@ -145,23 +144,25 @@ class EarningsDiscoveryEngine:
         )
         logger.info(f"💾 Stored {storage_result['total_events_stored']} raw earnings events")
         
-        # Step 3: Convert to discoveries and apply BASIC market filters only
-        discoveries = []
-        for event in all_earnings:
-            discovery = self._create_discovery_from_earnings(event)
-            if self._passes_market_filters(discovery):
-                discoveries.append(discovery)
+        # Step 3: Convert all events to earning-date records (no filtering here)
+        discoveries = [self._create_discovery_from_earnings(event) for event in all_earnings]
+        logger.info(f"📊 Prepared {len(discoveries)} earning-date records (no filtering applied)")
         
-        logger.info(f"📊 {len(discoveries)} discoveries passed basic market filters")
-        
-        # Step 4: Export discoveries for other systems to use
+        # Step 4: Export earning-date records for other systems to use
         export_file = self._export_discoveries(discoveries)
-        logger.info(f"💾 Exported {len(discoveries)} discoveries to {export_file}")
+        logger.info(f"💾 Exported {len(discoveries)} earning-date records to {export_file}")
+        
+        # Data lifecycle summary
+        today_str = date.today().isoformat()
+        raw_partition = EARNINGS_PATH / f"collection_date={today_str}"
+        logger.info("📦 Data lifecycle: raw parquet under %s/source=<provider>/earnings_*.parquet",
+                    raw_partition)
+        logger.info("🗂️  Data lifecycle: daily CSV export at %s", export_file)
         
         return discoveries
     
     def _create_discovery_from_earnings(self, event: EarningsEvent) -> EarningsDiscovery:
-        """Convert earnings event to pure discovery (no trading data)."""
+        """Convert earnings event to discovery record."""
         discovery = EarningsDiscovery(
             symbol=event.symbol,
             company_name=event.company_name,
@@ -182,7 +183,7 @@ class EarningsDiscoveryEngine:
         return discovery
     
     def _passes_market_filters(self, discovery: EarningsDiscovery) -> bool:
-        """Apply BASIC market filtering criteria (NO trading filters)."""
+        """Apply basic market filtering criteria."""
         
         # Timing filter (allow historical data with negative days)
         # For future earnings, apply min/max day constraints
@@ -227,7 +228,7 @@ class EarningsDiscoveryEngine:
         return True
     
     def _calculate_quality_score(self, discovery: EarningsDiscovery) -> float:
-        """Calculate basic data quality score (NO trading metrics)."""
+        """Calculate basic data quality score."""
         score = 0.0
         
         # Company name available
@@ -253,7 +254,7 @@ class EarningsDiscoveryEngine:
         return min(score, 100.0)
     
     def _export_discoveries(self, discoveries: List[EarningsDiscovery]) -> Path:
-        """Export pure discoveries to file for other systems to consume."""
+        """Export discoveries to file for other systems to consume."""
         
         output_file = EXPORTS_PATH / f"earnings_discoveries_{date.today().isoformat()}.csv"
         output_file.parent.mkdir(parents=True, exist_ok=True)
@@ -278,7 +279,7 @@ class EarningsDiscoveryEngine:
         df = df.sort_values(['days_until', 'market_cap'], ascending=[True, False], na_position='last')
         df.to_csv(output_file, index=False)
         
-        logger.info(f"💾 Exported {len(discoveries)} pure discoveries to {output_file}")
+        logger.info(f"💾 Exported {len(discoveries)} earning-date records to {output_file}")
         return output_file
     
     def get_recent_discoveries(self, max_age_days: int = 1) -> Optional[pd.DataFrame]:
@@ -320,21 +321,21 @@ class EarningsDiscoveryEngine:
 
 
 def main():
-    """Test the pure earnings discovery system."""
+    """Run earnings discovery end-to-end for a quick check."""
     from utils.logging_setup import setup_logging
     setup_logging()
     
-    print("🔍 PURE EARNINGS DISCOVERY SYSTEM TEST")
+    print("🔍 EARNINGS DATE COLLECTION")
     print("=" * 60)
-    print("📊 NO TRADING ANALYSIS - Discovery only")
+    
     
     engine = EarningsDiscoveryEngine()
     
-    # Discover earnings including historical data
+    # Collect earning dates (optionally including historical days_back)
     discoveries = engine.discover_and_store_earnings(days_ahead=21, days_back=7)
     
     if discoveries:
-        print(f"\n📊 Found {len(discoveries)} market discoveries:")
+        print(f"\n📊 Found {len(discoveries)} earning dates:")
         
         # Show top 10 by quality score
         sorted_discoveries = sorted(discoveries, key=lambda x: -x.quality_score)
@@ -351,14 +352,16 @@ def main():
             print(f"   Average market cap: ${avg_market_cap/1e9:.1f}B")
             print(f"   Companies with market cap data: {len(market_caps)}")
         
-        print(f"\n💾 Data stored and exported for other systems to use")
-        print(f"📊 Other systems can now analyze these {len(discoveries)} discoveries")
+        print(f"\n💾 Data stored:")
+        print(f"   • Raw parquet: {EARNINGS_PATH}/collection_date={date.today().isoformat()}/source=<provider>/earnings_*.parquet")
+        print(f"   • Daily CSV:   {EXPORTS_PATH}/earnings_discoveries_{date.today().isoformat()}.csv")
+        print(f"📊 Other systems can consume the daily CSV or query parquet directly")
                 
     else:
-        print("❌ No discoveries found")
+        print("❌ No earning dates found")
         print("💡 This could be due to:")
-        print("   • Missing earnings API keys")
         print("   • No earnings in the specified timeframe")
+        print("   • Temporary NASDAQ API issues or connectivity")
         print("   • Market filters too restrictive")
 
 

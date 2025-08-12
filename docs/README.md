@@ -60,9 +60,9 @@ earnings_ibapi/
 ## 🔍 Core Components
 
 ### 1. Earnings Discovery (`earnings/discovery.py`)
-- **Market-wide scanning**: Discovers earnings events (no fixed portfolios)
-- **Basic filtering**: Market cap, timing, symbol hygiene
-- **Exports**: Daily CSV of discoveries for downstream consumers
+- **Market-wide scanning**: Collects earnings dates (no fixed portfolios)
+- **No filtering at this stage**: All collected events are stored and exported
+- **Exports**: Daily CSV of earning-date records for downstream consumers
 
 ### 2. Configurable Sources (Opt-in) Fetcher (`earnings/fetcher.py`)
 - **Default**: NASDAQ-only (no API keys required)
@@ -74,24 +74,24 @@ earnings_ibapi/
 - **Analyzer**: `trading/strategy_analyzer.py` (not required for discovery)
 - **Pipelines**: Deferred until trading is enabled
 
-## 🎯 Recent Discovery Results
+## 🎯 Recent Earnings-Date Results
 
 ```
 🔍 EARNINGS DISCOVERY SYSTEM TEST
 ============================================================
 
 ✅ Collected 2,800+ raw events (NASDAQ)
-📊 1,000+ discoveries after basic market filters
+📊 1,000+ earning-date records after basic market filters
 💾 Exported to data/exports/earnings_discoveries_YYYY-MM-DD.csv
 ```
 
-## 📦 What Happens to Discovered Earnings
+## 📦 Earnings-Date Data Lifecycle
 
 - **Raw Storage**: Parquet under `data/earnings/collection_date=YYYY-MM-DD/source=nasdaq/earnings_HHMMSS.parquet`.
-- **Deduplication & Filtering**: De-dup by symbol+date; apply market filters (market cap, timing, symbol hygiene).
-- **Exports**: CSV at `data/exports/earnings_discoveries_YYYY-MM-DD.csv` sorted by `days_until` and `market_cap`.
-- **Accessing Discoveries**: `EarningsDiscoveryEngine.get_recent_discoveries(max_age_days=1)` returns the latest as DataFrame.
-- **Downstream Use**: Trading analysis is optional and can consume these later.
+- **Deduplication only**: De-dup by `symbol+earnings_date`; no market filtering at this layer.
+- **Daily Export**: CSV at `data/exports/earnings_discoveries_YYYY-MM-DD.csv` sorted by `days_until` (asc) and `market_cap` (desc).
+- **Programmatic Access**: `EarningsDiscoveryEngine.get_recent_discoveries(max_age_days=1)` returns the latest as a DataFrame.
+- **Downstream Use**: Other systems can consume the daily CSV or query raw parquet directly; any filtering/analysis happens later.
 
 ## 📚 Documentation
 
