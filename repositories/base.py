@@ -51,6 +51,24 @@ except ImportError:
             return func
         return decorator
 
+# Import lineage tracking components
+try:
+    from lineage.decorators import track_repository_operation
+    from lineage.core import OperationType
+    LINEAGE_AVAILABLE = True
+except ImportError:
+    # Fallback when lineage not available
+    def track_repository_operation(operation_type):
+        def decorator(func):
+            return func
+        return decorator
+    
+    class OperationType:
+        READ = "read"
+        WRITE = "write"
+    
+    LINEAGE_AVAILABLE = False
+
 
 class BaseRepository(ABC):
     """
@@ -244,6 +262,7 @@ class BaseRepository(ABC):
         return df
     
     @performance_log("repository_save")
+    @track_repository_operation(OperationType.WRITE)
     def save(self, df: pd.DataFrame, **kwargs) -> None:
         """
         Save DataFrame to Parquet dataset with proper partitioning.
@@ -315,6 +334,7 @@ class BaseRepository(ABC):
                     )
     
     @performance_log("repository_load")
+    @track_repository_operation(OperationType.READ)
     def load(self, **kwargs) -> pd.DataFrame:
         """
         Load data from Parquet dataset with filtering.
