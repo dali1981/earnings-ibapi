@@ -32,6 +32,7 @@ import pyarrow.parquet as pq
 from ibapi.client import EClient
 from ibapi.wrapper import EWrapper
 from ibapi.contract import Contract
+from ibx_time import ib_end_datetime
 from ibapi.utils import iswrapper
 
 # ————————————————————————————————————————————————————————————————
@@ -242,7 +243,8 @@ class EarningsStreamer:
 
     def _submit_all(self):
         stk = self._stk()
-        end = (self.earnings_date + dt.timedelta(days=self.days_after)).strftime("%Y%m%d %H:%M:%S")
+        end_dt = dt.datetime.combine(self.earnings_date + dt.timedelta(days=self.days_after), dt.time(0,0,0))
+        end = ib_end_datetime(end_dt, tz="UTC", hyphen=True)
         rid = self
 
 if __name__ == "__main__":

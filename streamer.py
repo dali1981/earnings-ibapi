@@ -13,6 +13,7 @@ from request_sequencer import RequestSequencer
 from response_sequencer import ResponseSequencer
 from sink import Sink, EquityBarSink
 from utils import RateLimiter, make_stock, make_option
+from ibx_time import ib_end_datetime
 from config import IB_HOST, IB_PORT, IB_CLIENT_IDS, DATA_ROOT
 
 
@@ -99,7 +100,8 @@ class EarningsStreamer:
     def send_minute_bars(self, _first_id: int):
         stk = make_stock(self.cfg.symbol)
         rid = self.sequencer.next("earn1m")
-        end = f"{self.cfg.date:%Y%m%d} 23:59:59"
+        end_dt = dt.datetime.combine(self.cfg.date, dt.time(23,59,59))
+        end = ib_end_datetime(end_dt, tz="UTC", hyphen=True)
         self._client.reqHistoricalData(rid, stk, end, "1 D", "1 min", "TRADES", 0, 1, False, [])
 
     def send_secdef_pre(self, _first_id: int):
@@ -126,13 +128,14 @@ class EarningsStreamer:
         stk = make_stock(self.cfg.symbol)
         # daily bars
         rid = self.sequencer.next("daily");
-        end = (self.cfg.date + dt.timedelta(days=self.cfg.days_after)).strftime("%Y%m%d %H:%M:%S")
+        end_dt = dt.datetime.combine(self.cfg.date + dt.timedelta(days=self.cfg.days_after), dt.time(0,0,0))
+        end = ib_end_datetime(end_dt, tz="UTC", hyphen=True)
         dur = f"{self.cfg.days_before + self.cfg.days_after} D"
         self._client.reqHistoricalData(rid, stk, end, dur, "1 day", "TRADES", 0, 1, False, [])
         # minute bars earnings day
         rid = self.sequencer.next("earn1m");
-        self._client.reqHistoricalData(rid, stk, f"{self.cfg.date:%Y%m%d} 23:59:59", "1 D", "1 min", "TRADES", 0, 1, False,
-                                  [])
+        end_intraday = ib_end_datetime(dt.datetime.combine(self.cfg.date, dt.time(23,59,59)), tz="UTC", hyphen=True)
+        self._client.reqHistoricalData(rid, stk, end_intraday, "1 D", "1 min", "TRADES", 0, 1, False, [])
         # option secdef pre / post
         for off, tag in [(-1, "pre"), (1, "post")]:
             rid = self.sequencer.next(f"secdef_{tag}");
@@ -199,7 +202,7 @@ class EarningsStreamer:
         # Register callback and metadata
         self._resp.add(req_id, callback, meta)
         # Format end datetime string
-        end_str = end_datetime.strftime('%Y%m%d-%H:%M:%S') if end_datetime else ''
+        end_str = ib_end_datetime(end_datetime, tz='UTC', hyphen=True) if end_datetime else ''
         # Issue the IB request
         self._client.reqHistoricalData(
             req_id,

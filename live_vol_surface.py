@@ -18,6 +18,7 @@ from request_sequencer import RequestSequencer
 from ib_client import IBClient
 from sink import Sink
 from utils import RateLimiter, make_option, make_stock
+from ibx_time import ib_end_datetime
 
 
 def parse_args() -> argparse.Namespace:
@@ -56,7 +57,7 @@ def main():
     def on_ready(_first_id: int):
         # 1) Fetch underlying historical prices for last month (for realized vol)
         stock_contract: Contract = make_stock(args.symbol)
-        end_ts = dt.datetime.now().strftime("%Y%m%d %H:%M:%S")
+        end_ts = ib_end_datetime(dt.datetime.now(dt.timezone.utc))
         rid_hist = sequencer.next("hist_underlying")
         client.reqHistoricalData(
             rid_hist,
