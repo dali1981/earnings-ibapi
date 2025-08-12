@@ -71,8 +71,8 @@ EARNINGS_CONFIG = {
     "max_days_ahead": 60,              # Maximum lookahead window
     "collection_hour": 6,              # Daily collection time (6 AM)
     
-    # Data sources (in priority order)
-    "data_sources": ["nasdaq", "fmp", "finnhub"],
+    # Data sources (in priority order) — NASDAQ only per project choice
+    "data_sources": ["nasdaq"],
     "primary_source": "nasdaq",        # Free, reliable source
     
     # Data retention

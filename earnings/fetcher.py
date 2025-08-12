@@ -1,15 +1,11 @@
 #!/usr/bin/env python3
 """
-Earnings Calendar Data Fetcher
+Earnings Calendar Data Fetcher (NASDAQ-only)
 
-Multi-source earnings data fetcher with fallback mechanisms for robust
-earnings calendar data acquisition from free APIs.
-
-Supported sources:
-1. Financial Modeling Prep (FMP) - Primary
-2. Finnhub - Secondary  
-3. NASDAQ API - Fallback
-4. Yahoo Finance scraping - Emergency fallback
+This repository is configured to fetch earnings exclusively from the
+NASDAQ API for reliability and consistency. Hooks for other sources
+remain in code for future use, but the default execution path only
+queries NASDAQ unless specific sources are explicitly provided.
 
 Usage:
     fetcher = EarningsCalendarFetcher()
@@ -123,8 +119,9 @@ class EarningsCalendarFetcher:
             List of earnings events from (today - days_back) to (today + days_ahead)
         """
         
+        # Default to NASDAQ-only unless explicit sources are provided
         if sources is None:
-            sources = [EarningsSource.FMP, EarningsSource.FINNHUB, EarningsSource.NASDAQ]
+            sources = [EarningsSource.NASDAQ]
         
         all_earnings = []
         successful_sources = []
@@ -180,7 +177,7 @@ class EarningsCalendarFetcher:
             symbols=symbols,
             days_back=0,
             days_ahead=days_ahead,
-            sources=sources
+            sources=sources or [EarningsSource.NASDAQ]
         )
     
     def get_historical_earnings(self,
@@ -193,7 +190,7 @@ class EarningsCalendarFetcher:
             symbols=symbols,
             days_back=days_back,
             days_ahead=0,
-            sources=sources
+            sources=sources or [EarningsSource.NASDAQ]
         )
 
     def _get_upcoming_earnings_legacy(self, 
