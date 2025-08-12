@@ -10,6 +10,8 @@ from typing import Iterable, List, Optional, Sequence, Set, Dict, Any, Callable
 
 import pandas as pd
 
+from config import IB_HOST, IB_PORT, IB_CLIENT_IDS, CONTRACTS_PATH
+
 # --- ibx runtime/services (kept as-is to match your project layout) ---
 try:
     from ibx import IBRuntime, ContractDetailsService
@@ -32,9 +34,9 @@ log = logging.getLogger("contracts_backfill")
 @dataclass
 class BackfillConfig:
     # IB connection
-    host: str = "127.0.0.1"
-    port: int = 7497
-    client_id: int = 1
+    host: str = IB_HOST
+    port: int = IB_PORT
+    client_id: int = IB_CLIENT_IDS["contracts_backfill"]
 
     # Filters
     exchanges: Sequence[str] = field(default_factory=lambda: ["NYSE", "NASDAQ", "ARCA", "BATS", "ISLAND", "SMART"])
@@ -51,7 +53,7 @@ class BackfillConfig:
     timeout_sec: float = 20.0
 
     # Storage
-    out_path: str = "data/contracts"  # hive-partitioned parquet dataset
+    out_path: str = str(CONTRACTS_PATH)  # hive-partitioned parquet dataset
 
     def normalized(self) -> "BackfillConfig":
         # ensure upper-case filters

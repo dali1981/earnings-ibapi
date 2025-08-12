@@ -5,7 +5,18 @@ from pathlib import Path
 # --- IB Connection ---
 IB_HOST = "127.0.0.1"
 IB_PORT = 4002  # Paper trading port
-IB_CLIENT_ID = 77
+
+# Dedicated client IDs for different jobs/examples
+IB_CLIENT_IDS = {
+    "default": 77,
+    "streamer": 17,
+    "contract_details_backfill": 8,
+    "ib_source": 101,
+    "contracts_backfill": 1,
+}
+
+# Fallback client id
+IB_CLIENT_ID = IB_CLIENT_IDS["default"]
 
 # --- Data Paths ---
 DATA_ROOT = Path("data")
