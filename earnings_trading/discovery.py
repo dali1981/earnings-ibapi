@@ -21,6 +21,11 @@ from typing import Dict, List, Optional, Set, Tuple, Any
 from dataclasses import dataclass, asdict
 from enum import Enum
 
+# Import configuration first
+import sys
+sys.path.append(str(Path(__file__).parent.parent))
+from config import DISCOVERY_CONFIG, EARNINGS_CONFIG, EARNINGS_PATH
+
 # Import our earnings fetcher
 from earnings.fetcher import EarningsCalendarFetcher, EarningsEvent
 
@@ -90,40 +95,78 @@ class EarningsCandidate:
 class EarningsDiscoveryEngine:
     """Discovers and analyzes ALL market earnings for options trading opportunities."""
     
-    def __init__(self, data_path: Path = Path("data")):
-        self.data_path = data_path
+    def __init__(self, data_path: Path = None, config: dict = None):
+        """
+        Initialize earnings discovery engine with configurable settings.
+        
+        Args:
+            data_path: Path for data exports (uses config default if None)
+            config: Configuration dictionary (uses DISCOVERY_CONFIG if None)
+        """
+        
+        # Use configured paths and settings
+        self.data_path = data_path or EARNINGS_PATH.parent
+        self.config = config or DISCOVERY_CONFIG
         self.earnings_fetcher = EarningsCalendarFetcher()
         
-        # Filtering criteria for options trading
-        self.min_market_cap = 1e9      # $1B minimum market cap
-        self.min_avg_volume = 1e6      # 1M shares average volume
-        self.min_price = 10.0          # $10 minimum price
-        self.max_price = 1000.0        # $1000 maximum price
+        # Load filtering criteria from configuration
+        self.min_market_cap = self.config["min_market_cap"]
+        self.max_market_cap = self.config["max_market_cap"]
+        self.min_avg_volume = self.config["min_avg_volume"]
+        self.min_price = self.config["min_price"]
+        self.max_price = self.config["max_price"]
         
-        # Options requirements
-        self.require_weekly_options = True
-        self.require_liquid_options = True
-        self.min_iv_rank = 20          # Minimum IV rank for trades
+        # Options requirements from config
+        self.require_weekly_options = self.config["require_weekly_options"]
+        self.require_liquid_options = self.config["require_liquid_options"]
+        self.min_iv_rank = self.config["min_iv_rank"]
         
-        # Timing windows
-        self.min_days_ahead = 1        # At least 1 day ahead
-        self.max_days_ahead = 60       # Within 2 months (flexible)
+        # Timing windows from config
+        self.min_days_ahead = self.config["discovery_min_days"]
+        self.max_days_ahead = self.config["discovery_max_days"]
+        self.strategy_optimal_start = self.config["strategy_optimal_start"]
+        self.strategy_optimal_end = self.config["strategy_optimal_end"]
         
-        logger.info(f"📊 Initialized earnings discovery engine with filters:")
-        logger.info(f"   Market cap: ${self.min_market_cap/1e9:.1f}B+")
+        # Scoring weights from config
+        self.timing_weights = self.config["timing_weights"]
+        self.strategy_multipliers = self.config["strategy_multipliers"]
+        
+        # Quality thresholds from config
+        self.min_opportunity_score = self.config["min_opportunity_score"]
+        self.excellent_threshold = self.config["excellent_threshold"]
+        self.good_threshold = self.config["good_threshold"]
+        
+        logger.info(f"📊 Initialized earnings discovery engine with CONFIGURED filters:")
+        logger.info(f"   Market cap: ${self.min_market_cap/1e9:.1f}B - ${self.max_market_cap/1e12:.1f}T")
         logger.info(f"   Volume: {self.min_avg_volume/1e6:.1f}M+ shares")
         logger.info(f"   Price range: ${self.min_price} - ${self.max_price}")
-        logger.info(f"   Time window: {self.min_days_ahead}-{self.max_days_ahead} days")
+        logger.info(f"   Discovery window: {self.min_days_ahead}-{self.max_days_ahead} days")
+        logger.info(f"   Strategy optimal: {self.strategy_optimal_start}-{self.strategy_optimal_end} days")
+        logger.info(f"   Min opportunity score: {self.min_opportunity_score}")
+        logger.info(f"   Weekly options required: {self.require_weekly_options}")
+        logger.info(f"   Liquid options required: {self.require_liquid_options}")
     
     def discover_earnings_opportunities(self, 
-                                      days_ahead: int = 21,
-                                      min_score: float = 50.0) -> List[EarningsCandidate]:
+                                      days_ahead: int = None,
+                                      min_score: float = None) -> List[EarningsCandidate]:
         """
         Discover ALL earnings in the market and filter for options trading opportunities.
         
         This is the main entry point that replaces fixed portfolio management.
+        
+        Args:
+            days_ahead: Number of days ahead to search (uses config default if None)
+            min_score: Minimum opportunity score (uses config default if None)
         """
+        
+        # Use configured defaults if not provided
+        if days_ahead is None:
+            days_ahead = EARNINGS_CONFIG["default_days_ahead"]
+        if min_score is None:
+            min_score = self.min_opportunity_score
+            
         logger.info(f"🔍 Discovering ALL market earnings for next {days_ahead} days")
+        logger.info(f"🎯 Using minimum opportunity score: {min_score}")
         
         # Step 1: Get ALL earnings events (no symbol filter)
         all_earnings = self.earnings_fetcher.get_upcoming_earnings(
@@ -190,6 +233,8 @@ class EarningsDiscoveryEngine:
         if hasattr(candidate, 'market_cap') and candidate.market_cap:
             if candidate.market_cap < self.min_market_cap:
                 return False
+            if candidate.market_cap > self.max_market_cap:
+                return False  # Exclude mega caps (low volatility)
         
         # Basic symbol validation for options trading
         symbol = candidate.symbol
@@ -206,16 +251,11 @@ class EarningsDiscoveryEngine:
         if len(symbol) <= 1:
             return False
         
-        # Basic price filter (if we had price data)
-        # For now, use market cap as a proxy for reasonable price range
+        # Additional market cap validation for penny stocks
         if hasattr(candidate, 'market_cap') and candidate.market_cap:
             # Very small market cap likely means penny stock
-            if candidate.market_cap < 100e6:  # $100M minimum
+            if candidate.market_cap < 100e6:  # $100M absolute minimum
                 return False
-            # Very large market cap might have low volatility  
-            if candidate.market_cap > 2000e9:  # $2T maximum (AAPL, MSFT level)
-                # Still include mega caps, but note they might be less volatile
-                pass
         
         return True
     
@@ -231,48 +271,54 @@ class EarningsDiscoveryEngine:
         candidate.strangle_score = timing_score * self._strangle_multiplier(candidate)
     
     def _calculate_timing_score(self, candidate: EarningsCandidate) -> float:
-        """Calculate base score based on earnings timing."""
+        """Calculate base score based on earnings timing using configured weights."""
         days = candidate.days_until_earnings
         
-        # Optimal timing is 7-14 days for most strategies
-        if 7 <= days <= 14:
-            return 100.0
+        # Use configured optimal timing windows
+        if self.strategy_optimal_start <= days <= self.strategy_optimal_end:
+            return self.timing_weights["optimal"]  # Default: 100.0
         elif 3 <= days <= 21:
-            return 80.0
+            return self.timing_weights["good"]     # Default: 80.0
         elif 1 <= days <= 3:
-            return 60.0  # Less time to set up
+            return self.timing_weights["fair"]     # Default: 60.0 - Less time to set up
         else:
-            return 40.0
+            return self.timing_weights["poor"]     # Default: 40.0
     
     def _calendar_multiplier(self, candidate: EarningsCandidate) -> float:
-        """Calendar spread suitability multiplier."""
-        # Calendar spreads work best with time decay
-        if candidate.days_until_earnings >= 14:
-            return 1.0
-        elif candidate.days_until_earnings >= 7:
-            return 0.8
+        """Calendar spread suitability multiplier using configured values."""
+        days = candidate.days_until_earnings
+        multipliers = self.strategy_multipliers["calendar_spread"]
+        
+        if days >= 14:
+            return multipliers["14_plus_days"]     # Default: 1.0
+        elif days >= 7:
+            return multipliers["7_to_14_days"]     # Default: 0.8
         else:
-            return 0.5  # Too close for effective calendar
+            return multipliers["under_7_days"]     # Default: 0.5 - Too close for effective calendar
     
     def _straddle_multiplier(self, candidate: EarningsCandidate) -> float:
-        """Straddle suitability multiplier."""
-        # Straddles work best close to earnings for volatility expansion
-        if candidate.days_until_earnings <= 5:
-            return 1.0
-        elif candidate.days_until_earnings <= 10:
-            return 0.9
+        """Straddle suitability multiplier using configured values."""
+        days = candidate.days_until_earnings
+        multipliers = self.strategy_multipliers["straddle"]
+        
+        if days <= 5:
+            return multipliers["under_5_days"]     # Default: 1.0
+        elif days <= 10:
+            return multipliers["5_to_10_days"]     # Default: 0.9
         else:
-            return 0.7
+            return multipliers["over_10_days"]     # Default: 0.7
     
     def _strangle_multiplier(self, candidate: EarningsCandidate) -> float:
-        """Strangle suitability multiplier."""
-        # Strangles similar to straddles but slightly more forgiving on timing
-        if candidate.days_until_earnings <= 7:
-            return 1.0
-        elif candidate.days_until_earnings <= 14:
-            return 0.8
+        """Strangle suitability multiplier using configured values."""
+        days = candidate.days_until_earnings
+        multipliers = self.strategy_multipliers["strangle"]
+        
+        if days <= 7:
+            return multipliers["under_7_days"]     # Default: 1.0
+        elif days <= 14:
+            return multipliers["7_to_14_days"]     # Default: 0.8
         else:
-            return 0.6
+            return multipliers["over_14_days"]     # Default: 0.6
     
     def export_opportunities(self, 
                            candidates: List[EarningsCandidate],
@@ -280,7 +326,8 @@ class EarningsDiscoveryEngine:
         """Export trading opportunities to file."""
         
         if output_file is None:
-            output_file = self.data_path / "exports" / f"earnings_opportunities_{date.today().isoformat()}.csv"
+            from config import EXPORTS_PATH
+            output_file = EXPORTS_PATH / f"earnings_opportunities_{date.today().isoformat()}.csv"
         
         output_file.parent.mkdir(parents=True, exist_ok=True)
         

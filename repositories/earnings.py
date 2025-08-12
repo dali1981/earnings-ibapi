@@ -27,11 +27,15 @@ import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent))
 
+# Import configuration first
+from config import EARNINGS_PATH, EARNINGS_CONFIG
+from utils.logging_setup import get_logger
+
 from repositories.base import BaseRepository
 from earnings.fetcher import EarningsEvent
 from lineage.decorators import track_lineage
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 @dataclass
@@ -50,7 +54,21 @@ class EarningsStorageMetadata:
 class EarningsRepository(BaseRepository):
     """Repository for persistent earnings calendar data storage."""
     
-    def __init__(self, data_path: Path = Path("data")):
+    def __init__(self, data_path: Path = None):
+        """
+        Initialize earnings repository with configured paths and settings.
+        
+        Args:
+            data_path: Base data path (uses configured EARNINGS_PATH if None)
+        """
+        
+        # Use configured path if not provided
+        if data_path is None:
+            data_path = EARNINGS_PATH.parent
+            logger.info(f"📁 Using configured earnings path: {EARNINGS_PATH}")
+        else:
+            logger.info(f"📁 Using provided data path: {data_path}")
+            
         super().__init__(data_path, "earnings")
         self.data_path = self.dataset_path  # Use the dataset path from BaseRepository
         self.data_path.mkdir(parents=True, exist_ok=True)
@@ -58,10 +76,13 @@ class EarningsRepository(BaseRepository):
         # Partitioning strategy: collection_date=YYYY-MM-DD/source=nasdaq/
         self.partition_cols = ['collection_date', 'source']
         
-        # Retention policy (days to keep data)
-        self.retention_days = 365  # Keep 1 year of historical data
+        # Use configured retention policy
+        self.retention_days = EARNINGS_CONFIG.get("retention_days", 365)
         
-        logger.info(f"📊 Initialized earnings repository at {data_path}")
+        logger.info(f"📊 Initialized earnings repository with CONFIGURED settings:")
+        logger.info(f"   Data path: {self.data_path}")
+        logger.info(f"   Retention: {self.retention_days} days")
+        logger.info(f"   Partitioning: {self.partition_cols}")
     
     def _create_schema(self) -> pa.Schema:
         """Create PyArrow schema for earnings data."""
