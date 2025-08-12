@@ -97,14 +97,16 @@ class EarningsDiscoveryEngine:
         logger.info(f"   NO TRADING ANALYSIS - Pure discovery only")
     
     def discover_and_store_earnings(self, 
-                                  days_ahead: int = None) -> List[EarningsDiscovery]:
+                                  days_ahead: int = None,
+                                  days_back: int = None) -> List[EarningsDiscovery]:
         """
-        Discover ALL earnings in the market, filter, and store them.
+        Discover ALL earnings in the market (including historical), filter, and store them.
         
         This is the main entry point for pure earnings discovery.
         
         Args:
             days_ahead: Number of days ahead to search (uses config default if None)
+            days_back: Number of days back to search for historical data (default: 0)
             
         Returns:
             List of discovered earnings (no trading analysis)
@@ -113,13 +115,20 @@ class EarningsDiscoveryEngine:
         # Use configured defaults if not provided
         if days_ahead is None:
             days_ahead = EARNINGS_CONFIG["default_days_ahead"]
+        if days_back is None:
+            days_back = EARNINGS_CONFIG.get("default_days_back", 0)
             
-        logger.info(f"🔍 PURE EARNINGS DISCOVERY for next {days_ahead} days")
-        logger.info(f"📊 NO trading analysis - just discovery and storage")
+        if days_back > 0:
+            logger.info(f"🔍 PURE EARNINGS DISCOVERY: {days_back} days back + {days_ahead} days ahead")
+            logger.info(f"📊 INCLUDES HISTORICAL DATA - No trading analysis")
+        else:
+            logger.info(f"🔍 PURE EARNINGS DISCOVERY for next {days_ahead} days")
+            logger.info(f"📊 NO trading analysis - just discovery and storage")
         
-        # Step 1: Get ALL earnings events (no symbol filter)
-        all_earnings = self.earnings_fetcher.get_upcoming_earnings(
+        # Step 1: Get ALL earnings events (no symbol filter) including historical
+        all_earnings = self.earnings_fetcher.get_earnings_range(
             symbols=None,  # No filter - get everything
+            days_back=days_back,
             days_ahead=days_ahead
         )
         
@@ -175,11 +184,18 @@ class EarningsDiscoveryEngine:
     def _passes_market_filters(self, discovery: EarningsDiscovery) -> bool:
         """Apply BASIC market filtering criteria (NO trading filters)."""
         
-        # Timing filter
-        if discovery.days_until_earnings < self.discovery_min_days:
-            return False
-        if discovery.days_until_earnings > self.discovery_max_days:
-            return False
+        # Timing filter (allow historical data with negative days)
+        # For future earnings, apply min/max day constraints
+        if discovery.days_until_earnings > 0:
+            if discovery.days_until_earnings < self.discovery_min_days:
+                return False
+            if discovery.days_until_earnings > self.discovery_max_days:
+                return False
+        # For historical earnings (negative days), allow reasonable lookback
+        elif discovery.days_until_earnings < 0:
+            # Allow up to 30 days of historical data
+            if abs(discovery.days_until_earnings) > 30:
+                return False
         
         # Market cap filter (if available from NASDAQ data)
         if hasattr(discovery, 'market_cap') and discovery.market_cap:
@@ -259,7 +275,7 @@ class EarningsDiscoveryEngine:
             })
         
         df = pd.DataFrame(data)
-        df = df.sort_values(['days_until', 'market_cap'], ascending=[True, False])
+        df = df.sort_values(['days_until', 'market_cap'], ascending=[True, False], na_position='last')
         df.to_csv(output_file, index=False)
         
         logger.info(f"💾 Exported {len(discoveries)} pure discoveries to {output_file}")
@@ -314,8 +330,8 @@ def main():
     
     engine = EarningsDiscoveryEngine()
     
-    # Discover earnings
-    discoveries = engine.discover_and_store_earnings(days_ahead=21)
+    # Discover earnings including historical data
+    discoveries = engine.discover_and_store_earnings(days_ahead=21, days_back=7)
     
     if discoveries:
         print(f"\n📊 Found {len(discoveries)} market discoveries:")

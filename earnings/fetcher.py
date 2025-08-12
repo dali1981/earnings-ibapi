@@ -105,11 +105,102 @@ class EarningsCalendarFetcher:
             'User-Agent': 'Trading-Data-System/1.0'
         })
         
+    def get_earnings_range(self,
+                          symbols: Optional[List[str]] = None,
+                          days_back: int = 0,
+                          days_ahead: int = 30,
+                          sources: List[EarningsSource] = None) -> List[EarningsEvent]:
+        """
+        Get earnings events for a date range including past and future dates.
+        
+        Args:
+            symbols: Optional list of symbols to filter
+            days_back: Number of days back to look for historical earnings
+            days_ahead: Number of days ahead to look for upcoming earnings
+            sources: List of data sources to use
+            
+        Returns:
+            List of earnings events from (today - days_back) to (today + days_ahead)
+        """
+        
+        if sources is None:
+            sources = [EarningsSource.FMP, EarningsSource.FINNHUB, EarningsSource.NASDAQ]
+        
+        all_earnings = []
+        successful_sources = []
+        
+        # Calculate date range
+        start_date = date.today() - timedelta(days=days_back)
+        end_date = date.today() + timedelta(days=days_ahead)
+        total_days = days_back + days_ahead + 1  # Include today
+        
+        logger.info(f"📅 Fetching earnings from {start_date} to {end_date} ({total_days} days)")
+        
+        # Try each source until we get data
+        for source in sources:
+            try:
+                if source == EarningsSource.FMP:
+                    earnings = self._fetch_from_fmp_range(symbols, start_date, end_date)
+                elif source == EarningsSource.FINNHUB:
+                    earnings = self._fetch_from_finnhub_range(symbols, start_date, end_date)
+                elif source == EarningsSource.NASDAQ:
+                    earnings = self._fetch_from_nasdaq_range(symbols, start_date, end_date)
+                elif source == EarningsSource.YAHOO:
+                    earnings = self._fetch_from_yahoo(symbols, days_ahead)  # Yahoo only supports forward
+                else:
+                    continue
+                
+                if earnings:
+                    all_earnings.extend(earnings)
+                    successful_sources.append(source.value)
+                    logger.info(f"✅ {source.value}: {len(earnings)} events")
+                else:
+                    logger.warning(f"⚠️ {source.value}: No data returned")
+                    
+            except Exception as e:
+                logger.error(f"❌ {source.value} failed: {e}")
+                continue
+        
+        # Deduplicate and sort
+        unique_earnings = self._deduplicate_earnings(all_earnings)
+        unique_earnings.sort(key=lambda x: (x.earnings_date, x.symbol))
+        
+        logger.info(f"📊 Total unique earnings events: {len(unique_earnings)}")
+        logger.info(f"🎯 Sources used: {successful_sources}")
+        
+        return unique_earnings
+
     def get_upcoming_earnings(self, 
                             symbols: Optional[List[str]] = None,
                             days_ahead: int = 30,
                             sources: List[EarningsSource] = None) -> List[EarningsEvent]:
-        """Get upcoming earnings events with multi-source fallback."""
+        """Get upcoming earnings events with multi-source fallback (forward-looking only)."""
+        
+        return self.get_earnings_range(
+            symbols=symbols,
+            days_back=0,
+            days_ahead=days_ahead,
+            sources=sources
+        )
+    
+    def get_historical_earnings(self,
+                               symbols: Optional[List[str]] = None,
+                               days_back: int = 30,
+                               sources: List[EarningsSource] = None) -> List[EarningsEvent]:
+        """Get historical earnings events (backward-looking only)."""
+        
+        return self.get_earnings_range(
+            symbols=symbols,
+            days_back=days_back,
+            days_ahead=0,
+            sources=sources
+        )
+
+    def _get_upcoming_earnings_legacy(self, 
+                            symbols: Optional[List[str]] = None,
+                            days_ahead: int = 30,
+                            sources: List[EarningsSource] = None) -> List[EarningsEvent]:
+        """Legacy method - use get_earnings_range instead."""
         
         if sources is None:
             sources = [EarningsSource.FMP, EarningsSource.FINNHUB, EarningsSource.NASDAQ]
@@ -224,6 +315,56 @@ class EarningsCalendarFetcher:
             
         return earnings
     
+    def _fetch_from_fmp_range(self, symbols: Optional[List[str]], start_date: date, end_date: date) -> List[EarningsEvent]:
+        """Fetch from Financial Modeling Prep for a date range."""
+        earnings = []
+        
+        try:
+            # FMP earnings calendar endpoint
+            url = f"{self.api_configs[EarningsSource.FMP]['base_url']}/earning_calendar"
+            params = {
+                'from': start_date.strftime('%Y-%m-%d'),
+                'to': end_date.strftime('%Y-%m-%d'),
+                'apikey': self.api_configs[EarningsSource.FMP]['api_key']
+            }
+            
+            response = self.session.get(url, params=params, timeout=30)
+            response.raise_for_status()
+            
+            data = response.json()
+            
+            for event in data:
+                symbol = event.get('symbol', '').upper()
+                
+                # Filter by symbols if specified
+                if symbols and symbol not in symbols:
+                    continue
+                
+                earnings_date_str = event.get('date')
+                if not earnings_date_str:
+                    continue
+                
+                earnings_date = datetime.strptime(earnings_date_str, '%Y-%m-%d').date()
+                
+                earnings.append(EarningsEvent(
+                    symbol=symbol,
+                    company_name=event.get('eps', ''),  # FMP may not have company name
+                    earnings_date=earnings_date,
+                    time=event.get('time', 'unknown'),
+                    eps_estimate=self._safe_float(event.get('epsEstimated')),
+                    eps_actual=self._safe_float(event.get('eps')),
+                    revenue_estimate=self._safe_float(event.get('revenueEstimated')),
+                    revenue_actual=self._safe_float(event.get('revenue')),
+                    source="financial_modeling_prep"
+                ))
+        
+        except requests.exceptions.RequestException as e:
+            logger.error(f"FMP range API request failed: {e}")
+        except (ValueError, KeyError) as e:
+            logger.error(f"FMP range data parsing failed: {e}")
+            
+        return earnings
+
     def _fetch_from_finnhub(self, symbols: Optional[List[str]], days_ahead: int) -> List[EarningsEvent]:
         """Fetch from Finnhub."""
         earnings = []
@@ -284,36 +425,96 @@ class EarningsCalendarFetcher:
             
         return earnings
     
-    def _fetch_from_nasdaq(self, symbols: Optional[List[str]], days_ahead: int) -> List[EarningsEvent]:
-        """Fetch from NASDAQ public API with enhanced multi-day support."""
+    def _fetch_from_finnhub_range(self, symbols: Optional[List[str]], start_date: date, end_date: date) -> List[EarningsEvent]:
+        """Fetch from Finnhub for a date range."""
         earnings = []
         
-        start_date = date.today()
-        logger.info(f"📅 Fetching NASDAQ earnings for {days_ahead} days ahead")
-        
-        for i in range(days_ahead + 1):  # Include today
-            check_date = start_date + timedelta(days=i)
+        try:
+            # Finnhub earnings calendar endpoint  
+            url = f"{self.api_configs[EarningsSource.FINNHUB]['base_url']}/calendar/earnings"
+            params = {
+                'from': start_date.strftime('%Y-%m-%d'),
+                'to': end_date.strftime('%Y-%m-%d'),
+                'token': self.api_configs[EarningsSource.FINNHUB]['api_key']
+            }
             
+            response = self.session.get(url, params=params, timeout=30)
+            response.raise_for_status()
+            
+            data = response.json()
+            
+            # Parse earnings events
+            if 'earningsCalendar' in data:
+                for event in data['earningsCalendar']:
+                    symbol = event.get('symbol', '').upper()
+                    
+                    # Filter by symbols if specified
+                    if symbols and symbol not in symbols:
+                        continue
+                    
+                    earnings_date_str = event.get('date')
+                    if not earnings_date_str:
+                        continue
+                    
+                    earnings_date = datetime.strptime(earnings_date_str, '%Y-%m-%d').date()
+                    
+                    earnings_event = EarningsEvent(
+                        symbol=symbol,
+                        company_name=symbol,  # Finnhub may not provide company name
+                        earnings_date=earnings_date,
+                        time='unknown',  # Finnhub may not specify time
+                        eps_estimate=self._safe_float(event.get('epsEstimate')),
+                        eps_actual=self._safe_float(event.get('epsActual')),
+                        revenue_estimate=self._safe_float(event.get('revenueEstimate')),
+                        revenue_actual=self._safe_float(event.get('revenueActual')),
+                        source="finnhub"
+                    )
+                    
+                    earnings.append(earnings_event)
+                
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Finnhub range API request failed: {e}")
+        except (ValueError, KeyError) as e:
+            logger.error(f"Finnhub range data parsing failed: {e}")
+            
+        return earnings
+
+    def _fetch_from_nasdaq_range(self, symbols: Optional[List[str]], start_date: date, end_date: date) -> List[EarningsEvent]:
+        """Fetch from NASDAQ public API for a date range (supports historical data)."""
+        earnings = []
+        
+        logger.info(f"📅 Fetching NASDAQ earnings from {start_date} to {end_date}")
+        
+        current_date = start_date
+        while current_date <= end_date:
             # Skip weekends (NASDAQ typically has no earnings data)
-            if check_date.weekday() >= 5:  # Saturday = 5, Sunday = 6
+            if current_date.weekday() >= 5:  # Saturday = 5, Sunday = 6
+                current_date += timedelta(days=1)
                 continue
             
             try:
-                daily_earnings = self._fetch_nasdaq_single_day(check_date, symbols)
+                daily_earnings = self._fetch_nasdaq_single_day(current_date, symbols)
                 if daily_earnings:
                     earnings.extend(daily_earnings)
-                    logger.debug(f"✅ NASDAQ {check_date}: {len(daily_earnings)} earnings")
+                    logger.debug(f"✅ NASDAQ {current_date}: {len(daily_earnings)} earnings")
                 
                 # Be respectful to NASDAQ servers - small delay
                 import time
                 time.sleep(0.3)
                 
             except Exception as e:
-                logger.warning(f"⚠️ NASDAQ {check_date} failed: {e}")
-                continue
+                logger.error(f"NASDAQ single day fetch failed for {current_date}: {e}")
+            
+            current_date += timedelta(days=1)
         
         logger.info(f"📊 NASDAQ total earnings collected: {len(earnings)}")
         return earnings
+
+    def _fetch_from_nasdaq(self, symbols: Optional[List[str]], days_ahead: int) -> List[EarningsEvent]:
+        """Fetch from NASDAQ public API with enhanced multi-day support (forward-looking only)."""
+        start_date = date.today()
+        end_date = start_date + timedelta(days=days_ahead)
+        return self._fetch_from_nasdaq_range(symbols, start_date, end_date)
     
     def _fetch_nasdaq_single_day(self, target_date: date, symbols: Optional[List[str]]) -> List[EarningsEvent]:
         """Fetch NASDAQ earnings for a single day."""

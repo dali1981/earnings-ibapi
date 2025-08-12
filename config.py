@@ -66,6 +66,7 @@ BACKFILL_BAR_SIZE = "1 day"
 EARNINGS_CONFIG = {
     # Collection timing
     "default_days_ahead": 30,          # How many days ahead to collect earnings
+    "default_days_back": 7,            # How many days back to collect historical earnings
     "max_days_ahead": 60,              # Maximum lookahead window
     "collection_hour": 6,              # Daily collection time (6 AM)
     
