@@ -63,10 +63,10 @@ class BackfillOptionBarsTask(Task):
     strikes_per_side: int = 6
     selection_mode: str = "k_around_atm"
 
-    _chain_repo: Optional[ChainRepository] = None
+    _chain_repo: Optional[OptionChainSnapshotRepository] = None
 
     def validate(self) -> None:
-        chain_repo = ChainRepository(self.chain_base)
+        chain_repo = OptionChainSnapshotRepository(self.chain_base / "option_chains")
         try:
             df = chain_repo.load()
         except Exception as exc:
