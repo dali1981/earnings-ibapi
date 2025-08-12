@@ -20,10 +20,10 @@ python scripts/compare_earnings_sources.py
 ## 📊 Key Features
 
 - **Market-Wide Earnings Discovery**: Scans entire market using free NASDAQ API (1,122+ events)
-- **Options Strategy Analysis**: Scores candidates for calendar spreads, strangles, straddles
-- **Dynamic Symbol Selection**: Replaces fixed portfolios with opportunity-driven selection
-- **Multi-Source Data**: Fallback from FMP → Finnhub → NASDAQ → Yahoo Finance
-- **Priority-Based Collection**: Focuses resources on highest-value opportunities
+- **Options Strategy Analysis**: Optional; trading layer is decoupled and can be run later
+- **Dynamic Symbol Selection**: Opportunity-driven selection (when using trading layer)
+- **Configurable Sources (Opt-in)**: Fallback from FMP → Finnhub → NASDAQ → Yahoo Finance
+- **Priority-Based Collection**: Focuses resources on high-value opportunities (when using trading layer)
 - **Real-Time Filtering**: Market cap, timing, liquidity, and options-tradability filters
 
 ## 🎯 System Overview
@@ -68,11 +68,11 @@ earnings_ibapi/
 - **Intelligent filtering**: Market cap, timing, options liquidity requirements
 - **Priority classification**: HIGH/MEDIUM/LOW opportunity groups
 
-### 2. Multi-Source Data Fetcher (`earnings/fetcher.py`)
-- **Primary**: Financial Modeling Prep (FMP) - Premium features
-- **Secondary**: Finnhub - Good coverage
-- **Fallback**: NASDAQ API - Free, reliable (currently active)
-- **Emergency**: Yahoo Finance scraping
+### 2. Configurable Sources (Opt-in) Fetcher (`earnings/fetcher.py`)
+- **Default**: NASDAQ-only (no API keys required)
+- **Optional**: Enable additional sources via `EARNINGS_ALLOWED_SOURCES` (e.g., `nasdaq,fmp,finnhub`) and set API keys
+- 
+- 
 
 ### 3. Dynamic Data Pipeline (`earnings_trading/data_pipeline.py`)
 - **Opportunity-driven**: Collects data based on discovered opportunities
@@ -96,6 +96,14 @@ TOP OPPORTUNITIES:
 4. WMT    - 2025-08-21 (+9 days) - 80 pts - calendar_spread
 5. NVDA   - 2025-08-28 (+16 days) - 60 pts - calendar_spread
 ```
+
+## 📦 What Happens to Discovered Earnings
+
+- **Raw Storage**: Parquet under `data/earnings/collection_date=YYYY-MM-DD/source=nasdaq/earnings_HHMMSS.parquet`.
+- **Deduplication & Filtering**: De-dup by symbol+date; apply market filters (market cap, timing, symbol hygiene).
+- **Exports**: CSV at `data/exports/earnings_discoveries_YYYY-MM-DD.csv` sorted by `days_until` and `market_cap`.
+- **Accessing Discoveries**: `EarningsDiscoveryEngine.get_recent_discoveries(max_age_days=1)` returns the latest as DataFrame.
+- **Downstream Use**: Trading analysis is optional and can consume these later.
 
 ## 📚 Documentation
 
@@ -122,7 +130,7 @@ export CACHE_PATH=/path/to/cache
 ```
 
 ### Key Settings
-- **Min Market Cap**: $1B (configurable in `earnings_trading/discovery.py`)
+- **Min Market Cap**: $1B (configurable in `earnings/discovery.py`)
 - **Time Window**: 1-60 days ahead (configurable)
 - **Strategy Thresholds**: 50+ score minimum (adjustable)
 
