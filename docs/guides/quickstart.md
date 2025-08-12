@@ -132,6 +132,44 @@ self.discovery_min_days = 1        # At least 1 day ahead
 self.discovery_max_days = 60       # Within 2 months
 ```
 
+## 🔧 Bootstrap From Earnings
+
+### What is a Dry Run?
+A "dry run" is a no-op preview that plans and prints what would happen without making any external requests or writing data:
+- Reads latest earning-date CSV to list target symbols
+- Prints planned steps per symbol (contracts → chains → equity → options)
+- Shows key parameters (lookback window, bar sizes, symbol list)
+- Makes NO IB Gateway/TWS calls
+- Writes NO data to filesystem
+
+### Bootstrap Data Collection
+```bash
+# Preview what will be collected (dry run)
+make from-earnings-dry
+
+# Actually run the bootstrap
+make from-earnings
+
+# Custom bootstrap with specific parameters
+python jobs/run_from_earnings.py --max-symbols 10 --lookback-days 365 --option-bar-size "1 min"
+
+# Bootstrap specific symbols
+python jobs/run_from_earnings.py --symbols AAPL,MSFT,NVDA --lookback-days 180
+```
+
+### Bootstrap Process
+For each symbol, the bootstrap will:
+1. **Contracts**: Targeted backfill if missing
+2. **Chain snapshot**: Refresh if >24h old  
+3. **Equity bars**: Backfill 1-day bars over lookback window
+4. **Option bars**: Backfill 1-minute bars (default) over lookback window
+
+### Data Storage Locations
+- Contracts: `data/contracts/`
+- Option chains: `data/option_chains/`
+- Equity bars: `data/equity_bars/`
+- Option bars: `data/option_bars/`
+
 ## 📈 Next Steps (optional)
 
 ### 1. Data Collection Setup
