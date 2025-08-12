@@ -1,0 +1,39 @@
+# Python virtual environment
+venv/
+.venv/
+env/
+.env/
+
+# Byte-compiled / optimized files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# IDE-specific files (VSCode, PyCharm, etc.)
+.vscode/
+.idea/
+
+# Log files
+*.log
+ib_logs/
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Test and coverage reports
+.pytest_cache/
+.coverage
+htmlcov/
+
+# OS-generated files
+.DS_Store
+Thumbs.db
+
+data/

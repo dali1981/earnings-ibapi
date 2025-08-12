@@ -1,0 +1,92 @@
+/Users/mohamedali/trading_project/earnings_ibapi/venv/bin/python /Users/mohamedali/trading_project/earnings_ibapi/option_ticks.py
+2025-08-09 11:47:44,017 INFO ibapi.client sent startApi
+2025-08-09 11:47:44,017 INFO ibapi.utils REQUEST startApi {}
+2025-08-09 11:47:44,017 INFO ibapi.client SENDING startApi b'\x00\x00\x00\t71\x002\x0042\x00\x00'
+2025-08-09 11:47:44,017 INFO ibapi.utils ANSWER connectAck {}
+2025-08-09 11:47:45,022 INFO ibapi.utils REQUEST reqMarketDataType {'marketDataType': 4}
+2025-08-09 11:47:45,022 INFO ibapi.client SENDING reqMarketDataType b'\x00\x00\x00\x0759\x001\x004\x00'
+2025-08-09 11:47:45,023 INFO ibapi.utils REQUEST reqMktData {'reqId': 1000, 'contract': 4665564624: 0,AMD,STK,,,0,,,SMART,NASDAQ,USD,,,False,,,,combo:, 'genericTickList': '100,101,104,106,411', 'snapshot': False, 'regulatorySnapshot': False, 'mktDataOptions': []}
+2025-08-09 11:47:45,023 INFO ibapi.client SENDING reqMktData b'\x00\x00\x00I1\x0011\x001000\x000\x00AMD\x00STK\x00\x000.0\x00\x00\x00SMART\x00NASDAQ\x00USD\x00\x00\x000\x00100,101,104,106,411\x000\x000\x00\x00'
+2025-08-09 11:47:45,026 INFO ibapi.utils REQUEST reqMktData {'reqId': 2000, 'contract': 4665565200: 0,AMD,OPT,20250919,,170,C,100,SMART,,USD,,,False,,,,combo:, 'genericTickList': '', 'snapshot': False, 'regulatorySnapshot': False, 'mktDataOptions': []}
+2025-08-09 11:47:45,026 INFO ibapi.client SENDING reqMktData b'\x00\x00\x00>1\x0011\x002000\x000\x00AMD\x00OPT\x0020250919\x00170.0\x00C\x00100\x00SMART\x00\x00USD\x00\x00\x000\x00\x000\x000\x00\x00'
+2025-08-09 11:47:45,032 INFO ibapi.utils REQUEST reqMktData {'reqId': 2001, 'contract': 4665565200: 0,AMD,OPT,20250919,,175,C,100,SMART,,USD,,,False,,,,combo:, 'genericTickList': '', 'snapshot': False, 'regulatorySnapshot': False, 'mktDataOptions': []}
+2025-08-09 11:47:45,034 INFO ibapi.client SENDING reqMktData b'\x00\x00\x00>1\x0011\x002001\x000\x00AMD\x00OPT\x0020250919\x00175.0\x00C\x00100\x00SMART\x00\x00USD\x00\x00\x000\x00\x000\x000\x00\x00'
+2025-08-09 11:47:45,034 INFO ibapi.utils REQUEST reqMktData {'reqId': 2002, 'contract': 4665565200: 0,AMD,OPT,20250919,,175,P,100,SMART,,USD,,,False,,,,combo:, 'genericTickList': '', 'snapshot': False, 'regulatorySnapshot': False, 'mktDataOptions': []}
+2025-08-09 11:47:45,034 INFO ibapi.client SENDING reqMktData b'\x00\x00\x00>1\x0011\x002002\x000\x00AMD\x00OPT\x0020250919\x00175.0\x00P\x00100\x00SMART\x00\x00USD\x00\x00\x000\x00\x000\x000\x00\x00'
+2025-08-09 11:47:45,034 INFO ibapi.utils REQUEST reqMktData {'reqId': 2003, 'contract': 4665565200: 0,AMD,OPT,20251017,,180,C,100,SMART,,USD,,,False,,,,combo:, 'genericTickList': '', 'snapshot': False, 'regulatorySnapshot': False, 'mktDataOptions': []}
+2025-08-09 11:47:45,034 INFO ibapi.client SENDING reqMktData b'\x00\x00\x00>1\x0011\x002003\x000\x00AMD\x00OPT\x0020251017\x00180.0\x00C\x00100\x00SMART\x00\x00USD\x00\x00\x000\x00\x000\x000\x00\x00'
+2025-08-09 11:47:45,035 INFO ibapi.utils ANSWER managedAccounts {'accountsList': 'DU8753501'}
+2025-08-09 11:47:45,035 INFO ibapi.utils ANSWER nextValidId {'orderId': 1}
+2025-08-09 11:47:45,035 ERROR LiveVolTap ERR code=2104 reqId=-1 msg=Market data farm connection is OK:eufarm
+2025-08-09 11:47:45,035 ERROR LiveVolTap ERR code=2104 reqId=-1 msg=Market data farm connection is OK:usopt
+2025-08-09 11:47:45,036 ERROR LiveVolTap ERR code=2104 reqId=-1 msg=Market data farm connection is OK:usfarm
+2025-08-09 11:47:45,036 ERROR LiveVolTap ERR code=2106 reqId=-1 msg=HMDS data farm connection is OK:euhmds
+2025-08-09 11:47:45,036 ERROR LiveVolTap ERR code=2106 reqId=-1 msg=HMDS data farm connection is OK:ushmds
+2025-08-09 11:47:45,036 ERROR LiveVolTap ERR code=2158 reqId=-1 msg=Sec-def data farm connection is OK:secdefeu
+2025-08-09 11:47:45,297 INFO ibapi.utils ANSWER tickReqParams {'tickerId': 2000, 'minTick': 0.01, 'bboExchange': 'c70003', 'snapshotPermissions': 3}
+2025-08-09 11:47:45,337 INFO LiveVolTap marketDataType for reqId=1000: 1
+2025-08-09 11:47:45,337 INFO ibapi.utils ANSWER tickReqParams {'tickerId': 1000, 'minTick': 0.01, 'bboExchange': '9c0001', 'snapshotPermissions': 3}
+2025-08-09 11:47:45,337 INFO LiveVolTap id1000 : AMD.Underlier price BID = -1.0
+2025-08-09 11:47:45,337 INFO LiveVolTap id1000 : AMD.Underlier size BID_SIZE = 170141183460469231731687303715884105727
+2025-08-09 11:47:45,337 INFO LiveVolTap id1000 : AMD.Underlier generic HISTORICAL_VOLATILITY_30D = 0.477150
+2025-08-09 11:47:45,337 INFO LiveVolTap id1000 : AMD.Underlier generic OPTION_IMPLIED_VOL_30D = 0.420922
+2025-08-09 11:47:45,337 INFO LiveVolTap id1000 : AMD.Underlier price ASK = -1.0
+2025-08-09 11:47:45,337 INFO LiveVolTap id1000 : AMD.Underlier size ASK_SIZE = 170141183460469231731687303715884105727
+2025-08-09 11:47:45,397 INFO ibapi.utils ANSWER tickReqParams {'tickerId': 2001, 'minTick': 0.01, 'bboExchange': 'c70003', 'snapshotPermissions': 3}
+2025-08-09 11:47:45,427 INFO LiveVolTap marketDataType for reqId=2000: 1
+2025-08-09 11:47:45,427 INFO LiveVolTap id2000 : AMD 20250919 C170 price BID = -1.0
+2025-08-09 11:47:45,427 INFO LiveVolTap id2000 : AMD 20250919 C170 size BID_SIZE = 170141183460469231731687303715884105727
+2025-08-09 11:47:45,427 INFO LiveVolTap id2000 : AMD 20250919 C170 price ASK = -1.0
+2025-08-09 11:47:45,427 INFO LiveVolTap id2000 : AMD 20250919 C170 size ASK_SIZE = 170141183460469231731687303715884105727
+2025-08-09 11:47:45,467 INFO LiveVolTap id1000 : AMD.Underlier size LAST_SIZE = 0
+2025-08-09 11:47:45,467 INFO LiveVolTap id1000 : AMD.Underlier size VOLUME = 0
+2025-08-09 11:47:45,467 INFO LiveVolTap id1000 : AMD.Underlier price CLOSE = 172.4
+2025-08-09 11:47:45,467 INFO LiveVolTap id1000 : AMD.Underlier size BID_SIZE = 0
+2025-08-09 11:47:45,467 INFO LiveVolTap id1000 : AMD.Underlier size ASK_SIZE = 0
+2025-08-09 11:47:45,497 INFO ibapi.utils ANSWER tickReqParams {'tickerId': 2002, 'minTick': 0.01, 'bboExchange': 'c70003', 'snapshotPermissions': 3}
+2025-08-09 11:47:45,557 INFO LiveVolTap id2000 : AMD 20250919 C170 size BID_SIZE = 0
+2025-08-09 11:47:45,557 INFO LiveVolTap id2000 : AMD 20250919 C170 size ASK_SIZE = 0
+2025-08-09 11:47:45,597 INFO LiveVolTap id1000 : AMD.Underlier size CALL_OPEN_INT = 2123910
+2025-08-09 11:47:45,597 INFO LiveVolTap id1000 : AMD.Underlier size PUT_OPEN_INT = 1606793
+2025-08-09 11:47:45,599 INFO ibapi.utils ANSWER tickReqParams {'tickerId': 2003, 'minTick': 0.01, 'bboExchange': 'c70003', 'snapshotPermissions': 3}
+2025-08-09 11:47:45,660 INFO LiveVolTap marketDataType for reqId=2001: 1
+2025-08-09 11:47:45,661 INFO LiveVolTap id2001 : AMD 20250919 C175 price BID = -1.0
+2025-08-09 11:47:45,661 INFO LiveVolTap id2001 : AMD 20250919 C175 size BID_SIZE = 170141183460469231731687303715884105727
+2025-08-09 11:47:45,661 INFO LiveVolTap id2001 : AMD 20250919 C175 price ASK = -1.0
+2025-08-09 11:47:45,662 INFO LiveVolTap id2001 : AMD 20250919 C175 size ASK_SIZE = 170141183460469231731687303715884105727
+2025-08-09 11:47:45,662 INFO LiveVolTap id2001 : AMD 20250919 C175 size BID_SIZE = 0
+2025-08-09 11:47:45,662 INFO LiveVolTap id2001 : AMD 20250919 C175 size ASK_SIZE = 0
+2025-08-09 11:47:45,817 INFO LiveVolTap marketDataType for reqId=2002: 1
+2025-08-09 11:47:45,821 INFO LiveVolTap id2002 : AMD 20250919 P175 price BID = -1.0
+2025-08-09 11:47:45,821 INFO LiveVolTap id2002 : AMD 20250919 P175 size BID_SIZE = 170141183460469231731687303715884105727
+2025-08-09 11:47:45,821 INFO LiveVolTap id2002 : AMD 20250919 P175 price ASK = -1.0
+2025-08-09 11:47:45,821 INFO LiveVolTap id2002 : AMD 20250919 P175 size ASK_SIZE = 170141183460469231731687303715884105727
+2025-08-09 11:47:45,821 INFO LiveVolTap id2002 : AMD 20250919 P175 size BID_SIZE = 0
+2025-08-09 11:47:45,821 INFO LiveVolTap id2002 : AMD 20250919 P175 size ASK_SIZE = 0
+2025-08-09 11:47:45,821 INFO LiveVolTap marketDataType for reqId=2003: 1
+2025-08-09 11:47:45,821 INFO LiveVolTap id2003 : AMD 20251017 C180 price BID = -1.0
+2025-08-09 11:47:45,821 INFO LiveVolTap id2003 : AMD 20251017 C180 size BID_SIZE = 170141183460469231731687303715884105727
+2025-08-09 11:47:45,821 INFO LiveVolTap id2003 : AMD 20251017 C180 price ASK = -1.0
+2025-08-09 11:47:45,821 INFO LiveVolTap id2003 : AMD 20251017 C180 size ASK_SIZE = 170141183460469231731687303715884105727
+2025-08-09 11:47:45,919 INFO LiveVolTap id2003 : AMD 20251017 C180 size BID_SIZE = 0
+2025-08-09 11:47:45,919 INFO LiveVolTap id2003 : AMD 20251017 C180 size ASK_SIZE = 0
+2025-08-09 11:47:46,210 INFO LiveVolTap id2000 : AMD 20250919 C170 last_ts = 0
+2025-08-09 11:47:46,210 INFO LiveVolTap id2001 : AMD 20250919 C175 last_ts = 0
+2025-08-09 11:47:46,210 INFO LiveVolTap id2002 : AMD 20250919 P175 last_ts = 0
+2025-08-09 11:47:46,211 INFO LiveVolTap id2003 : AMD 20251017 C180 last_ts = 0
+2025-08-09 11:47:49,032 INFO LiveVolTap id2001 : AMD 20250919 C175 size LAST_SIZE = 0
+2025-08-09 11:47:49,035 INFO LiveVolTap id2000 : AMD 20250919 C170 size VOLUME = 0
+2025-08-09 11:47:49,036 INFO LiveVolTap id2000 : AMD 20250919 C170 price CLOSE = 11.85
+2025-08-09 11:47:49,036 INFO LiveVolTap id2001 : AMD 20250919 C175 size VOLUME = 0
+2025-08-09 11:47:49,036 INFO LiveVolTap id2001 : AMD 20250919 C175 price CLOSE = 9.43
+2025-08-09 11:47:49,036 INFO LiveVolTap id2002 : AMD 20250919 P175 size LAST_SIZE = 0
+2025-08-09 11:47:49,036 INFO LiveVolTap id2003 : AMD 20251017 C180 size LAST_SIZE = 0
+2025-08-09 11:47:49,036 INFO LiveVolTap id2003 : AMD 20251017 C180 size VOLUME = 0
+2025-08-09 11:47:49,036 INFO LiveVolTap id2003 : AMD 20251017 C180 price CLOSE = 10.32
+2025-08-09 11:47:49,036 INFO LiveVolTap id2000 : AMD 20250919 C170 size LAST_SIZE = 0
+2025-08-09 11:47:49,036 INFO LiveVolTap id2002 : AMD 20250919 P175 size VOLUME = 0
+2025-08-09 11:47:49,036 INFO LiveVolTap id2002 : AMD 20250919 P175 price CLOSE = 11.05
+2025-08-09 11:47:49,244 INFO LiveVolTap id1000 : AMD.Underlier size LAST_SIZE = 0
+2025-08-09 11:47:49,244 INFO LiveVolTap id1000 : AMD.Underlier last_ts = 0
+2025-08-09 11:47:49,244 INFO LiveVolTap id1000 : AMD.Underlier size LAST_SIZE = 0
+2025-08-09 11:47:49,244 INFO LiveVolTap id1000 : AMD.Underlier last_ts = 0

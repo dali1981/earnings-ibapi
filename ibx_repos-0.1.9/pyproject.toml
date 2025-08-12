@@ -1,0 +1,15 @@
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ibx_repos"
+version = "0.1.9"
+description = "Parquet repositories for equities, options, and option chains for ibx"
+authors = [{name="ibx_repos"}]
+requires-python = ">=3.9"
+dependencies = ["pandas>=2.0.0", "pyarrow>=14.0.0", "ibapi>=9.81.1", "ibx>=0.1.1"]
+
+[tool.setuptools.packages.find]
+include = ["ibx_repos"]

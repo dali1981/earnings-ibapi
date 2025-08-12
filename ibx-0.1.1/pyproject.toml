@@ -1,0 +1,15 @@
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ibx"
+version = "0.1.1"
+description = "Compositional helpers for Interactive Brokers ibapi"
+authors = [{name="ibx"}]
+requires-python = ">=3.8"
+dependencies = ["ibapi>=9.81.1"]
+
+[tool.setuptools.packages.find]
+include = ["ibx"]
