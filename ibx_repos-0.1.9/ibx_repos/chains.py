@@ -1,7 +1,7 @@
 
 from __future__ import annotations
 from pathlib import Path
-from typing import Optional, Union, List, Dict, Any
+from typing import Optional, Union, List, Dict, Any, Set
 from datetime import date
 import pandas as pd
 import pyarrow as pa
@@ -198,3 +198,10 @@ class OptionChainSnapshotRepository:
         table = dset.to_table(filter=expr) if expr is not None else dset.to_table()
         df = table.to_pandas()
         return df
+
+    def present_dates(self, underlying: str, start: date, end: date) -> Set[date]:
+        """Return the set of dates for which snapshots already exist."""
+        df = self.load(underlying=underlying, asof_start=start, asof_end=end)
+        if df.empty:
+            return set()
+        return set(pd.to_datetime(df["asof"]).dt.date)
