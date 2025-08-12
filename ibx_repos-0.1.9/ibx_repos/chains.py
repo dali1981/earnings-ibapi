@@ -8,6 +8,8 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 import pyarrow.dataset as ds
 
+from ._util import _write_empty_dataset
+
 import pyarrow.dataset as ds
 import pandas as pd
 from datetime import date, datetime
@@ -132,6 +134,8 @@ class OptionChainSnapshotRepository:
             pa.field('strikes', pa.list_(pa.float64())),
             pa.field('snapshot_date', pa.date32()),
         ])
+        if not any(self.base_path.rglob("*.parquet")):
+            _write_empty_dataset(self.base_path, self.schema)
 
     # ----- your save() is fine; keep it as-is -----
     def save(self, underlying: str, underlying_conid: int, snapshots: List[Dict[str, Any]], snapshot_date: Optional[date] = None) -> None:
@@ -168,6 +172,7 @@ class OptionChainSnapshotRepository:
             str(self.base_path),
             format="parquet",
             partitioning=ds.partitioning(flavor="hive", schema=part_schema),
+            schema=self.schema,
         )
 
     # ----- robust load() that casts scalars to column types -----
