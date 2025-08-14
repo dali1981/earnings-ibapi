@@ -17,11 +17,9 @@ from typing import Dict, List, Optional
 from config import DISCOVERY_CONFIG, EXPORTS_PATH
 from earnings.discovery import EarningsDiscoveryEngine as PureDiscoveryEngine
 from earnings.fetcher import EarningsEvent
-from trading.strategy_analyzer import (
-    OptionsStrategy,
-    OptionsStrategyAnalyzer,
-    TradingOpportunity,
-)
+from trading.strategy_analyzer import (OptionsStrategy,
+                                       OptionsStrategyAnalyzer,
+                                       TradingOpportunity)
 
 # Backwards-compatible aliases
 EarningsCandidate = TradingOpportunity
@@ -41,7 +39,9 @@ class EarningsDiscoveryEngine:
         self._analyzer = OptionsStrategyAnalyzer(self.config)
 
     # ---- Compatibility helpers used by examples/tests ----
-    def _create_candidate_from_earnings(self, event: EarningsEvent) -> EarningsCandidate:
+    def _create_candidate_from_earnings(
+        self, event: EarningsEvent
+    ) -> EarningsCandidate:
         return EarningsCandidate(
             symbol=event.symbol,
             company_name=event.company_name,
@@ -78,13 +78,19 @@ class EarningsDiscoveryEngine:
             base = tw["poor"]
 
         mult = self.config["strategy_multipliers"]
-        candidate.calendar_score = base * mult["calendar_spread"]["7_to_14_days"] / 100.0
+        candidate.calendar_score = (
+            base * mult["calendar_spread"]["7_to_14_days"] / 100.0
+        )
         candidate.straddle_score = base * mult["straddle"]["5_to_10_days"] / 100.0
         candidate.strangle_score = base * mult["strangle"]["7_to_14_days"] / 100.0
 
     # ---- Public API maintained for examples ----
-    def discover_earnings_opportunities(self, days_ahead: int = 21, min_score: float = 50.0) -> List[EarningsCandidate]:
-        events = self._pure.earnings_fetcher.get_earnings_range(None, days_back=0, days_ahead=days_ahead)
+    def discover_earnings_opportunities(
+        self, days_ahead: int = 21, min_score: float = 50.0
+    ) -> List[EarningsCandidate]:
+        events = self._pure.earnings_fetcher.get_earnings_range(
+            None, days_back=0, days_ahead=days_ahead
+        )
         candidates: List[EarningsCandidate] = []
         for ev in events:
             c = self._create_candidate_from_earnings(ev)
@@ -102,15 +108,31 @@ class EarningsDiscoveryEngine:
 
         with out.open("w", newline="") as f:
             w = csv.writer(f)
-            w.writerow([
-                "symbol", "earnings_date", "days_until", "total_score", "best_strategy",
-            ])
+            w.writerow(
+                [
+                    "symbol",
+                    "earnings_date",
+                    "days_until",
+                    "total_score",
+                    "best_strategy",
+                ]
+            )
             for o in opportunities:
                 best = o.best_strategy.value if o.best_strategy else ""
-                w.writerow([o.symbol, o.earnings_date.isoformat(), o.days_until_earnings, f"{o.total_score:.1f}", best])
+                w.writerow(
+                    [
+                        o.symbol,
+                        o.earnings_date.isoformat(),
+                        o.days_until_earnings,
+                        f"{o.total_score:.1f}",
+                        best,
+                    ]
+                )
         return out
 
-    def get_data_collection_list(self, opportunities: List[EarningsCandidate]) -> Dict[str, List[str]]:
+    def get_data_collection_list(
+        self, opportunities: List[EarningsCandidate]
+    ) -> Dict[str, List[str]]:
         buckets = {"critical": [], "high": [], "medium": [], "low": []}
         for o in opportunities:
             d = o.days_until_earnings

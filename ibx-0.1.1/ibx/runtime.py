@@ -1,14 +1,17 @@
-
 import threading
 from typing import Optional
+
 from ibapi.client import EClient
-from .ids import RequestIdSequencer
+
 from .futures import FutureRegistry
+from .ids import RequestIdSequencer
 from .subscriptions import SubscriptionRegistry
 from .wrapper import IBWrapperBridge
 
+
 class IBRuntime:
     """Connection + network thread. Composition root for wrapper/registries."""
+
     def __init__(self, host: str = "127.0.0.1", port: int = 7497, client_id: int = 1):
         self.host, self.port, self.client_id = host, port, client_id
         self.sequencer = RequestIdSequencer()
@@ -22,7 +25,9 @@ class IBRuntime:
         if self.client.isConnected():
             return
         self.client.connect(self.host, self.port, self.client_id)
-        self._run_thread = threading.Thread(target=self.client.run, name="ib-reader", daemon=False)
+        self._run_thread = threading.Thread(
+            target=self.client.run, name="ib-reader", daemon=False
+        )
         self._run_thread.start()
         self.sequencer.wait_ready(ready_timeout)
 

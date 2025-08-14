@@ -1,21 +1,20 @@
-
 from __future__ import annotations
+
+from datetime import date, datetime
 from pathlib import Path
-from typing import Optional, Union, List, Dict, Any, Set
-from datetime import date
+from typing import Any, Dict, List, Optional, Set, Union
+
 import pandas as pd
 import pyarrow as pa
-import pyarrow.parquet as pq
 import pyarrow.dataset as ds
+import pyarrow.parquet as pq
 
 from ._util import _write_empty_dataset
 
-import pyarrow.dataset as ds
-import pandas as pd
-from datetime import date, datetime
 
 def _dataset_hive(path: str):
     return ds.dataset(path, format="parquet", partitioning="hive")
+
 
 def _build_filter(**kwargs):
     """
@@ -43,14 +42,15 @@ def _build_filter(**kwargs):
     return expr
 
 
+from datetime import date, datetime
+
+import pandas as pd
 import pyarrow.dataset as ds
 
-import pyarrow.dataset as ds
-import pandas as pd
-from datetime import date, datetime
 
 def _dataset_hive(path: str):
     return ds.dataset(path, format="parquet", partitioning="hive")
+
 
 def _build_filter(**kwargs):
     """
@@ -77,8 +77,11 @@ def _build_filter(**kwargs):
         expr = term if expr is None else (expr & term)
     return expr
 
-import pandas as pd
+
 from datetime import date
+
+import pandas as pd
+
 
 def _build_filter(**kwargs):
     """
@@ -99,20 +102,26 @@ def _build_filter(**kwargs):
                     pass
             if hasattr(value, "isoformat"):
                 # date or datetime
-                value = value if isinstance(value, date) else getattr(value, "date", lambda: value)()
+                value = (
+                    value
+                    if isinstance(value, date)
+                    else getattr(value, "date", lambda: value)()
+                )
         term = ds.field(key) == value
         expr = term if expr is None else (expr & term)
     return expr
 
-from typing import Optional, Union, List, Dict, Any
-from pathlib import Path
+
 from datetime import date
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Union
 
 import pandas as pd
 import pyarrow as pa
-import pyarrow.dataset as ds
 import pyarrow.compute as pc
+import pyarrow.dataset as ds
 import pyarrow.parquet as pq  # used by save()
+
 
 class OptionChainSnapshotRepository:
     """
@@ -121,53 +130,81 @@ class OptionChainSnapshotRepository:
       base/underlying=AAPL/snapshot_date=2025-08-09/*.parquet
     Schema mirrors: exchange,trading_class,multiplier,expirations[],strikes[] plus underlying info.
     """
+
     def __init__(self, base_path: Union[str, Path]):
         self.base_path = Path(base_path)
         self.base_path.mkdir(parents=True, exist_ok=True)
-        self.schema = pa.schema([
-            pa.field('underlying', pa.string()),
-            pa.field('underlying_conid', pa.int64()),
-            pa.field('exchange', pa.string()),
-            pa.field('trading_class', pa.string()),
-            pa.field('multiplier', pa.string()),
-            pa.field('expirations', pa.list_(pa.string())),
-            pa.field('strikes', pa.list_(pa.float64())),
-            pa.field('snapshot_date', pa.date32()),
-        ])
+        self.schema = pa.schema(
+            [
+                pa.field("underlying", pa.string()),
+                pa.field("underlying_conid", pa.int64()),
+                pa.field("exchange", pa.string()),
+                pa.field("trading_class", pa.string()),
+                pa.field("multiplier", pa.string()),
+                pa.field("expirations", pa.list_(pa.string())),
+                pa.field("strikes", pa.list_(pa.float64())),
+                pa.field("snapshot_date", pa.date32()),
+            ]
+        )
         if not any(self.base_path.rglob("*.parquet")):
             _write_empty_dataset(self.base_path, self.schema)
 
     # ----- your save() is fine; keep it as-is -----
-    def save(self, underlying: str, underlying_conid: int, snapshots: List[Dict[str, Any]], snapshot_date: Optional[date] = None) -> None:
+    def save(
+        self,
+        underlying: str,
+        underlying_conid: int,
+        snapshots: List[Dict[str, Any]],
+        snapshot_date: Optional[date] = None,
+    ) -> None:
         df = pd.DataFrame(snapshots)
-        df['underlying'] = underlying
-        df['underlying_conid'] = int(underlying_conid)
-        df['snapshot_date'] = snapshot_date or date.today()
+        df["underlying"] = underlying
+        df["underlying_conid"] = int(underlying_conid)
+        df["snapshot_date"] = snapshot_date or date.today()
         # Normalize types
-        df['trading_class'] = df['tradingClass'] if 'tradingClass' in df.columns else df.get('trading_class')
-        if 'tradingClass' in df.columns: df.drop(columns=['tradingClass'], inplace=True)
-        df['multiplier'] = df['multiplier'].astype(str)
-        df['expirations'] = df['expirations'].apply(lambda x: list(x))
-        df['strikes'] = df['strikes'].apply(lambda x: [float(s) for s in x])
+        df["trading_class"] = (
+            df["tradingClass"]
+            if "tradingClass" in df.columns
+            else df.get("trading_class")
+        )
+        if "tradingClass" in df.columns:
+            df.drop(columns=["tradingClass"], inplace=True)
+        df["multiplier"] = df["multiplier"].astype(str)
+        df["expirations"] = df["expirations"].apply(lambda x: list(x))
+        df["strikes"] = df["strikes"].apply(lambda x: [float(s) for s in x])
         table = pa.Table.from_pandas(
-            df[['underlying','underlying_conid','exchange','trading_class','multiplier','expirations','strikes','snapshot_date']],
-            schema=self.schema, preserve_index=False
+            df[
+                [
+                    "underlying",
+                    "underlying_conid",
+                    "exchange",
+                    "trading_class",
+                    "multiplier",
+                    "expirations",
+                    "strikes",
+                    "snapshot_date",
+                ]
+            ],
+            schema=self.schema,
+            preserve_index=False,
         )
 
         pq.write_to_dataset(
             table,
             root_path=str(self.base_path),
-            partition_cols=['underlying','snapshot_date'],
+            partition_cols=["underlying", "snapshot_date"],
             use_dictionary=True,
-            compression='snappy'
+            compression="snappy",
         )
 
     # ----- improved dataset builder (typed Hive partitions) -----
     def _dataset(self) -> ds.Dataset:
-        part_schema = pa.schema([
-            pa.field("underlying", pa.string()),
-            pa.field("snapshot_date", pa.date32()),
-        ])
+        part_schema = pa.schema(
+            [
+                pa.field("underlying", pa.string()),
+                pa.field("snapshot_date", pa.date32()),
+            ]
+        )
         return ds.dataset(
             str(self.base_path),
             format="parquet",
@@ -176,7 +213,11 @@ class OptionChainSnapshotRepository:
         )
 
     # ----- robust load() that casts scalars to column types -----
-    def load(self, underlying: Optional[str] = None, snapshot_date: Optional[Union[str, date]] = None) -> pd.DataFrame:
+    def load(
+        self,
+        underlying: Optional[str] = None,
+        snapshot_date: Optional[Union[str, date]] = None,
+    ) -> pd.DataFrame:
         dset = self._dataset()
         schema = dset.schema
 
@@ -184,7 +225,10 @@ class OptionChainSnapshotRepository:
 
         # underlying filter (string)
         if underlying is not None and "underlying" in schema.names:
-            expr_u = pc.equal(pc.field("underlying"), pa.scalar(underlying, type=schema.field("underlying").type))
+            expr_u = pc.equal(
+                pc.field("underlying"),
+                pa.scalar(underlying, type=schema.field("underlying").type),
+            )
             expr = expr_u if expr is None else pc.and_(expr, expr_u)
 
         # snapshot_date filter (date32)
@@ -192,12 +236,19 @@ class OptionChainSnapshotRepository:
             if isinstance(snapshot_date, str):
                 # accept "YYYY-MM-DD" or "YYYYMMDD"
                 try:
-                    dt = pd.to_datetime(snapshot_date, format="%Y-%m-%d", errors="raise").date()
+                    dt = pd.to_datetime(
+                        snapshot_date, format="%Y-%m-%d", errors="raise"
+                    ).date()
                 except Exception:
-                    dt = pd.to_datetime(snapshot_date, format="%Y%m%d", errors="coerce").date()
+                    dt = pd.to_datetime(
+                        snapshot_date, format="%Y%m%d", errors="coerce"
+                    ).date()
             else:
                 dt = snapshot_date
-            expr_d = pc.equal(pc.field("snapshot_date"), pa.scalar(dt, type=schema.field("snapshot_date").type))
+            expr_d = pc.equal(
+                pc.field("snapshot_date"),
+                pa.scalar(dt, type=schema.field("snapshot_date").type),
+            )
             expr = expr_d if expr is None else pc.and_(expr, expr_d)
 
         table = dset.to_table(filter=expr) if expr is not None else dset.to_table()

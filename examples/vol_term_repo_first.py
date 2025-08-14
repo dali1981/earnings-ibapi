@@ -18,8 +18,10 @@ Run example:
 """
 from __future__ import annotations
 
+import pathlib
 # --- project-root import shim (so this runs from examples/ without installing) ---
-import sys, pathlib
+import sys
+
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
@@ -29,16 +31,17 @@ import argparse
 import math
 import time
 from datetime import date
-from typing import Iterable, List, Optional, Tuple, Dict
+from typing import Dict, Iterable, List, Optional, Tuple
 
 import pandas as pd
-
-from ibx import IBRuntime, SubscriptionService, HistoricalService, make_stock, make_option
-from ibx_repos import ChainRepository, OptionBarRepository
-from ibx.time import ib_end_datetime_instrument
+from ibx import (HistoricalService, IBRuntime, SubscriptionService,
+                 make_option, make_stock)
 from ibx.greeks_repo_first import option_greeks_repo_first
+from ibx.time import ib_end_datetime_instrument
+from ibx_repos import ChainRepository, OptionBarRepository
 
 # -------------------- small utils --------------------
+
 
 def _to_list(x):
     if x is None:
@@ -52,6 +55,7 @@ def _to_list(x):
         return list(x)
     try:
         import numpy as np
+
         if isinstance(x, np.ndarray):
             return x.tolist()
     except Exception:
@@ -66,9 +70,13 @@ def _nearest_strike(strikes: Iterable[float], S: float) -> float:
     arr = sorted({float(s) for s in strikes})
     return min(arr, key=lambda k: abs(k - float(S)))
 
+
 # -------------------- spot at AS-OF --------------------
 
-def _stock_snapshot_last(subs: SubscriptionService, symbol: str, timeout_sec: float = 4.0) -> Optional[float]:
+
+def _stock_snapshot_last(
+    subs: SubscriptionService, symbol: str, timeout_sec: float = 4.0
+) -> Optional[float]:
     h = subs.market_data(make_stock(symbol), genericTicks="", snapshot=True)
     deadline = time.time() + timeout_sec
     last = bid = ask = close = None
@@ -91,10 +99,17 @@ def _stock_snapshot_last(subs: SubscriptionService, symbol: str, timeout_sec: fl
     return None
 
 
-def _ref_price_asof(hist: HistoricalService, subs: SubscriptionService, symbol: str, as_of: Optional[str]) -> float:
+def _ref_price_asof(
+    hist: HistoricalService,
+    subs: SubscriptionService,
+    symbol: str,
+    as_of: Optional[str],
+) -> float:
     end = ""
     if as_of:
-        end = ib_end_datetime_instrument(hist.rt, make_stock(symbol), as_of, hyphen=False)
+        end = ib_end_datetime_instrument(
+            hist.rt, make_stock(symbol), as_of, hyphen=False
+        )
     rows = hist.bars(
         make_stock(symbol),
         endDateTime=end,
@@ -116,10 +131,14 @@ def _ref_price_asof(hist: HistoricalService, subs: SubscriptionService, symbol: 
     if S is None:
         S = _stock_snapshot_last(subs, symbol)
     if S is None or not (S == S) or S <= 0:
-        raise RuntimeError("Could not determine a valid AS-OF reference price for the underlying")
+        raise RuntimeError(
+            "Could not determine a valid AS-OF reference price for the underlying"
+        )
     return S
 
+
 # -------------------- chain snapshot --------------------
+
 
 def _load_latest_chain(chain_repo: ChainRepository, symbol: str) -> pd.DataFrame:
     try:
@@ -127,7 +146,9 @@ def _load_latest_chain(chain_repo: ChainRepository, symbol: str) -> pd.DataFrame
     except TypeError:
         df = chain_repo.load()
     if df.empty:
-        raise RuntimeError(f"No chain snapshot found (base={getattr(chain_repo, 'base_path', '???')}).")
+        raise RuntimeError(
+            f"No chain snapshot found (base={getattr(chain_repo, 'base_path', '???')})."
+        )
 
     if "snapshot_date" in df.columns:
         df["snapshot_date"] = pd.to_datetime(df["snapshot_date"], errors="coerce")
@@ -149,13 +170,17 @@ def _next_expiries(chain_df: pd.DataFrame, limit: Optional[int]) -> List[str]:
     for xs in chain_df["expirations"]:
         exps.extend(_to_list(xs))
     today = pd.Timestamp(date.today())
-    vals = sorted({pd.to_datetime(x, format="%Y%m%d", errors="coerce") for x in exps if x})
+    vals = sorted(
+        {pd.to_datetime(x, format="%Y%m%d", errors="coerce") for x in exps if x}
+    )
     vals = [x for x in vals if pd.notna(x) and x >= today]
     if limit:
         vals = vals[:limit]
     return [x.strftime("%Y%m%d") for x in vals]
 
+
 # -------------------- main computation --------------------
+
 
 def compute_atm_vol_term_repo_first(
     rt: IBRuntime,
@@ -181,8 +206,12 @@ def compute_atm_vol_term_repo_first(
 
     for expiry in expiries:
         k_atm = _nearest_strike(strike_union, S_asof)
-        iv_c, d_c = option_greeks_repo_first(hist, opt_repo, subs, symbol, expiry, k_atm, "C", as_of, S_asof)
-        iv_p, d_p = option_greeks_repo_first(hist, opt_repo, subs, symbol, expiry, k_atm, "P", as_of, S_asof)
+        iv_c, d_c = option_greeks_repo_first(
+            hist, opt_repo, subs, symbol, expiry, k_atm, "C", as_of, S_asof
+        )
+        iv_p, d_p = option_greeks_repo_first(
+            hist, opt_repo, subs, symbol, expiry, k_atm, "P", as_of, S_asof
+        )
 
         iv_atm = None
         if iv_c is not None and iv_p is not None:
@@ -195,24 +224,28 @@ def compute_atm_vol_term_repo_first(
         exp_dt = pd.to_datetime(expiry, format="%Y%m%d")
         ttm_years = max((exp_dt - asof_dt).total_seconds(), 0) / (365.0 * 24 * 3600)
 
-        rows.append({
-            "expiry": expiry,
-            "expiry_dt": exp_dt,
-            "ttm_years": ttm_years,
-            "k_atm": float(k_atm),
-            "spot_asof": float(S_asof),
-            "iv_call": iv_c,
-            "iv_put": iv_p,
-            "iv_atm": iv_atm,
-            "skew": (None if (iv_c is None or iv_p is None) else (iv_c - iv_p)),
-            "delta_call": d_c,
-            "delta_put": d_p,
-        })
+        rows.append(
+            {
+                "expiry": expiry,
+                "expiry_dt": exp_dt,
+                "ttm_years": ttm_years,
+                "k_atm": float(k_atm),
+                "spot_asof": float(S_asof),
+                "iv_call": iv_c,
+                "iv_put": iv_p,
+                "iv_atm": iv_atm,
+                "skew": (None if (iv_c is None or iv_p is None) else (iv_c - iv_p)),
+                "delta_call": d_c,
+                "delta_put": d_p,
+            }
+        )
 
     df = pd.DataFrame(rows).sort_values("expiry").reset_index(drop=True)
     return df
 
+
 # -------------------- realized (historical) volatility --------------------
+
 
 def compute_realized_vol(
     hist: HistoricalService,
@@ -226,7 +259,9 @@ def compute_realized_vol(
     duration = f"{max_lb + 40} D"
     end = ""
     if as_of:
-        end = ib_end_datetime_instrument(hist.rt, make_stock(symbol), as_of, hyphen=False)
+        end = ib_end_datetime_instrument(
+            hist.rt, make_stock(symbol), as_of, hyphen=False
+        )
     rows = hist.bars(
         make_stock(symbol),
         endDateTime=end,
@@ -246,15 +281,22 @@ def compute_realized_vol(
     out: Dict[int, float] = {}
     for lb in lookbacks:
         if rets.size >= lb:
-            vol = float(rets.tail(lb).std(ddof=1)) * (252.0 ** 0.5)
+            vol = float(rets.tail(lb).std(ddof=1)) * (252.0**0.5)
             out[lb] = vol
         else:
             out[lb] = float("nan")
     return out
 
+
 # -------------------- plotting --------------------
 
-def plot_term(df: pd.DataFrame, lookbacks: List[int], title: str | None = None, save: str | None = None):
+
+def plot_term(
+    df: pd.DataFrame,
+    lookbacks: List[int],
+    title: str | None = None,
+    save: str | None = None,
+):
     import matplotlib.pyplot as plt
 
     x = df["ttm_years"].astype(float)
@@ -263,16 +305,30 @@ def plot_term(df: pd.DataFrame, lookbacks: List[int], title: str | None = None, 
     fig1, ax1 = plt.subplots()
     ax1.plot(x, y, marker="o", label="ATM IV")
     if df["iv_call"].notna().any():
-        ax1.plot(x, df["iv_call"].astype(float) * 100.0, marker="x", linestyle="--", label="Call IV")
+        ax1.plot(
+            x,
+            df["iv_call"].astype(float) * 100.0,
+            marker="x",
+            linestyle="--",
+            label="Call IV",
+        )
     if df["iv_put"].notna().any():
-        ax1.plot(x, df["iv_put"].astype(float) * 100.0, marker="x", linestyle=":", label="Put IV")
+        ax1.plot(
+            x,
+            df["iv_put"].astype(float) * 100.0,
+            marker="x",
+            linestyle=":",
+            label="Put IV",
+        )
 
     xmax = float(x.max()) if len(x) else 1.0
     for lb in lookbacks:
         col = f"hv_{lb}"
         if col in df.columns and pd.notna(df[col]).any():
             hvp = float(df[col].dropna().iloc[0]) * 100.0
-            ax1.hlines(hvp, xmin=0.0, xmax=xmax * 1.05, linestyles="dashed", label=f"HV{lb}")
+            ax1.hlines(
+                hvp, xmin=0.0, xmax=xmax * 1.05, linestyles="dashed", label=f"HV{lb}"
+            )
 
     ax1.set_xlabel("TTM (years)")
     ax1.set_ylabel("Vol (%)")
@@ -281,7 +337,9 @@ def plot_term(df: pd.DataFrame, lookbacks: List[int], title: str | None = None, 
 
     if df["skew"].notna().any():
         fig2, ax2 = plt.subplots()
-        ax2.plot(x, df["skew"].astype(float) * 100.0, marker="o", label="ATM Skew (C−P)")
+        ax2.plot(
+            x, df["skew"].astype(float) * 100.0, marker="o", label="ATM Skew (C−P)"
+        )
         ax2.axhline(0, linestyle="dotted")
         ax2.set_xlabel("TTM (years)")
         ax2.set_ylabel("Skew (pp)")
@@ -296,22 +354,32 @@ def plot_term(df: pd.DataFrame, lookbacks: List[int], title: str | None = None, 
     else:
         plt.show()
 
+
 # -------------------- CLI --------------------
+
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--symbol", required=True)
-    ap.add_argument("--as-of", default=None, help='AS-OF time "YYYYMMDD HH:MM:SS" (instrument TZ applied).')
+    ap.add_argument(
+        "--as-of",
+        default=None,
+        help='AS-OF time "YYYYMMDD HH:MM:SS" (instrument TZ applied).',
+    )
     ap.add_argument("--host", default="127.0.0.1")
     ap.add_argument("--port", type=int, default=4002)
     ap.add_argument("--client-id", type=int, default=77)
     ap.add_argument("--chains-base", default="data/option_chains")
     ap.add_argument("--options-base", default="data/option_bars")
     ap.add_argument("--limit", type=int, default=10, help="Max expiries to include")
-    ap.add_argument("--lookbacks", default="10,20,60", help="CSV of day windows for realized vol")
+    ap.add_argument(
+        "--lookbacks", default="10,20,60", help="CSV of day windows for realized vol"
+    )
     ap.add_argument("--rows", type=int, default=50)
     ap.add_argument("--plot", action="store_true")
-    ap.add_argument("--save", default=None, help="Path prefix to save figures (e.g., term.png)")
+    ap.add_argument(
+        "--save", default=None, help="Path prefix to save figures (e.g., term.png)"
+    )
     args = ap.parse_args()
 
     lookbacks = [int(x) for x in str(args.lookbacks).split(",") if str(x).strip()]
@@ -322,7 +390,16 @@ def main():
     with IBRuntime(host=args.host, port=args.port, client_id=args.client_id) as rt:
         subs = SubscriptionService(rt)
         hist = HistoricalService(rt)
-        df = compute_atm_vol_term_repo_first(rt, chain_repo, opt_repo, hist, subs, args.symbol, args.as_of, limit=args.limit)
+        df = compute_atm_vol_term_repo_first(
+            rt,
+            chain_repo,
+            opt_repo,
+            hist,
+            subs,
+            args.symbol,
+            args.as_of,
+            limit=args.limit,
+        )
         hv = compute_realized_vol(hist, args.symbol, args.as_of, lookbacks)
 
     if df.empty:
@@ -348,6 +425,7 @@ def main():
     if args.plot:
         title = f"{args.symbol} ATM Term ({args.as_of or 'now'})"
         plot_term(df, lookbacks, title=title, save=args.save)
+
 
 if __name__ == "__main__":
     main()

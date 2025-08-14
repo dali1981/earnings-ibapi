@@ -1,19 +1,16 @@
-
 """
 ibx: Compositional utilities for Interactive Brokers TWS API (ibapi).
 """
-from .runtime import IBRuntime
+
+from .contracts import make_option, make_stock
+from .futures import FutureRegistry, IBFuture
 from .ids import RequestIdSequencer
-from .futures import IBFuture, FutureRegistry
-from .subscriptions import Subscription, SubscriptionRegistry, SubscriptionHandle
+from .runtime import IBRuntime
+from .services import (ContractDetailsService, HistoricalService,
+                       SecDefService, SubscriptionService)
+from .subscriptions import (Subscription, SubscriptionHandle,
+                            SubscriptionRegistry)
 from .wrapper import IBWrapperBridge
-from .services import (
-    ContractDetailsService,
-    SecDefService,
-    HistoricalService,
-    SubscriptionService,
-)
-from .contracts import make_stock, make_option
 
 __all__ = [
     "IBRuntime",

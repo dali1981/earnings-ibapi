@@ -6,16 +6,17 @@ Also exposes light-weight IO helpers expected by callers (e.g., append_parquet).
 """
 
 from .logging_setup import (
-    setup_logging,
-    get_logger,
-    setup_script_logging,
     disable_noisy_loggers,
+    get_logger,
+    setup_logging,
+    setup_script_logging,
 )
+from pathlib import Path
 
 # Minimal IO helper re-exposed here to avoid import confusion between the
 # top-level `utils.py` module and this `utils` package.
-from typing import List, Dict, Any
-from pathlib import Path
+from typing import Any, Dict, List
+
 
 try:
     import pyarrow as pa
@@ -44,9 +45,10 @@ def append_parquet(path: Path, records: List[Dict[str, Any]]):
 
 class RateLimiter:
     """Simple token bucket rate limiter (re-exported for compatibility)."""
+
     def __init__(self, max_tokens: int = 60, refill_seconds: int = 600):
-        import time as _t
         import threading as _th
+        import time as _t
 
         self.max_tokens = max_tokens
         self.refill_seconds = refill_seconds
@@ -56,6 +58,7 @@ class RateLimiter:
 
     def acquire(self):
         import time as _t
+
         while True:
             with self.lock:
                 now = _t.monotonic()
@@ -74,6 +77,7 @@ class RateLimiter:
 # IB contract helpers (compat exports)
 def make_stock(symbol: str, exchange: str = "SMART", currency: str = "USD"):
     from ibapi.contract import Contract
+
     c = Contract()
     c.symbol = symbol
     c.secType = "STK"
@@ -93,6 +97,7 @@ def make_option(
     currency: str = "USD",
 ):
     from ibapi.contract import Contract
+
     c = Contract()
     c.symbol = symbol
     c.secType = "OPT"
@@ -109,12 +114,12 @@ def make_option(
 
 
 __all__ = [
-    'setup_logging',
-    'get_logger',
-    'setup_script_logging',
-    'disable_noisy_loggers',
-    'append_parquet',
-    'RateLimiter',
-    'make_stock',
-    'make_option',
+    "setup_logging",
+    "get_logger",
+    "setup_script_logging",
+    "disable_noisy_loggers",
+    "append_parquet",
+    "RateLimiter",
+    "make_stock",
+    "make_option",
 ]

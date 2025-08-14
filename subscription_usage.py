@@ -8,9 +8,12 @@ def main():
         aapl = make_stock("AAPL")
 
         # Subscribe (callback optional). You can also just iterate the handle.
-        handle = subs.market_data(aapl, genericTicks="",
-                                  on_event=lambda e: print("EVENT", e["type"], e.get("tick")),
-                                  qsize=1000)
+        handle = subs.market_data(
+            aapl,
+            genericTicks="",
+            on_event=lambda e: print("EVENT", e["type"], e.get("tick")),
+            qsize=1000,
+        )
 
         # Consume a few events then cancel
         n = 0

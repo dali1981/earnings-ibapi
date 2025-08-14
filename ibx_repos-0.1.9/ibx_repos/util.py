@@ -1,9 +1,11 @@
 from __future__ import annotations
+
 from pathlib import Path
-import pyarrow as pa
-import pyarrow.parquet as pq
-import pyarrow.dataset as ds
+
 import pandas as pd
+import pyarrow as pa
+import pyarrow.dataset as ds
+import pyarrow.parquet as pq
 
 
 def _ensure_dir(p: Path) -> None:
@@ -16,7 +18,12 @@ def _to_table(df: pd.DataFrame, schema: pa.schema | None) -> pa.Table:
     return pa.Table.from_pandas(df, schema=schema, preserve_index=False)
 
 
-def write_dataset(df: pd.DataFrame, root_path: Path, schema: pa.schema | None, partition_cols: list[str]) -> None:
+def write_dataset(
+    df: pd.DataFrame,
+    root_path: Path,
+    schema: pa.schema | None,
+    partition_cols: list[str],
+) -> None:
     _ensure_dir(root_path)
     table = _to_table(df, schema)
     pq.write_to_dataset(
@@ -45,7 +52,7 @@ def _build_filter(**kwargs):
         if isinstance(value, (list, tuple, set)):
             term = field.isin(list(value))
         else:
-            if key in {"asof","date"}:
+            if key in {"asof", "date"}:
                 try:
                     value = pd.to_datetime(value).date()
                 except Exception:
@@ -55,7 +62,9 @@ def _build_filter(**kwargs):
     return expr
 
 
-def read_dataset(root_path: Path, columns: list[str] | None = None, **filters) -> pd.DataFrame:
+def read_dataset(
+    root_path: Path, columns: list[str] | None = None, **filters
+) -> pd.DataFrame:
     ds_ = _dataset_hive(root_path)
     expr = _build_filter(**filters)
     tbl = ds_.to_table(filter=expr, columns=columns)
@@ -72,7 +81,12 @@ def _to_table(df: pd.DataFrame, schema: pa.schema | None) -> pa.Table:
     return pa.Table.from_pandas(df, schema=schema, preserve_index=False)
 
 
-def write_dataset(df: pd.DataFrame, root_path: Path, schema: pa.schema | None, partition_cols: list[str]) -> None:
+def write_dataset(
+    df: pd.DataFrame,
+    root_path: Path,
+    schema: pa.schema | None,
+    partition_cols: list[str],
+) -> None:
     _ensure_dir(root_path)
     table = _to_table(df, schema)
     pq.write_to_dataset(

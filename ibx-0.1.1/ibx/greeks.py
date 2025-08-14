@@ -22,6 +22,7 @@ Notes
 - For American-style equity options, BS is an approximation; good enough
   for strike selection (25Δ/75Δ) and term visualization.
 """
+
 from __future__ import annotations
 
 import math
@@ -29,7 +30,6 @@ from dataclasses import dataclass
 from typing import Iterable, List, Optional, Tuple
 
 import pandas as pd
-
 from ibx import HistoricalService, make_option
 from ibx.time import ib_end_datetime_instrument
 
@@ -46,7 +46,9 @@ def _norm_pdf(x: float) -> float:
     return math.exp(-0.5 * x * x) / SQRT_2PI
 
 
-def bs_price(S: float, K: float, r: float, q: float, sigma: float, T: float, right: str) -> float:
+def bs_price(
+    S: float, K: float, r: float, q: float, sigma: float, T: float, right: str
+) -> float:
     if sigma <= 0 or T <= 0 or S <= 0 or K <= 0:
         return max(0.0, (S - K) if right == "C" else (K - S))
     fwd = S * math.exp((r - q) * T)
@@ -58,7 +60,9 @@ def bs_price(S: float, K: float, r: float, q: float, sigma: float, T: float, rig
         return math.exp(-r * T) * (K * _norm_cdf(-d2) - fwd * _norm_cdf(-d1))
 
 
-def bs_delta(S: float, K: float, r: float, q: float, sigma: float, T: float, right: str) -> float:
+def bs_delta(
+    S: float, K: float, r: float, q: float, sigma: float, T: float, right: str
+) -> float:
     if sigma <= 0 or T <= 0 or S <= 0 or K <= 0:
         return 0.0 if right == "C" else -1.0  # degenerate; won't be used for selection
     fwd = S * math.exp((r - q) * T)
@@ -77,12 +81,29 @@ def _vega(S: float, K: float, r: float, q: float, sigma: float, T: float) -> flo
     return math.exp(-r * T) * fwd * _norm_pdf(d1) * math.sqrt(T)
 
 
-def implied_vol_from_price(price: float, S: float, K: float, r: float, q: float, T: float, right: str,
-                            *, tol: float = 1e-6, max_iter: int = 60) -> Optional[float]:
+def implied_vol_from_price(
+    price: float,
+    S: float,
+    K: float,
+    r: float,
+    q: float,
+    T: float,
+    right: str,
+    *,
+    tol: float = 1e-6,
+    max_iter: int = 60,
+) -> Optional[float]:
     """Bracketing + Newton fallback. Returns None if not solvable.
     Bounds: [1e-6, 5.0]. If price is outside no-arb bounds, clamp and continue.
     """
-    if price is None or not (price == price) or price <= 0 or T <= 0 or S <= 0 or K <= 0:
+    if (
+        price is None
+        or not (price == price)
+        or price <= 0
+        or T <= 0
+        or S <= 0
+        or K <= 0
+    ):
         return None
 
     # no-arbitrage bounds (discounted intrinsic to S upper bound)
@@ -120,19 +141,25 @@ def implied_vol_from_price(price: float, S: float, K: float, r: float, q: float,
                     return max(mid, 1e-6)
         # Bisection update
         if f_lo * f_mid <= 0:
-            hi = mid; f_hi = f_mid
+            hi = mid
+            f_hi = f_mid
         else:
-            lo = mid; f_lo = f_mid
+            lo = mid
+            f_lo = f_mid
     return max(mid, 1e-6)
 
 
-def delta_from_price(price: float, S: float, K: float, r: float, q: float, T: float, right: str) -> Tuple[Optional[float], Optional[float]]:
+def delta_from_price(
+    price: float, S: float, K: float, r: float, q: float, T: float, right: str
+) -> Tuple[Optional[float], Optional[float]]:
     sigma = implied_vol_from_price(price, S, K, r, q, T, right)
     if sigma is None:
         return None, None
     return sigma, bs_delta(S, K, r, q, sigma, T, right)
 
+
 # --------------- Historical as-of pricing helpers ---------------
+
 
 @dataclass
 class AsOfQuote:
@@ -140,8 +167,17 @@ class AsOfQuote:
     ts: Optional[pd.Timestamp]
 
 
-def _option_price_asof(hist: HistoricalService, symbol: str, expiry: str, strike: float, right: str,
-                        as_of: str, *, price_field: str = "close", timeout: float = 60.0) -> AsOfQuote:
+def _option_price_asof(
+    hist: HistoricalService,
+    symbol: str,
+    expiry: str,
+    strike: float,
+    right: str,
+    as_of: str,
+    *,
+    price_field: str = "close",
+    timeout: float = 60.0,
+) -> AsOfQuote:
     contract = make_option(symbol, expiry, strike, right)
     end = ib_end_datetime_instrument(hist.rt, contract, as_of, hyphen=True)
     rows = hist.bars(
@@ -159,7 +195,9 @@ def _option_price_asof(hist: HistoricalService, symbol: str, expiry: str, strike
     ts = pd.to_datetime(df.get("time", df.get("date")), errors="coerce")
     df["_ts"] = ts
     df = df.sort_values("_ts").dropna(subset=["_ts"])  # in case
-    px = pd.to_numeric(df.get(price_field, df.get("wap", df.get("close"))), errors="coerce").dropna()
+    px = pd.to_numeric(
+        df.get(price_field, df.get("wap", df.get("close"))), errors="coerce"
+    ).dropna()
     if px.empty:
         return AsOfQuote(price=None, ts=df["_ts"].iloc[-1] if not df.empty else None)
     return AsOfQuote(price=float(px.iloc[-1]), ts=df["_ts"].iloc[-1])
@@ -188,11 +226,24 @@ def compute_deltas_asof(
     T = max((exp_dt - asof_dt).total_seconds(), 0) / (365.0 * 24 * 3600)
 
     for k in sorted({float(s) for s in strikes}):
-        qte = _option_price_asof(hist, symbol, expiry, k, right, as_of, price_field=price_field, timeout=timeout)
+        qte = _option_price_asof(
+            hist,
+            symbol,
+            expiry,
+            k,
+            right,
+            as_of,
+            price_field=price_field,
+            timeout=timeout,
+        )
         if qte.price is None:
-            out.append({"strike": k, "price": None, "iv": None, "delta": None, "ts": qte.ts})
+            out.append(
+                {"strike": k, "price": None, "iv": None, "delta": None, "ts": qte.ts}
+            )
             continue
         iv, d = delta_from_price(qte.price, S_asof, k, r, q, T, right)
-        out.append({"strike": k, "price": qte.price, "iv": iv, "delta": d, "ts": qte.ts})
+        out.append(
+            {"strike": k, "price": qte.price, "iv": iv, "delta": d, "ts": qte.ts}
+        )
 
     return pd.DataFrame(out)

@@ -1,13 +1,17 @@
-
 from __future__ import annotations
+
 from dataclasses import dataclass
-from typing import List, Optional
 from datetime import date
+from typing import List, Optional
+
 import pandas as pd
-from ibx import IBRuntime, ContractDetailsService, SecDefService, HistoricalService, make_stock, make_option
+from ibx import (ContractDetailsService, HistoricalService, IBRuntime,
+                 SecDefService, make_option, make_stock)
+
+from .chains import OptionChainSnapshotRepository
 from .equity_bars import EquityBarRepository
 from .option_bars import OptionBarRepository, OptionMeta
-from .chains import OptionChainSnapshotRepository
+
 
 @dataclass
 class FetchSpec:
@@ -17,9 +21,17 @@ class FetchSpec:
     what_to_show: str = "TRADES"
     use_rth: int = 0
 
+
 class IBXDataService:
     """High-level helpers to fetch from IB via ibx services and persist via repositories."""
-    def __init__(self, rt: IBRuntime, equity_repo: EquityBarRepository, option_repo: OptionBarRepository, chain_repo: OptionChainSnapshotRepository):
+
+    def __init__(
+        self,
+        rt: IBRuntime,
+        equity_repo: EquityBarRepository,
+        option_repo: OptionBarRepository,
+        chain_repo: OptionChainSnapshotRepository,
+    ):
         self.rt = rt
         self.cds = ContractDetailsService(rt)
         self.secdef = SecDefService(rt)
@@ -29,11 +41,26 @@ class IBXDataService:
         self.chain_repo = chain_repo
 
     # ---------- Equity ----------
-    def fetch_equity_bars(self, spec: FetchSpec, end_datetime: str = "") -> pd.DataFrame:
+    def fetch_equity_bars(
+        self, spec: FetchSpec, end_datetime: str = ""
+    ) -> pd.DataFrame:
         stk = make_stock(spec.symbol)
-        rows = self.hist.bars(stk, end_datetime, spec.duration, spec.bar_size, spec.what_to_show, spec.use_rth, timeout=60.0)
+        rows = self.hist.bars(
+            stk,
+            end_datetime,
+            spec.duration,
+            spec.bar_size,
+            spec.what_to_show,
+            spec.use_rth,
+            timeout=60.0,
+        )
         df = pd.DataFrame(rows)
-        self.eq_repo.save(df, symbol=spec.symbol, bar_size=spec.bar_size, what_to_show=spec.what_to_show)
+        self.eq_repo.save(
+            df,
+            symbol=spec.symbol,
+            bar_size=spec.bar_size,
+            what_to_show=spec.what_to_show,
+        )
         return df
 
     # ---------- Chains ----------
@@ -46,9 +73,23 @@ class IBXDataService:
         return pd.DataFrame(snap)
 
     # ---------- Options ----------
-    def fetch_option_bars(self, meta: OptionMeta, end_datetime: str = "", duration: str = "1 D", use_rth: int = 0) -> pd.DataFrame:
+    def fetch_option_bars(
+        self,
+        meta: OptionMeta,
+        end_datetime: str = "",
+        duration: str = "1 D",
+        use_rth: int = 0,
+    ) -> pd.DataFrame:
         opt = make_option(meta.underlying, meta.expiry, meta.strike, meta.right)
-        rows = self.hist.bars(opt, end_datetime, duration, meta.bar_size, meta.what_to_show or "TRADES", use_rth, timeout=60.0)
+        rows = self.hist.bars(
+            opt,
+            end_datetime,
+            duration,
+            meta.bar_size,
+            meta.what_to_show or "TRADES",
+            use_rth,
+            timeout=60.0,
+        )
         df = pd.DataFrame(rows)
         self.opt_repo.save(df, meta)
         return df

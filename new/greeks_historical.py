@@ -1,11 +1,17 @@
 # ibx_flows/greeks_historical.py
 from __future__ import annotations
+
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Iterable, List, Optional, Literal, Dict
+from typing import Dict, Iterable, List, Literal, Optional
+
 import pandas as pd
-from ibx_pricing.black_scholes import implied_vol_from_price, delta, gamma, vega, theta, rho, Right
+from ibx_pricing.black_scholes import (Right, delta, gamma,
+                                       implied_vol_from_price, rho, theta,
+                                       vega)
+
 from ibx_time.timebox import ensure_utc
+
 
 @dataclass(frozen=True)
 class OptionMeta:

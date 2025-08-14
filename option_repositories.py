@@ -1,13 +1,12 @@
-from pathlib import Path
 from datetime import date
+from pathlib import Path
 from typing import List, Optional, Union
 
-import pyarrow as pa
-import pyarrow.parquet as pq
-import pyarrow.dataset as ds
 import duckdb
 import pandas as pd
-
+import pyarrow as pa
+import pyarrow.dataset as ds
+import pyarrow.parquet as pq
 
 
 class ChainRepository:
@@ -20,15 +19,17 @@ class ChainRepository:
         self.base_path = Path(base_path) / "chains"
         self.base_path.mkdir(parents=True, exist_ok=True)
         # Define Arrow schema
-        self.schema = pa.schema([
-            pa.field('underlying_conid', pa.int64()),
-            pa.field('exchange', pa.string()),
-            pa.field('trading_class', pa.string()),
-            pa.field('multiplier', pa.int64()),
-            pa.field('expirations', pa.list_(pa.string())),
-            pa.field('strikes', pa.list_(pa.float64())),
-            pa.field('date', pa.date32()),  # date when data was fetched
-        ])
+        self.schema = pa.schema(
+            [
+                pa.field("underlying_conid", pa.int64()),
+                pa.field("exchange", pa.string()),
+                pa.field("trading_class", pa.string()),
+                pa.field("multiplier", pa.int64()),
+                pa.field("expirations", pa.list_(pa.string())),
+                pa.field("strikes", pa.list_(pa.float64())),
+                pa.field("date", pa.date32()),  # date when data was fetched
+            ]
+        )
 
     def save(self, data: Union[pd.DataFrame, List[dict]]) -> None:
         """
@@ -41,31 +42,31 @@ class ChainRepository:
             df = data.copy()
 
         # Cast types and add ingestion_date
-        df['underlying_conid'] = df['underlying_conid'].astype(int)
-        df['multiplier'] = df['multiplier'].astype(int)
+        df["underlying_conid"] = df["underlying_conid"].astype(int)
+        df["multiplier"] = df["multiplier"].astype(int)
         # Ensure expirations are strings and strikes floats
-        df['expirations'] = df['expirations'].apply(lambda x: list(x))
-        df['strikes'] = df['strikes'].apply(lambda x: [float(s) for s in x])
-        df['date'] = date.today()
+        df["expirations"] = df["expirations"].apply(lambda x: list(x))
+        df["strikes"] = df["strikes"].apply(lambda x: [float(s) for s in x])
+        df["date"] = date.today()
 
         table = pa.Table.from_pandas(df, schema=self.schema, preserve_index=False)
         pq.write_to_dataset(
             table,
             root_path=str(self.base_path),
-            partition_cols=['underlying_conid'],
+            partition_cols=["underlying_conid"],
             use_dictionary=True,
-            compression='snappy'
+            compression="snappy",
         )
 
     def load(
         self,
         underlying: Optional[str] = None,
-        expiry: Optional[Union[str, date]] = None
+        expiry: Optional[Union[str, date]] = None,
     ) -> pd.DataFrame:
         """
         Load chains, optionally filtering by underlying and expiry.
         """
-        dataset = ds.dataset(str(self.base_path), format='parquet')
+        dataset = ds.dataset(str(self.base_path), format="parquet")
         filters = []
         if underlying:
             filters.append(("underlying", "=", underlying))
@@ -86,6 +87,8 @@ class ChainRepository:
     #         filters.append(("underlying_conid", "=", underlying_conid))
     #     table = dataset.to_table(filter=filters if filters else None)
     #     return table.to_pandas()
+
+
 class BarRepository:
     """
     Repository for storing and loading 1-minute option bars as Parquet.
@@ -95,17 +98,19 @@ class BarRepository:
     def __init__(self, base_path: Union[str, Path]):
         self.base_path = Path(base_path) / "bars"
         self.base_path.mkdir(parents=True, exist_ok=True)
-        self.schema = pa.schema([
-            pa.field('trade_time', pa.timestamp('ns')),
-            pa.field('contract_id', pa.int64()),
-            pa.field('open', pa.float64()),
-            pa.field('high', pa.float64()),
-            pa.field('low', pa.float64()),
-            pa.field('close', pa.float64()),
-            pa.field('volume', pa.int64()),
-            pa.field('open_interest', pa.int64()),
-            pa.field('trade_date', pa.date32()),  # extracted for partitioning
-        ])
+        self.schema = pa.schema(
+            [
+                pa.field("trade_time", pa.timestamp("ns")),
+                pa.field("contract_id", pa.int64()),
+                pa.field("open", pa.float64()),
+                pa.field("high", pa.float64()),
+                pa.field("low", pa.float64()),
+                pa.field("close", pa.float64()),
+                pa.field("volume", pa.int64()),
+                pa.field("open_interest", pa.int64()),
+                pa.field("trade_date", pa.date32()),  # extracted for partitioning
+            ]
+        )
 
     def save(self, df: pd.DataFrame) -> None:
         """
@@ -113,20 +118,18 @@ class BarRepository:
         Assumes df contains 'trade_time' datetime64[ns].
         """
         # extract date for partition
-        df['trade_date'] = df['trade_time'].dt.date
+        df["trade_date"] = df["trade_time"].dt.date
         table = pa.Table.from_pandas(df, schema=self.schema, preserve_index=False)
         pq.write_to_dataset(
             table,
             root_path=str(self.base_path),
-            partition_cols=['trade_date'],
+            partition_cols=["trade_date"],
             use_dictionary=True,
-            compression='snappy'
+            compression="snappy",
         )
 
     def load(
-        self,
-        trade_date: Union[str, date],
-        contract_id: Optional[int] = None
+        self, trade_date: Union[str, date], contract_id: Optional[int] = None
     ) -> pd.DataFrame:
         """
         Load bars for a given date and optional contract filter.
@@ -134,7 +137,7 @@ class BarRepository:
         if isinstance(trade_date, date):
             trade_date = trade_date.isoformat()
         partition_path = self.base_path / f"trade_date={trade_date}"
-        dataset = ds.dataset(str(partition_path), format='parquet')
+        dataset = ds.dataset(str(partition_path), format="parquet")
         filters = []
         if contract_id:
             filters.append(("contract_id", "=", contract_id))

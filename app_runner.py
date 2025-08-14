@@ -1,4 +1,6 @@
-import threading, time
+import threading
+import time
+
 
 class AppRunner:
     def __init__(self, app, host="127.0.0.1", port=7497, client_id=42):
@@ -17,8 +19,10 @@ class AppRunner:
 
     def stop(self, join_timeout=5):
         # optional: cancel all to be nice with pacing
-        try: self.app.reqGlobalCancel()
-        except: pass
+        try:
+            self.app.reqGlobalCancel()
+        except:
+            pass
         # set a 'done' flag (some IB samples check this) and disconnect
         setattr(self.app, "done", True)
         self.app.disconnect()

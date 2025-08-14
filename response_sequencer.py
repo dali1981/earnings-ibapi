@@ -1,10 +1,11 @@
 import threading
-from datetime import datetime, date
-from typing import Callable, Dict, List, Optional, Any
+from datetime import date, datetime
+from typing import Any, Callable, Dict, List, Optional
+
 import pandas as pd
 from ibapi.client import EClient
-from ibapi.wrapper import EWrapper
 from ibapi.contract import Contract
+from ibapi.wrapper import EWrapper
 
 
 class ResponseSequencer:
@@ -12,6 +13,7 @@ class ResponseSequencer:
     Buffers incoming IB API responses keyed by reqId, matching them to request callbacks.
     Signals completion and emits a pandas DataFrame via the registered callback.
     """
+
     def __init__(self):
         self._events: Dict[int, threading.Event] = {}
         self._buffer: Dict[int, List[dict]] = {}
@@ -23,7 +25,7 @@ class ResponseSequencer:
         self,
         req_id: int,
         callback: Callable[[pd.DataFrame], None],
-        metadata: Dict[str, Any]
+        metadata: Dict[str, Any],
     ) -> None:
         """
         Register a new request: allocate event, buffer, callback, and store request metadata.

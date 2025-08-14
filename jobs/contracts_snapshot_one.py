@@ -1,6 +1,9 @@
-from ibx_flows.contracts_backfill import ContractsConfig, ContractDescriptionsSnapshotJob
-from ibx_repos import ContractDescriptionsRepository
 from ibx import IBRuntime
+from ibx_flows.contracts_backfill import (
+    ContractDescriptionsSnapshotJob,
+    ContractsConfig,
+)
+from ibx_repos import ContractDescriptionsRepository
 
 
 if __name__ == "__main__":

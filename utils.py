@@ -4,10 +4,10 @@
 import threading
 import time
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import Any, Dict, List
+
 import pyarrow as pa
 import pyarrow.parquet as pq
-
 from ibapi.contract import Contract
 
 
@@ -44,9 +44,11 @@ def make_option(
         c.multiplier = str(multiplier)
     return c
 
+
 # ───────────────────────────────────────────────────────────────────────────────
 # Rate limiter – token bucket
 # ───────────────────────────────────────────────────────────────────────────────
+
 
 class RateLimiter:
     def __init__(self, max_tokens: int = 60, refill_seconds: int = 600):
@@ -71,9 +73,11 @@ class RateLimiter:
                     return
             time.sleep(0.2)
 
+
 # ───────────────────────────────────────────────────────────────────────────────
 # Arrow sink helpers – incremental parquet writing
 # ───────────────────────────────────────────────────────────────────────────────
+
 
 def append_parquet(path: Path, records: List[Dict[str, Any]]):
     if not records:

@@ -1,15 +1,17 @@
 # ib_core.py
-import logging, threading
-from typing import Any, Dict, List, Optional, Tuple
+import logging
+import threading
 from dataclasses import dataclass
+from typing import Any, Dict, List, Optional, Tuple
 
 from ibapi.client import EClient
-from ibapi.wrapper import EWrapper
 from ibapi.contract import Contract
+from ibapi.wrapper import EWrapper
 
 from api.subscriptions import SubscriptionRegistry
 
 log = logging.getLogger("ib.core")
+
 
 # ---------- ReqId sequencing ----------
 class RequestIdSequencer:
@@ -34,6 +36,7 @@ class RequestIdSequencer:
             rid = self._next
             self._next += n
             return rid
+
 
 # ---------- Minimal future + registry ----------
 class IBFuture:
@@ -63,7 +66,12 @@ class IBFuture:
         if self._error:
             code, msg = self._error
             raise RuntimeError(f"IB error {code}: {msg}")
-        return self._items if self.expect_many else (self._items[0] if self._items else None)
+        return (
+            self._items
+            if self.expect_many
+            else (self._items[0] if self._items else None)
+        )
+
 
 class FutureRegistry:
     def __init__(self):
@@ -95,6 +103,7 @@ class FutureRegistry:
         else:
             log.warning("IB error reqId=%s code=%s: %s", req_id, code, msg)
 
+
 # ---------- Wrapper: callbacks only ----------
 class IBWrapperBridge(EWrapper):
     def __init__(self, sequencer: RequestIdSequencer, registry: FutureRegistry):
@@ -108,7 +117,13 @@ class IBWrapperBridge(EWrapper):
         self._seq.set_base(orderId)
 
     # errors
-    def error(self, reqId: int, errorCode: int, errorString: str, advancedOrderRejectJson: str = ""):
+    def error(
+        self,
+        reqId: int,
+        errorCode: int,
+        errorString: str,
+        advancedOrderRejectJson: str = "",
+    ):
         if reqId in (-1, 0):
             log.warning("IB error (no reqId) code=%s msg=%s", errorCode, errorString)
             return
@@ -123,64 +138,130 @@ class IBWrapperBridge(EWrapper):
         self._reg.finish(reqId)
 
     # ---- SecDef Option Params ----
-    def securityDefinitionOptionParameter(self, reqId, exchange, underlyingConId, tradingClass, multiplier,
-                                          expirations, strikes):
-        self._reg.add_item(reqId, {
-            "exchange": exchange,
-            "underlyingConId": underlyingConId,
-            "tradingClass": tradingClass,
-            "multiplier": multiplier,
-            "expirations": list(expirations),
-            "strikes": list(strikes),
-        })
+    def securityDefinitionOptionParameter(
+        self,
+        reqId,
+        exchange,
+        underlyingConId,
+        tradingClass,
+        multiplier,
+        expirations,
+        strikes,
+    ):
+        self._reg.add_item(
+            reqId,
+            {
+                "exchange": exchange,
+                "underlyingConId": underlyingConId,
+                "tradingClass": tradingClass,
+                "multiplier": multiplier,
+                "expirations": list(expirations),
+                "strikes": list(strikes),
+            },
+        )
 
     def securityDefinitionOptionParameterEnd(self, reqId):
         self._reg.finish(reqId)
 
     # ---- Historical Data ----
     def historicalData(self, reqId, bar):
-        self._reg.add_item(reqId, {
-            "date": bar.date, "open": bar.open, "high": bar.high,
-            "low": bar.low, "close": bar.close, "volume": bar.volume,
-            "wap": getattr(bar, "wap", None), "barCount": getattr(bar, "barCount", None)
-        })
+        self._reg.add_item(
+            reqId,
+            {
+                "date": bar.date,
+                "open": bar.open,
+                "high": bar.high,
+                "low": bar.low,
+                "close": bar.close,
+                "volume": bar.volume,
+                "wap": getattr(bar, "wap", None),
+                "barCount": getattr(bar, "barCount", None),
+            },
+        )
 
     def historicalDataEnd(self, reqId, start, end):
         self._reg.finish(reqId)
 
         # ---- STREAMING MARKET DATA ----
         def marketDataType(self, reqId, marketDataType):
-            self._subs.dispatch(reqId, {"type": "marketDataType", "mode": marketDataType})
+            self._subs.dispatch(
+                reqId, {"type": "marketDataType", "mode": marketDataType}
+            )
 
         def tickPrice(self, reqId, tickType, price, attrib):
-            self._subs.dispatch(reqId, {
-                "type": "tickPrice",
-                "tick": TickTypeEnum.to_str(tickType),
-                "price": price,
-                "attrib": {
-                    "canAutoExecute": getattr(attrib, "canAutoExecute", None),
-                    "pastLimit": getattr(attrib, "pastLimit", None),
-                    "preOpen": getattr(attrib, "preOpen", None),
-                }
-            })
+            self._subs.dispatch(
+                reqId,
+                {
+                    "type": "tickPrice",
+                    "tick": TickTypeEnum.to_str(tickType),
+                    "price": price,
+                    "attrib": {
+                        "canAutoExecute": getattr(attrib, "canAutoExecute", None),
+                        "pastLimit": getattr(attrib, "pastLimit", None),
+                        "preOpen": getattr(attrib, "preOpen", None),
+                    },
+                },
+            )
 
         def tickSize(self, reqId, tickType, size):
-            self._subs.dispatch(reqId, {"type": "tickSize", "tick": TickTypeEnum.to_str(tickType), "size": size})
+            self._subs.dispatch(
+                reqId,
+                {
+                    "type": "tickSize",
+                    "tick": TickTypeEnum.to_str(tickType),
+                    "size": size,
+                },
+            )
 
         def tickString(self, reqId, tickType, value):
-            self._subs.dispatch(reqId, {"type": "tickString", "tick": TickTypeEnum.to_str(tickType), "value": value})
+            self._subs.dispatch(
+                reqId,
+                {
+                    "type": "tickString",
+                    "tick": TickTypeEnum.to_str(tickType),
+                    "value": value,
+                },
+            )
 
         def tickGeneric(self, reqId, tickType, value):
-            self._subs.dispatch(reqId, {"type": "tickGeneric", "tick": TickTypeEnum.to_str(tickType), "value": value})
+            self._subs.dispatch(
+                reqId,
+                {
+                    "type": "tickGeneric",
+                    "tick": TickTypeEnum.to_str(tickType),
+                    "value": value,
+                },
+            )
 
-        def tickOptionComputation(self, reqId, tickType, impliedVol, delta, optPrice, pvDividend, gamma, vega, theta,
-                                  undPrice):
-            self._subs.dispatch(reqId, {
-                "type": "tickOption", "tick": TickTypeEnum.to_str(tickType),
-                "impliedVol": impliedVol, "delta": delta, "optPrice": optPrice,
-                "pvDividend": pvDividend, "gamma": gamma, "vega": vega, "theta": theta,
-                "underPrice": undPrice
-            })
+        def tickOptionComputation(
+            self,
+            reqId,
+            tickType,
+            impliedVol,
+            delta,
+            optPrice,
+            pvDividend,
+            gamma,
+            vega,
+            theta,
+            undPrice,
+        ):
+            self._subs.dispatch(
+                reqId,
+                {
+                    "type": "tickOption",
+                    "tick": TickTypeEnum.to_str(tickType),
+                    "impliedVol": impliedVol,
+                    "delta": delta,
+                    "optPrice": optPrice,
+                    "pvDividend": pvDividend,
+                    "gamma": gamma,
+                    "vega": vega,
+                    "theta": theta,
+                    "underPrice": undPrice,
+                },
+            )
+
 
 # ---------- Runtime: connection + run thread ----------
 class IBRuntime:
@@ -189,8 +270,7 @@ class IBRuntime:
         self.sequencer = RequestIdSequencer()
         self.registry = FutureRegistry()
         self.subs = SubscriptionRegistry()
-        self.wrapper = IBWrapperBridge(self.sequencer, self.registry,
-                                         self.subs)
+        self.wrapper = IBWrapperBridge(self.sequencer, self.registry, self.subs)
         self.client = EClient(self.wrapper)
 
         self._run_thread: Optional[threading.Thread] = None
@@ -200,7 +280,9 @@ class IBRuntime:
         if self.client.isConnected():
             return
         self.client.connect(self.host, self.port, self.client_id)
-        self._run_thread = threading.Thread(target=self.client.run, name="ib-reader", daemon=False)
+        self._run_thread = threading.Thread(
+            target=self.client.run, name="ib-reader", daemon=False
+        )
         self._run_thread.start()
         self.sequencer.wait_ready(ready_timeout)
 
@@ -221,6 +303,7 @@ class IBRuntime:
     def __exit__(self, exc_type, exc, tb):
         self.stop()
 
+
 # ---------- Services (composition) ----------
 class ContractDetailsService:
     def __init__(self, rt: IBRuntime):
@@ -228,38 +311,74 @@ class ContractDetailsService:
 
     def fetch(self, contract: Contract, timeout: float = 10.0) -> List[Any]:
         rid = self.rt.sequencer.next()
-        fut = self.rt.registry.register(rid, IBFuture(expect_many=True, timeout=timeout))
+        fut = self.rt.registry.register(
+            rid, IBFuture(expect_many=True, timeout=timeout)
+        )
         self.rt.client.reqContractDetails(rid, contract)
         return fut.result()
+
 
 class SecDefService:
     def __init__(self, rt: IBRuntime):
         self.rt = rt
 
-    def option_params(self, symbol: str, conid: int, sec_type="STK", exchange: str = "",
-                      timeout: float = 10.0) -> List[Dict[str, Any]]:
+    def option_params(
+        self,
+        symbol: str,
+        conid: int,
+        sec_type="STK",
+        exchange: str = "",
+        timeout: float = 10.0,
+    ) -> List[Dict[str, Any]]:
         rid = self.rt.sequencer.next()
-        fut = self.rt.registry.register(rid, IBFuture(expect_many=True, timeout=timeout))
+        fut = self.rt.registry.register(
+            rid, IBFuture(expect_many=True, timeout=timeout)
+        )
         self.rt.client.reqSecDefOptParams(rid, symbol, exchange, sec_type, conid)
         return fut.result()
+
 
 class HistoricalService:
     def __init__(self, rt: IBRuntime):
         self.rt = rt
 
-    def bars(self, contract: Contract, endDateTime: str, durationStr: str,
-             barSizeSetting: str, whatToShow: str, useRTH: int,
-             formatDate: int = 1, keepUpToDate: bool = False, chartOptions=None,
-             timeout: float = 20.0) -> List[Dict[str, Any]]:
+    def bars(
+        self,
+        contract: Contract,
+        endDateTime: str,
+        durationStr: str,
+        barSizeSetting: str,
+        whatToShow: str,
+        useRTH: int,
+        formatDate: int = 1,
+        keepUpToDate: bool = False,
+        chartOptions=None,
+        timeout: float = 20.0,
+    ) -> List[Dict[str, Any]]:
         rid = self.rt.sequencer.next()
-        fut = self.rt.registry.register(rid, IBFuture(expect_many=True, timeout=timeout))
+        fut = self.rt.registry.register(
+            rid, IBFuture(expect_many=True, timeout=timeout)
+        )
         self.rt.client.reqHistoricalData(
-            rid, contract, endDateTime, durationStr, barSizeSetting,
-            whatToShow, useRTH, formatDate, keepUpToDate, chartOptions or []
+            rid,
+            contract,
+            endDateTime,
+            durationStr,
+            barSizeSetting,
+            whatToShow,
+            useRTH,
+            formatDate,
+            keepUpToDate,
+            chartOptions or [],
         )
         return fut.result()
 
+
 # ---------- Small helper ----------
 def make_stock(symbol: str, exch="SMART", curr="USD") -> Contract:
-    c = Contract(); c.symbol=symbol; c.secType="STK"; c.exchange=exch; c.currency=curr
+    c = Contract()
+    c.symbol = symbol
+    c.secType = "STK"
+    c.exchange = exch
+    c.currency = curr
     return c

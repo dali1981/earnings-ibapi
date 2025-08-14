@@ -16,9 +16,9 @@ class RequestSequencer:
 
     def seed(self, start: int):
         """
-                Initialize the requests with the first valid ID (nextValidId event).
-                Fires and clears any callbacks queued before seeding.
-                """
+        Initialize the requests with the first valid ID (nextValidId event).
+        Fires and clears any callbacks queued before seeding.
+        """
         with self._lock:
             self._next_id = start
             logging.info("Sequencer seeded: next_id=%d", start)
@@ -33,12 +33,14 @@ class RequestSequencer:
 
     def next(self, tag: str | None = None) -> int:
         """
-                Allocate and return the next request ID. Optionally tag it for tracking.
-                Raises if requests is not yet seeded.
-                """
+        Allocate and return the next request ID. Optionally tag it for tracking.
+        Raises if requests is not yet seeded.
+        """
         with self._lock:
             if self._next_id is None:
-                raise RuntimeError("nextValidId not received yet. Cannot allocate request ID.")
+                raise RuntimeError(
+                    "nextValidId not received yet. Cannot allocate request ID."
+                )
             rid = self._next_id
             self._next_id += 1
             if tag:
@@ -72,14 +74,14 @@ class RequestSequencer:
 
     def when_ready(self, fn: Callable[[int], None]):
         """
-                Queue a callback to be invoked once the requests is seeded,
-                or invoke immediately if already seeded.
+        Queue a callback to be invoked once the requests is seeded,
+        or invoke immediately if already seeded.
 
-                - If not seeded: store fn in the queue.
-                - If seeded: call fn immediately with the current next ID.
+        - If not seeded: store fn in the queue.
+        - If seeded: call fn immediately with the current next ID.
 
-                Callbacks queued before seeding are fired exactly once in seed().
-                """
+        Callbacks queued before seeding are fired exactly once in seed().
+        """
         with self._lock:
             if self._next_id is None:
                 self._on_ready.append(fn)

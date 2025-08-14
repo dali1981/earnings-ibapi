@@ -12,28 +12,32 @@ Usage:
     earnings = fetcher.get_upcoming_earnings(days_ahead=14)
 """
 
+from dataclasses import dataclass
+from datetime import date, datetime, timedelta
+from enum import Enum
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
 import json
 import os
-import requests
 import pandas as pd
-from datetime import datetime, date, timedelta
-from pathlib import Path
-from typing import Dict, List, Optional, Any
-from dataclasses import dataclass
-from enum import Enum
+import requests
 import sys
+
 
 # Add path for centralized logging
 sys.path.append(str(Path(__file__).parent.parent))
 from utils.logging_setup import get_logger
+
 
 logger = get_logger(__name__)
 
 
 class EarningsSource(Enum):
     """Earnings data sources."""
+
     FMP = "financial_modeling_prep"
-    FINNHUB = "finnhub"  
+    FINNHUB = "finnhub"
     NASDAQ = "nasdaq"
     YAHOO = "yahoo"
 
@@ -41,39 +45,42 @@ class EarningsSource(Enum):
 @dataclass
 class EarningsEvent:
     """Single earnings event."""
+
     symbol: str
     company_name: str
     earnings_date: date
-    time: Optional[str] = None  # "bmo", "amc", "dmt" (before market, after market, during market)
+    time: Optional[str] = (
+        None  # "bmo", "amc", "dmt" (before market, after market, during market)
+    )
     eps_estimate: Optional[float] = None
     eps_actual: Optional[float] = None
     revenue_estimate: Optional[float] = None
     revenue_actual: Optional[float] = None
     source: str = "unknown"
-    
+
     @property
     def days_until_earnings(self) -> int:
         """Days until earnings (negative if in past)."""
         return (self.earnings_date - date.today()).days
-    
+
     @property
     def priority_score(self) -> float:
         """Priority score for scheduling (higher = more urgent)."""
         days_until = self.days_until_earnings
-        
+
         # High priority for earnings in next 7 days
         if days_until <= 0:
             return 100.0  # Today or past
         elif days_until <= 3:
-            return 90.0   # Next 3 days
+            return 90.0  # Next 3 days
         elif days_until <= 7:
-            return 80.0   # Next week
+            return 80.0  # Next week
         elif days_until <= 14:
-            return 60.0   # Next 2 weeks
+            return 60.0  # Next 2 weeks
         elif days_until <= 30:
-            return 40.0   # Next month
+            return 40.0  # Next month
         else:
-            return 20.0   # Future
+            return 20.0  # Future
 
 
 class EarningsCalendarFetcher:
@@ -94,48 +101,48 @@ class EarningsCalendarFetcher:
         return [mapping[k] for k in mapping.keys() if k in allowed]
 
     """Multi-source earnings calendar data fetcher."""
-    
+
     def __init__(self, cache_dir: Path = Path("cache/earnings")):
         self.cache_dir = cache_dir
         self.cache_dir.mkdir(parents=True, exist_ok=True)
-        
+
         # API configurations (free tiers)
         self.api_configs = {
             EarningsSource.FMP: {
                 "base_url": "https://financialmodelingprep.com/api/v3",
                 "rate_limit": 250,  # per day free
-                "api_key": None  # Can be set via environment or config
+                "api_key": None,  # Can be set via environment or config
             },
             EarningsSource.FINNHUB: {
                 "base_url": "https://finnhub.io/api/v1",
-                "rate_limit": 60,   # per minute free
-                "api_key": None
-            }
+                "rate_limit": 60,  # per minute free
+                "api_key": None,
+            },
         }
-        
+
         self.session = requests.Session()
-        self.session.headers.update({
-            'User-Agent': 'Trading-Data-System/1.0'
-        })
-        
-    def get_earnings_range(self,
-                          symbols: Optional[List[str]] = None,
-                          days_back: int = 0,
-                          days_ahead: int = 30,
-                          sources: List[EarningsSource] = None) -> List[EarningsEvent]:
+        self.session.headers.update({"User-Agent": "Trading-Data-System/1.0"})
+
+    def get_earnings_range(
+        self,
+        symbols: Optional[List[str]] = None,
+        days_back: int = 0,
+        days_ahead: int = 30,
+        sources: List[EarningsSource] = None,
+    ) -> List[EarningsEvent]:
         """
         Get earnings events for a date range including past and future dates.
-        
+
         Args:
             symbols: Optional list of symbols to filter
             days_back: Number of days back to look for historical earnings
             days_ahead: Number of days ahead to look for upcoming earnings
             sources: List of data sources to use
-            
+
         Returns:
             List of earnings events from (today - days_back) to (today + days_ahead)
         """
-        
+
         # Default to NASDAQ-only unless explicit sources are provided
         if sources is None:
             sources = [EarningsSource.NASDAQ]
@@ -147,129 +154,147 @@ class EarningsCalendarFetcher:
         if disallowed:
             logger.warning(
                 "Skipping disallowed sources: %s (allowed: %s)",
-                [s.value for s in disallowed], [s.value for s in allowed]
+                [s.value for s in disallowed],
+                [s.value for s in allowed],
             )
         sources = filtered or [EarningsSource.NASDAQ]
-        
+
         all_earnings = []
         successful_sources = []
-        
+
         # Calculate date range
         start_date = date.today() - timedelta(days=days_back)
         end_date = date.today() + timedelta(days=days_ahead)
         total_days = days_back + days_ahead + 1  # Include today
-        
-        logger.info(f"📅 Fetching earnings from {start_date} to {end_date} ({total_days} days)")
-        
+
+        logger.info(
+            f"📅 Fetching earnings from {start_date} to {end_date} ({total_days} days)"
+        )
+
         # Try each source until we get data
         for source in sources:
             try:
                 if source == EarningsSource.FMP:
                     earnings = self._fetch_from_fmp_range(symbols, start_date, end_date)
                 elif source == EarningsSource.FINNHUB:
-                    earnings = self._fetch_from_finnhub_range(symbols, start_date, end_date)
+                    earnings = self._fetch_from_finnhub_range(
+                        symbols, start_date, end_date
+                    )
                 elif source == EarningsSource.NASDAQ:
-                    earnings = self._fetch_from_nasdaq_range(symbols, start_date, end_date)
+                    earnings = self._fetch_from_nasdaq_range(
+                        symbols, start_date, end_date
+                    )
                 elif source == EarningsSource.YAHOO:
-                    earnings = self._fetch_from_yahoo(symbols, days_ahead)  # Yahoo only supports forward
+                    earnings = self._fetch_from_yahoo(
+                        symbols, days_ahead
+                    )  # Yahoo only supports forward
                 else:
                     continue
-                
+
                 if earnings:
                     all_earnings.extend(earnings)
                     successful_sources.append(source.value)
                     logger.info(f"✅ {source.value}: {len(earnings)} events")
                 else:
                     logger.warning(f"⚠️ {source.value}: No data returned")
-                    
+
             except Exception as e:
                 logger.error(f"❌ {source.value} failed: {e}")
                 continue
-        
+
         # Deduplicate and sort
         unique_earnings = self._deduplicate_earnings(all_earnings)
         unique_earnings.sort(key=lambda x: (x.earnings_date, x.symbol))
-        
+
         logger.info(f"📊 Total unique earnings events: {len(unique_earnings)}")
         logger.info(f"🎯 Sources used: {successful_sources}")
-        
+
         return unique_earnings
 
-    def get_upcoming_earnings(self, 
-                            symbols: Optional[List[str]] = None,
-                            days_ahead: int = 30,
-                            sources: List[EarningsSource] = None) -> List[EarningsEvent]:
+    def get_upcoming_earnings(
+        self,
+        symbols: Optional[List[str]] = None,
+        days_ahead: int = 30,
+        sources: List[EarningsSource] = None,
+    ) -> List[EarningsEvent]:
         """Get upcoming earnings events with multi-source fallback (forward-looking only)."""
-        
+
         return self.get_earnings_range(
             symbols=symbols,
             days_back=0,
             days_ahead=days_ahead,
-            sources=sources or [EarningsSource.NASDAQ]
+            sources=sources or [EarningsSource.NASDAQ],
         )
-    
-    def get_historical_earnings(self,
-                               symbols: Optional[List[str]] = None,
-                               days_back: int = 30,
-                               sources: List[EarningsSource] = None) -> List[EarningsEvent]:
+
+    def get_historical_earnings(
+        self,
+        symbols: Optional[List[str]] = None,
+        days_back: int = 30,
+        sources: List[EarningsSource] = None,
+    ) -> List[EarningsEvent]:
         """Get historical earnings events (backward-looking only)."""
-        
+
         return self.get_earnings_range(
             symbols=symbols,
             days_back=days_back,
             days_ahead=0,
-            sources=sources or [EarningsSource.NASDAQ]
+            sources=sources or [EarningsSource.NASDAQ],
         )
 
-    def _get_upcoming_earnings_legacy(self, 
-                            symbols: Optional[List[str]] = None,
-                            days_ahead: int = 30,
-                            sources: List[EarningsSource] = None) -> List[EarningsEvent]:
+    def _get_upcoming_earnings_legacy(
+        self,
+        symbols: Optional[List[str]] = None,
+        days_ahead: int = 30,
+        sources: List[EarningsSource] = None,
+    ) -> List[EarningsEvent]:
         """Legacy method - use get_earnings_range instead."""
-        
+
         if sources is None:
-            sources = [EarningsSource.FMP, EarningsSource.FINNHUB, EarningsSource.NASDAQ]
-        
+            sources = [
+                EarningsSource.FMP,
+                EarningsSource.FINNHUB,
+                EarningsSource.NASDAQ,
+            ]
+
         all_earnings = []
         successful_sources = []
-        
+
         for source in sources:
             try:
                 logger.info(f"Fetching earnings from {source.value}")
                 earnings = self._fetch_from_source(source, symbols, days_ahead)
-                
+
                 if earnings:
                     all_earnings.extend(earnings)
                     successful_sources.append(source)
                     logger.info(f"✅ {source.value}: {len(earnings)} events")
                 else:
                     logger.warning(f"⚠️ {source.value}: No data returned")
-                    
+
             except Exception as e:
                 logger.error(f"❌ {source.value} failed: {e}")
                 continue
-        
+
         if not all_earnings:
             logger.error("All earnings sources failed")
             return []
-        
+
         # Deduplicate by symbol and date
         unique_earnings = self._deduplicate_earnings(all_earnings)
-        
+
         # Sort by priority (most urgent first)
         unique_earnings.sort(key=lambda x: -x.priority_score)
-        
+
         logger.info(f"📊 Total unique earnings events: {len(unique_earnings)}")
         logger.info(f"🎯 Sources used: {[s.value for s in successful_sources]}")
-        
+
         return unique_earnings
-    
-    def _fetch_from_source(self, 
-                          source: EarningsSource, 
-                          symbols: Optional[List[str]],
-                          days_ahead: int) -> List[EarningsEvent]:
+
+    def _fetch_from_source(
+        self, source: EarningsSource, symbols: Optional[List[str]], days_ahead: int
+    ) -> List[EarningsEvent]:
         """Fetch from specific source."""
-        
+
         if source == EarningsSource.FMP:
             return self._fetch_from_fmp(symbols, days_ahead)
         elif source == EarningsSource.FINNHUB:
@@ -280,493 +305,525 @@ class EarningsCalendarFetcher:
             return self._fetch_from_yahoo(symbols, days_ahead)
         else:
             raise ValueError(f"Unknown source: {source}")
-    
-    def _fetch_from_fmp(self, symbols: Optional[List[str]], days_ahead: int) -> List[EarningsEvent]:
+
+    def _fetch_from_fmp(
+        self, symbols: Optional[List[str]], days_ahead: int
+    ) -> List[EarningsEvent]:
         """Fetch from Financial Modeling Prep."""
         earnings = []
-        
+
         # Date range
         start_date = date.today()
         end_date = start_date + timedelta(days=days_ahead)
-        
+
         try:
             # FMP earnings calendar endpoint
             url = f"{self.api_configs[EarningsSource.FMP]['base_url']}/earning_calendar"
-            params = {
-                'from': start_date.isoformat(),
-                'to': end_date.isoformat()
-            }
-            
+            params = {"from": start_date.isoformat(), "to": end_date.isoformat()}
+
             # Add API key if available
-            api_key = self.api_configs[EarningsSource.FMP].get('api_key')
+            api_key = self.api_configs[EarningsSource.FMP].get("api_key")
             if api_key:
-                params['apikey'] = api_key
-            
+                params["apikey"] = api_key
+
             response = self.session.get(url, params=params, timeout=30)
             response.raise_for_status()
-            
+
             data = response.json()
-            
+
             for event in data:
                 # Filter by symbols if specified
-                symbol = event.get('symbol', '').upper()
+                symbol = event.get("symbol", "").upper()
                 if symbols and symbol not in symbols:
                     continue
-                
+
                 # Parse date
-                date_str = event.get('date')
+                date_str = event.get("date")
                 if not date_str:
                     continue
-                
-                earnings_date = datetime.strptime(date_str, '%Y-%m-%d').date()
-                
+
+                earnings_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+
                 earnings_event = EarningsEvent(
                     symbol=symbol,
-                    company_name=event.get('name', symbol),
+                    company_name=event.get("name", symbol),
                     earnings_date=earnings_date,
-                    time=event.get('time', '').lower(),
-                    eps_estimate=self._safe_float(event.get('epsEstimated')),
-                    eps_actual=self._safe_float(event.get('eps')),
-                    revenue_estimate=self._safe_float(event.get('revenueEstimated')),
-                    revenue_actual=self._safe_float(event.get('revenue')),
-                    source=EarningsSource.FMP.value
+                    time=event.get("time", "").lower(),
+                    eps_estimate=self._safe_float(event.get("epsEstimated")),
+                    eps_actual=self._safe_float(event.get("eps")),
+                    revenue_estimate=self._safe_float(event.get("revenueEstimated")),
+                    revenue_actual=self._safe_float(event.get("revenue")),
+                    source=EarningsSource.FMP.value,
                 )
                 earnings.append(earnings_event)
-                
+
         except requests.exceptions.RequestException as e:
             logger.error(f"FMP API request failed: {e}")
         except (ValueError, KeyError) as e:
             logger.error(f"FMP data parsing failed: {e}")
-            
+
         return earnings
-    
-    def _fetch_from_fmp_range(self, symbols: Optional[List[str]], start_date: date, end_date: date) -> List[EarningsEvent]:
+
+    def _fetch_from_fmp_range(
+        self, symbols: Optional[List[str]], start_date: date, end_date: date
+    ) -> List[EarningsEvent]:
         """Fetch from Financial Modeling Prep for a date range."""
         earnings = []
-        
+
         try:
             # FMP earnings calendar endpoint
             url = f"{self.api_configs[EarningsSource.FMP]['base_url']}/earning_calendar"
             params = {
-                'from': start_date.strftime('%Y-%m-%d'),
-                'to': end_date.strftime('%Y-%m-%d'),
-                'apikey': self.api_configs[EarningsSource.FMP]['api_key']
+                "from": start_date.strftime("%Y-%m-%d"),
+                "to": end_date.strftime("%Y-%m-%d"),
+                "apikey": self.api_configs[EarningsSource.FMP]["api_key"],
             }
-            
+
             response = self.session.get(url, params=params, timeout=30)
             response.raise_for_status()
-            
+
             data = response.json()
-            
+
             for event in data:
-                symbol = event.get('symbol', '').upper()
-                
+                symbol = event.get("symbol", "").upper()
+
                 # Filter by symbols if specified
                 if symbols and symbol not in symbols:
                     continue
-                
-                earnings_date_str = event.get('date')
+
+                earnings_date_str = event.get("date")
                 if not earnings_date_str:
                     continue
-                
-                earnings_date = datetime.strptime(earnings_date_str, '%Y-%m-%d').date()
-                
-                earnings.append(EarningsEvent(
-                    symbol=symbol,
-                    company_name=event.get('eps', ''),  # FMP may not have company name
-                    earnings_date=earnings_date,
-                    time=event.get('time', 'unknown'),
-                    eps_estimate=self._safe_float(event.get('epsEstimated')),
-                    eps_actual=self._safe_float(event.get('eps')),
-                    revenue_estimate=self._safe_float(event.get('revenueEstimated')),
-                    revenue_actual=self._safe_float(event.get('revenue')),
-                    source="financial_modeling_prep"
-                ))
-        
+
+                earnings_date = datetime.strptime(earnings_date_str, "%Y-%m-%d").date()
+
+                earnings.append(
+                    EarningsEvent(
+                        symbol=symbol,
+                        company_name=event.get(
+                            "eps", ""
+                        ),  # FMP may not have company name
+                        earnings_date=earnings_date,
+                        time=event.get("time", "unknown"),
+                        eps_estimate=self._safe_float(event.get("epsEstimated")),
+                        eps_actual=self._safe_float(event.get("eps")),
+                        revenue_estimate=self._safe_float(
+                            event.get("revenueEstimated")
+                        ),
+                        revenue_actual=self._safe_float(event.get("revenue")),
+                        source="financial_modeling_prep",
+                    )
+                )
+
         except requests.exceptions.RequestException as e:
             logger.error(f"FMP range API request failed: {e}")
         except (ValueError, KeyError) as e:
             logger.error(f"FMP range data parsing failed: {e}")
-            
+
         return earnings
 
-    def _fetch_from_finnhub(self, symbols: Optional[List[str]], days_ahead: int) -> List[EarningsEvent]:
+    def _fetch_from_finnhub(
+        self, symbols: Optional[List[str]], days_ahead: int
+    ) -> List[EarningsEvent]:
         """Fetch from Finnhub."""
         earnings = []
-        
+
         # Date range
         start_date = date.today()
         end_date = start_date + timedelta(days=days_ahead)
-        
+
         try:
             # Finnhub earnings calendar endpoint
             url = f"{self.api_configs[EarningsSource.FINNHUB]['base_url']}/calendar/earnings"
-            params = {
-                'from': start_date.isoformat(),
-                'to': end_date.isoformat()
-            }
-            
+            params = {"from": start_date.isoformat(), "to": end_date.isoformat()}
+
             # Add API key if available
-            api_key = self.api_configs[EarningsSource.FINNHUB].get('api_key')
+            api_key = self.api_configs[EarningsSource.FINNHUB].get("api_key")
             if api_key:
-                params['token'] = api_key
-            
+                params["token"] = api_key
+
             response = self.session.get(url, params=params, timeout=30)
             response.raise_for_status()
-            
+
             data = response.json()
-            earnings_list = data.get('earningsCalendar', [])
-            
+            earnings_list = data.get("earningsCalendar", [])
+
             for event in earnings_list:
                 # Filter by symbols if specified
-                symbol = event.get('symbol', '').upper()
+                symbol = event.get("symbol", "").upper()
                 if symbols and symbol not in symbols:
                     continue
-                
+
                 # Parse date
-                date_str = event.get('date')
+                date_str = event.get("date")
                 if not date_str:
                     continue
-                
-                earnings_date = datetime.strptime(date_str, '%Y-%m-%d').date()
-                
+
+                earnings_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+
                 earnings_event = EarningsEvent(
                     symbol=symbol,
-                    company_name=event.get('name', symbol),
+                    company_name=event.get("name", symbol),
                     earnings_date=earnings_date,
-                    time=event.get('hour', '').lower(),
-                    eps_estimate=self._safe_float(event.get('epsEstimate')),
-                    eps_actual=self._safe_float(event.get('epsActual')),
-                    revenue_estimate=self._safe_float(event.get('revenueEstimate')),
-                    revenue_actual=self._safe_float(event.get('revenueActual')),
-                    source=EarningsSource.FINNHUB.value
+                    time=event.get("hour", "").lower(),
+                    eps_estimate=self._safe_float(event.get("epsEstimate")),
+                    eps_actual=self._safe_float(event.get("epsActual")),
+                    revenue_estimate=self._safe_float(event.get("revenueEstimate")),
+                    revenue_actual=self._safe_float(event.get("revenueActual")),
+                    source=EarningsSource.FINNHUB.value,
                 )
                 earnings.append(earnings_event)
-                
+
         except requests.exceptions.RequestException as e:
             logger.error(f"Finnhub API request failed: {e}")
         except (ValueError, KeyError) as e:
             logger.error(f"Finnhub data parsing failed: {e}")
-            
+
         return earnings
-    
-    def _fetch_from_finnhub_range(self, symbols: Optional[List[str]], start_date: date, end_date: date) -> List[EarningsEvent]:
+
+    def _fetch_from_finnhub_range(
+        self, symbols: Optional[List[str]], start_date: date, end_date: date
+    ) -> List[EarningsEvent]:
         """Fetch from Finnhub for a date range."""
         earnings = []
-        
+
         try:
-            # Finnhub earnings calendar endpoint  
+            # Finnhub earnings calendar endpoint
             url = f"{self.api_configs[EarningsSource.FINNHUB]['base_url']}/calendar/earnings"
             params = {
-                'from': start_date.strftime('%Y-%m-%d'),
-                'to': end_date.strftime('%Y-%m-%d'),
-                'token': self.api_configs[EarningsSource.FINNHUB]['api_key']
+                "from": start_date.strftime("%Y-%m-%d"),
+                "to": end_date.strftime("%Y-%m-%d"),
+                "token": self.api_configs[EarningsSource.FINNHUB]["api_key"],
             }
-            
+
             response = self.session.get(url, params=params, timeout=30)
             response.raise_for_status()
-            
+
             data = response.json()
-            
+
             # Parse earnings events
-            if 'earningsCalendar' in data:
-                for event in data['earningsCalendar']:
-                    symbol = event.get('symbol', '').upper()
-                    
+            if "earningsCalendar" in data:
+                for event in data["earningsCalendar"]:
+                    symbol = event.get("symbol", "").upper()
+
                     # Filter by symbols if specified
                     if symbols and symbol not in symbols:
                         continue
-                    
-                    earnings_date_str = event.get('date')
+
+                    earnings_date_str = event.get("date")
                     if not earnings_date_str:
                         continue
-                    
-                    earnings_date = datetime.strptime(earnings_date_str, '%Y-%m-%d').date()
-                    
+
+                    earnings_date = datetime.strptime(
+                        earnings_date_str, "%Y-%m-%d"
+                    ).date()
+
                     earnings_event = EarningsEvent(
                         symbol=symbol,
                         company_name=symbol,  # Finnhub may not provide company name
                         earnings_date=earnings_date,
-                        time='unknown',  # Finnhub may not specify time
-                        eps_estimate=self._safe_float(event.get('epsEstimate')),
-                        eps_actual=self._safe_float(event.get('epsActual')),
-                        revenue_estimate=self._safe_float(event.get('revenueEstimate')),
-                        revenue_actual=self._safe_float(event.get('revenueActual')),
-                        source="finnhub"
+                        time="unknown",  # Finnhub may not specify time
+                        eps_estimate=self._safe_float(event.get("epsEstimate")),
+                        eps_actual=self._safe_float(event.get("epsActual")),
+                        revenue_estimate=self._safe_float(event.get("revenueEstimate")),
+                        revenue_actual=self._safe_float(event.get("revenueActual")),
+                        source="finnhub",
                     )
-                    
+
                     earnings.append(earnings_event)
-                
+
         except requests.exceptions.RequestException as e:
             logger.error(f"Finnhub range API request failed: {e}")
         except (ValueError, KeyError) as e:
             logger.error(f"Finnhub range data parsing failed: {e}")
-            
+
         return earnings
 
-    def _fetch_from_nasdaq_range(self, symbols: Optional[List[str]], start_date: date, end_date: date) -> List[EarningsEvent]:
+    def _fetch_from_nasdaq_range(
+        self, symbols: Optional[List[str]], start_date: date, end_date: date
+    ) -> List[EarningsEvent]:
         """Fetch from NASDAQ public API for a date range (supports historical data)."""
         earnings = []
-        
+
         logger.info(f"📅 Fetching NASDAQ earnings from {start_date} to {end_date}")
-        
+
         current_date = start_date
         while current_date <= end_date:
             # Skip weekends (NASDAQ typically has no earnings data)
             if current_date.weekday() >= 5:  # Saturday = 5, Sunday = 6
                 current_date += timedelta(days=1)
                 continue
-            
+
             try:
                 daily_earnings = self._fetch_nasdaq_single_day(current_date, symbols)
                 if daily_earnings:
                     earnings.extend(daily_earnings)
-                    logger.debug(f"✅ NASDAQ {current_date}: {len(daily_earnings)} earnings")
-                
+                    logger.debug(
+                        f"✅ NASDAQ {current_date}: {len(daily_earnings)} earnings"
+                    )
+
                 # Be respectful to NASDAQ servers - small delay
                 import time
+
                 time.sleep(0.3)
-                
+
             except Exception as e:
                 logger.error(f"NASDAQ single day fetch failed for {current_date}: {e}")
-            
+
             current_date += timedelta(days=1)
-        
+
         logger.info(f"📊 NASDAQ total earnings collected: {len(earnings)}")
         return earnings
 
-    def _fetch_from_nasdaq(self, symbols: Optional[List[str]], days_ahead: int) -> List[EarningsEvent]:
+    def _fetch_from_nasdaq(
+        self, symbols: Optional[List[str]], days_ahead: int
+    ) -> List[EarningsEvent]:
         """Fetch from NASDAQ public API with enhanced multi-day support (forward-looking only)."""
         start_date = date.today()
         end_date = start_date + timedelta(days=days_ahead)
         return self._fetch_from_nasdaq_range(symbols, start_date, end_date)
-    
-    def _fetch_nasdaq_single_day(self, target_date: date, symbols: Optional[List[str]]) -> List[EarningsEvent]:
+
+    def _fetch_nasdaq_single_day(
+        self, target_date: date, symbols: Optional[List[str]]
+    ) -> List[EarningsEvent]:
         """Fetch NASDAQ earnings for a single day."""
-        
+
         url = "https://api.nasdaq.com/api/calendar/earnings"
-        params = {
-            'date': target_date.strftime('%Y-%m-%d')
-        }
-        
+        params = {"date": target_date.strftime("%Y-%m-%d")}
+
         headers = {
-            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
-            'Accept': 'application/json, text/plain, */*',
-            'Accept-Language': 'en-US,en;q=0.9',
-            'Accept-Encoding': 'gzip, deflate, br',
-            'Referer': 'https://www.nasdaq.com/',
-            'Origin': 'https://www.nasdaq.com'
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+            "Accept": "application/json, text/plain, */*",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Accept-Encoding": "gzip, deflate, br",
+            "Referer": "https://www.nasdaq.com/",
+            "Origin": "https://www.nasdaq.com",
         }
-        
+
         try:
             response = self.session.get(url, params=params, headers=headers, timeout=30)
             response.raise_for_status()
-            
+
             data = response.json()
             daily_earnings = []
-            
+
             # Parse NASDAQ response format
-            if 'data' in data and data['data'] and 'rows' in data['data']:
-                for row in data['data']['rows']:
-                    symbol = row.get('symbol', '').strip().upper()
-                    
+            if "data" in data and data["data"] and "rows" in data["data"]:
+                for row in data["data"]["rows"]:
+                    symbol = row.get("symbol", "").strip().upper()
+
                     # Filter by symbols if specified
                     if symbols and symbol not in symbols:
                         continue
-                    
+
                     # Skip invalid symbols
-                    if not symbol or not symbol.replace('.', '').replace('-', '').isalnum():
+                    if (
+                        not symbol
+                        or not symbol.replace(".", "").replace("-", "").isalnum()
+                    ):
                         continue
-                    
+
                     # Parse earnings time
-                    time_str = row.get('time', '').lower()
-                    if 'pre-market' in time_str or 'pre' in time_str:
-                        timing = 'bmo'  # Before market open
-                    elif 'after' in time_str or 'post' in time_str:
-                        timing = 'amc'  # After market close
+                    time_str = row.get("time", "").lower()
+                    if "pre-market" in time_str or "pre" in time_str:
+                        timing = "bmo"  # Before market open
+                    elif "after" in time_str or "post" in time_str:
+                        timing = "amc"  # After market close
                     else:
-                        timing = 'dmt'  # During market hours
-                    
+                        timing = "dmt"  # During market hours
+
                     # Parse EPS forecast
-                    eps_forecast = self._safe_float(row.get('epsForecast'))
-                    
+                    eps_forecast = self._safe_float(row.get("epsForecast"))
+
                     # Parse market cap for filtering
-                    market_cap_str = row.get('marketCap', '')
+                    market_cap_str = row.get("marketCap", "")
                     market_cap = self._parse_market_cap(market_cap_str)
-                    
+
                     earnings_event = EarningsEvent(
                         symbol=symbol,
-                        company_name=row.get('name', symbol),
+                        company_name=row.get("name", symbol),
                         earnings_date=target_date,
                         time=timing,
                         eps_estimate=eps_forecast,
-                        source=EarningsSource.NASDAQ.value
+                        source=EarningsSource.NASDAQ.value,
                     )
-                    
+
                     # Add market cap as custom attribute for filtering
                     earnings_event.market_cap = market_cap
-                    
+
                     daily_earnings.append(earnings_event)
-            
+
             return daily_earnings
-            
+
         except Exception as e:
             logger.error(f"NASDAQ single day fetch failed for {target_date}: {e}")
             return []
-    
+
     def _parse_market_cap(self, market_cap_str: str) -> Optional[float]:
         """Parse market cap string to float value."""
-        if not market_cap_str or market_cap_str in ['N/A', '']:
+        if not market_cap_str or market_cap_str in ["N/A", ""]:
             return None
-        
+
         try:
             # Remove currency symbols and commas
-            clean_str = market_cap_str.replace('$', '').replace(',', '').strip()
-            
-            if 'B' in clean_str or 'b' in clean_str:
+            clean_str = market_cap_str.replace("$", "").replace(",", "").strip()
+
+            if "B" in clean_str or "b" in clean_str:
                 # Billion
-                number = float(clean_str.replace('B', '').replace('b', ''))
+                number = float(clean_str.replace("B", "").replace("b", ""))
                 return number * 1e9
-            elif 'M' in clean_str or 'm' in clean_str:
-                # Million  
-                number = float(clean_str.replace('M', '').replace('m', ''))
+            elif "M" in clean_str or "m" in clean_str:
+                # Million
+                number = float(clean_str.replace("M", "").replace("m", ""))
                 return number * 1e6
-            elif 'K' in clean_str or 'k' in clean_str:
+            elif "K" in clean_str or "k" in clean_str:
                 # Thousand
-                number = float(clean_str.replace('K', '').replace('k', ''))
+                number = float(clean_str.replace("K", "").replace("k", ""))
                 return number * 1e3
             else:
                 # Raw number
                 return float(clean_str)
         except (ValueError, AttributeError):
             return None
-    
-    def _fetch_from_yahoo(self, symbols: Optional[List[str]], days_ahead: int) -> List[EarningsEvent]:
+
+    def _fetch_from_yahoo(
+        self, symbols: Optional[List[str]], days_ahead: int
+    ) -> List[EarningsEvent]:
         """Emergency fallback: Yahoo Finance scraping."""
         earnings = []
-        
+
         try:
             # Yahoo Finance earnings calendar URL
             url = "https://finance.yahoo.com/calendar/earnings"
-            params = {'size': 100}
-            
-            headers = {
-                'User-Agent': 'Mozilla/5.0 (compatible; Trading-System/1.0)'
-            }
-            
+            params = {"size": 100}
+
+            headers = {"User-Agent": "Mozilla/5.0 (compatible; Trading-System/1.0)"}
+
             response = self.session.get(url, params=params, headers=headers, timeout=30)
             response.raise_for_status()
-            
+
             # Simple scraping approach (very basic)
             # In practice, you'd parse the HTML or look for JSON data in the page
             # This is just a placeholder for emergency fallback
-            logger.warning("Yahoo Finance scraping not fully implemented - emergency fallback")
-            
+            logger.warning(
+                "Yahoo Finance scraping not fully implemented - emergency fallback"
+            )
+
         except Exception as e:
             logger.error(f"Yahoo Finance scraping failed: {e}")
-            
+
         return earnings
-    
-    def _deduplicate_earnings(self, earnings: List[EarningsEvent]) -> List[EarningsEvent]:
+
+    def _deduplicate_earnings(
+        self, earnings: List[EarningsEvent]
+    ) -> List[EarningsEvent]:
         """Remove duplicate earnings events."""
         seen = {}
         unique = []
-        
+
         for event in earnings:
             key = (event.symbol, event.earnings_date)
-            
+
             if key not in seen:
                 seen[key] = event
                 unique.append(event)
             else:
                 # Keep the one with more data
                 existing = seen[key]
-                if (event.eps_estimate is not None and existing.eps_estimate is None) or \
-                   (event.revenue_estimate is not None and existing.revenue_estimate is None):
+                if (
+                    event.eps_estimate is not None and existing.eps_estimate is None
+                ) or (
+                    event.revenue_estimate is not None
+                    and existing.revenue_estimate is None
+                ):
                     seen[key] = event
                     unique[unique.index(existing)] = event
-        
+
         return unique
-    
+
     def _safe_float(self, value: Any) -> Optional[float]:
         """Safely convert to float."""
-        if value is None or value == '':
+        if value is None or value == "":
             return None
         try:
             return float(value)
         except (ValueError, TypeError):
             return None
-    
+
     def save_to_cache(self, earnings: List[EarningsEvent], cache_key: str = None):
         """Save earnings data to cache."""
         if not cache_key:
             cache_key = f"earnings_{date.today().isoformat()}.json"
-        
+
         cache_file = self.cache_dir / cache_key
-        
+
         # Convert to serializable format
         data = {
-            'timestamp': datetime.now().isoformat(),
-            'earnings': [
+            "timestamp": datetime.now().isoformat(),
+            "earnings": [
                 {
-                    'symbol': e.symbol,
-                    'company_name': e.company_name,
-                    'earnings_date': e.earnings_date.isoformat(),
-                    'time': e.time,
-                    'eps_estimate': e.eps_estimate,
-                    'eps_actual': e.eps_actual,
-                    'revenue_estimate': e.revenue_estimate,
-                    'revenue_actual': e.revenue_actual,
-                    'source': e.source,
-                    'priority_score': e.priority_score
+                    "symbol": e.symbol,
+                    "company_name": e.company_name,
+                    "earnings_date": e.earnings_date.isoformat(),
+                    "time": e.time,
+                    "eps_estimate": e.eps_estimate,
+                    "eps_actual": e.eps_actual,
+                    "revenue_estimate": e.revenue_estimate,
+                    "revenue_actual": e.revenue_actual,
+                    "source": e.source,
+                    "priority_score": e.priority_score,
                 }
                 for e in earnings
-            ]
+            ],
         }
-        
-        with open(cache_file, 'w') as f:
+
+        with open(cache_file, "w") as f:
             json.dump(data, f, indent=2)
-        
+
         logger.info(f"💾 Cached {len(earnings)} earnings events to {cache_file}")
-    
-    def load_from_cache(self, cache_key: str = None, max_age_hours: int = 6) -> Optional[List[EarningsEvent]]:
+
+    def load_from_cache(
+        self, cache_key: str = None, max_age_hours: int = 6
+    ) -> Optional[List[EarningsEvent]]:
         """Load earnings data from cache if fresh enough."""
         if not cache_key:
             cache_key = f"earnings_{date.today().isoformat()}.json"
-        
+
         cache_file = self.cache_dir / cache_key
-        
+
         if not cache_file.exists():
             return None
-        
+
         # Check if cache is too old
         cache_age = datetime.now() - datetime.fromtimestamp(cache_file.stat().st_mtime)
         if cache_age.total_seconds() > max_age_hours * 3600:
             logger.info(f"Cache too old ({cache_age}), refreshing")
             return None
-        
+
         try:
-            with open(cache_file, 'r') as f:
+            with open(cache_file, "r") as f:
                 data = json.load(f)
-            
+
             earnings = []
-            for item in data['earnings']:
+            for item in data["earnings"]:
                 earnings_event = EarningsEvent(
-                    symbol=item['symbol'],
-                    company_name=item['company_name'],
-                    earnings_date=datetime.strptime(item['earnings_date'], '%Y-%m-%d').date(),
-                    time=item.get('time'),
-                    eps_estimate=item.get('eps_estimate'),
-                    eps_actual=item.get('eps_actual'),
-                    revenue_estimate=item.get('revenue_estimate'),
-                    revenue_actual=item.get('revenue_actual'),
-                    source=item['source']
+                    symbol=item["symbol"],
+                    company_name=item["company_name"],
+                    earnings_date=datetime.strptime(
+                        item["earnings_date"], "%Y-%m-%d"
+                    ).date(),
+                    time=item.get("time"),
+                    eps_estimate=item.get("eps_estimate"),
+                    eps_actual=item.get("eps_actual"),
+                    revenue_estimate=item.get("revenue_estimate"),
+                    revenue_actual=item.get("revenue_actual"),
+                    source=item["source"],
                 )
                 earnings.append(earnings_event)
-            
+
             logger.info(f"📂 Loaded {len(earnings)} earnings events from cache")
             return earnings
-            
+
         except Exception as e:
             logger.error(f"Failed to load cache: {e}")
             return None
@@ -775,31 +832,31 @@ class EarningsCalendarFetcher:
 def main():
     """Test the earnings fetcher."""
     from utils.logging_setup import setup_logging
+
     setup_logging()
-    
+
     fetcher = EarningsCalendarFetcher()
-    
+
     print("🔍 Testing earnings calendar fetcher...")
-    
+
     # Test with some popular symbols
     test_symbols = ["AAPL", "GOOGL", "MSFT", "TSLA", "AMZN"]
-    
-    earnings = fetcher.get_upcoming_earnings(
-        symbols=test_symbols,
-        days_ahead=14
-    )
-    
+
+    earnings = fetcher.get_upcoming_earnings(symbols=test_symbols, days_ahead=14)
+
     if earnings:
         print(f"\n📊 Found {len(earnings)} upcoming earnings events:")
-        
+
         for event in earnings[:10]:  # Show first 10
             priority_emoji = "🔥" if event.priority_score >= 80 else "📅"
-            print(f"{priority_emoji} {event.symbol}: {event.earnings_date} "
-                  f"({event.days_until_earnings} days) - Priority: {event.priority_score:.0f}")
-        
+            print(
+                f"{priority_emoji} {event.symbol}: {event.earnings_date} "
+                f"({event.days_until_earnings} days) - Priority: {event.priority_score:.0f}"
+            )
+
         # Save to cache for testing
         fetcher.save_to_cache(earnings)
-        
+
     else:
         print("❌ No earnings data found")
 

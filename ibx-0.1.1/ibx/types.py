@@ -1,9 +1,11 @@
 from __future__ import annotations
+
 from dataclasses import dataclass
 from datetime import date
 from typing import Literal
 
 Right = Literal["C", "P"]
+
 
 @dataclass(frozen=True)
 class OptionKey:
@@ -11,6 +13,7 @@ class OptionKey:
     expiry: date
     right: Right
     strike: float
+
 
 @dataclass(frozen=True)
 class ContractMeta:

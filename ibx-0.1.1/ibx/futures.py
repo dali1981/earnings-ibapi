@@ -1,9 +1,10 @@
-
 import threading
 from typing import Any, Dict, List, Optional, Tuple
 
+
 class IBFuture:
     """Minimal thread-safe future for IB ...End style requests."""
+
     def __init__(self, expect_many: bool, timeout: float):
         self.expect_many = expect_many
         self.timeout = timeout
@@ -33,6 +34,7 @@ class IBFuture:
         if self.expect_many:
             return self._items
         return self._items[0] if self._items else None
+
 
 class FutureRegistry:
     def __init__(self):

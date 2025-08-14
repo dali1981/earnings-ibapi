@@ -14,11 +14,11 @@ from typing import List
 
 from ibapi.contract import Contract
 
-from request_sequencer import RequestSequencer
 from ib_client import IBClient
+from ibx_time import ib_end_datetime
+from request_sequencer import RequestSequencer
 from sink import Sink
 from utils import RateLimiter, make_option, make_stock
-from ibx_time import ib_end_datetime
 
 
 def parse_args() -> argparse.Namespace:
@@ -30,20 +30,20 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--port", type=int, default=7497, help="IB gateway port")
     parser.add_argument("--client-id", type=int, default=17, help="IB client ID")
     parser.add_argument(
-        "--expirations", required=True,
-        help="Comma-separated list of expiration dates (YYYYMMDD)"
+        "--expirations",
+        required=True,
+        help="Comma-separated list of expiration dates (YYYYMMDD)",
     )
     parser.add_argument(
-        "--strikes", required=True,
-        help="Comma-separated list of strike prices"
+        "--strikes", required=True, help="Comma-separated list of strike prices"
     )
     return parser.parse_args()
 
 
 def main():
     args = parse_args()
-    expirations = [e.strip() for e in args.expirations.split(',') if e.strip()]
-    strikes: List[float] = [float(s) for s in args.strikes.split(',') if s.strip()]
+    expirations = [e.strip() for e in args.expirations.split(",") if e.strip()]
+    strikes: List[float] = [float(s) for s in args.strikes.split(",") if s.strip()]
 
     # Initialize requests, sink (prints to console), limiter, and IB client
     sequencer = RequestSequencer()
@@ -69,17 +69,14 @@ def main():
             useRTH=0,
             formatDate=1,
             keepUpToDate=False,
-            chartOptions=[]
+            chartOptions=[],
         )
 
         # 2) Fetch implied volatility snapshot for each option
         for expiry in expirations:
             for strike in strikes:
                 opt_contract: Contract = make_option(
-                    symbol=args.symbol,
-                    expiry=expiry,
-                    strike=strike,
-                    currency="USD"
+                    symbol=args.symbol, expiry=expiry, strike=strike, currency="USD"
                 )
                 rid_iv = sequencer.next(f"iv_{expiry}_{strike}")
                 # snapshot=True to get one-time implied vol (tick 106)
@@ -89,7 +86,7 @@ def main():
                     marketDataType="106",
                     snapshot=True,
                     regulatorySnapshot=False,
-                    mktDataOptions=[]
+                    mktDataOptions=[],
                 )
 
         # Disconnect after all requests complete
@@ -99,5 +96,6 @@ def main():
     sequencer.when_ready(on_ready)
     client.run()
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()

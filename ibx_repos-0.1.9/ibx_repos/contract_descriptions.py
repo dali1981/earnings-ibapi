@@ -1,14 +1,21 @@
-
 from __future__ import annotations
+
 import datetime as dt
 from pathlib import Path
 from typing import Optional, Sequence, Set, Tuple
+
 import pandas as pd
+
 
 class ContractDescriptionsRepository:
     REQUIRED = [
-        "conid", "symbol", "sec_type", "currency",
-        "primary_exchange", "derivative_sec_types", "as_of_date"
+        "conid",
+        "symbol",
+        "sec_type",
+        "currency",
+        "primary_exchange",
+        "derivative_sec_types",
+        "as_of_date",
     ]
 
     def __init__(self, base_path: str | Path):
@@ -20,18 +27,23 @@ class ContractDescriptionsRepository:
     @staticmethod
     def _schema():
         import pyarrow as pa
-        return pa.schema([
-            ("conid", pa.int64()),
-            ("symbol", pa.string()),
-            ("sec_type", pa.string()),
-            ("currency", pa.string()),
-            ("primary_exchange", pa.string()),
-            ("derivative_sec_types", pa.list_(pa.string())),
-            ("as_of_date", pa.date32()),
-        ])
+
+        return pa.schema(
+            [
+                ("conid", pa.int64()),
+                ("symbol", pa.string()),
+                ("sec_type", pa.string()),
+                ("currency", pa.string()),
+                ("primary_exchange", pa.string()),
+                ("derivative_sec_types", pa.list_(pa.string())),
+                ("as_of_date", pa.date32()),
+            ]
+        )
 
     def _ensure_initialized(self) -> None:
-        import pyarrow as pa, pyarrow.parquet as pq
+        import pyarrow as pa
+        import pyarrow.parquet as pq
+
         if any(self.base.rglob("*.parquet")):
             return
         schema = self._schema()
@@ -40,19 +52,27 @@ class ContractDescriptionsRepository:
         pq.write_table(empty_tbl, self.base / "_empty.parquet")
 
     # ---------------- Internal helpers ----------------
-    def _existing_keys(self, dates: Sequence[dt.date], conids: Sequence[int]) -> Set[Tuple[int, dt.date]]:
+    def _existing_keys(
+        self, dates: Sequence[dt.date], conids: Sequence[int]
+    ) -> Set[Tuple[int, dt.date]]:
         """Return set of (query, conid, as_of_date) already in dataset for the given dates and conids."""
         import pyarrow.dataset as ds
+
         if not dates or not conids:
             return set()
         if not self.base.exists() or not any(self.base.rglob("*.parquet")):
             return set()
 
         # Build dataset and filter
-        dset = ds.dataset(self.base, format="parquet", partitioning="hive", schema=self._schema())
+        dset = ds.dataset(
+            self.base, format="parquet", partitioning="hive", schema=self._schema()
+        )
 
         from pyarrow.dataset import field
-        expr = (field("as_of_date").isin(list(dates))) & (field("conid").isin(list(conids)))
+
+        expr = (field("as_of_date").isin(list(dates))) & (
+            field("conid").isin(list(conids))
+        )
         cols = ["conid", "as_of_date"]
         tbl = dset.to_table(filter=expr, columns=cols)
         if tbl.num_rows == 0:
@@ -67,9 +87,10 @@ class ContractDescriptionsRepository:
     def save(self, df: pd.DataFrame) -> None:
         if df is None or len(df) == 0:
             return
-        import pyarrow as pa, pyarrow.parquet as pq
+        import pyarrow as pa
+        import pyarrow.parquet as pq
 
-        df['as_of_date'] = dt.date.today()
+        df["as_of_date"] = dt.date.today()
 
         df = df.copy()
         for col in self.REQUIRED:
@@ -88,6 +109,7 @@ class ContractDescriptionsRepository:
             if isinstance(x, (list, tuple, set)):
                 return [str(s).upper() for s in x]
             return [str(x).upper()]
+
         df["derivative_sec_types"] = df["derivative_sec_types"].map(_to_list_str)
 
         def _to_date(v):
@@ -96,11 +118,13 @@ class ContractDescriptionsRepository:
             if pd.isna(v):
                 return dt.date.today()
             return pd.to_datetime(v).date()
+
         df["as_of_date"] = df["as_of_date"].map(_to_date)
 
         def _first_char(row):
             base = str(row.get("symbol") or row.get("query") or "").strip().upper()
             return base[0] if base else "#"
+
         df["first_char"] = df.apply(_first_char, axis=1)
 
         # Dedup within-batch
@@ -113,7 +137,9 @@ class ContractDescriptionsRepository:
         u_conids = sorted({int(x) for x in df["conid"].dropna().tolist()})
         exists = self._existing_keys(u_dates, u_conids)
         if exists:
-            mask = ~df.apply(lambda r: (int(r["conid"]), r["as_of_date"]) in exists, axis=1)
+            mask = ~df.apply(
+                lambda r: (int(r["conid"]), r["as_of_date"]) in exists, axis=1
+            )
             df = df.loc[mask]
         if df.empty:
             return
@@ -125,11 +151,18 @@ class ContractDescriptionsRepository:
             if col == "derivative_sec_types":
                 arrays[col] = pa.array(df[col].tolist(), type=pa.list_(pa.string()))
             elif col == "as_of_date":
-                arrays[col] = pa.array(pd.to_datetime(df[col]).values.astype("datetime64[D]"))
+                arrays[col] = pa.array(
+                    pd.to_datetime(df[col]).values.astype("datetime64[D]")
+                )
             elif col == "conid":
-                arrays[col] = pa.array(df[col].astype("Int64").tolist(), type=pa.int64())
+                arrays[col] = pa.array(
+                    df[col].astype("Int64").tolist(), type=pa.int64()
+                )
             else:
-                arrays[col] = pa.array(df[col].astype(object).where(pd.notna(df[col]), None).tolist(), type=f.type)
+                arrays[col] = pa.array(
+                    df[col].astype(object).where(pd.notna(df[col]), None).tolist(),
+                    type=f.type,
+                )
         table = pa.Table.from_arrays(list(arrays.values()), names=list(arrays.keys()))
 
         pq.write_to_dataset(
@@ -144,18 +177,26 @@ class ContractDescriptionsRepository:
     # ---------------- Read ----------------
     def read(self, columns: Optional[Sequence[str]] = None, **filters) -> pd.DataFrame:
         import pyarrow.dataset as ds
+
         if not self.base.exists() or not any(self.base.rglob("*.parquet")):
             cols = list(columns) if columns else [f.name for f in self._schema()]
             return pd.DataFrame(columns=cols)
 
-        dset = ds.dataset(self.base, format="parquet", partitioning="hive", schema=self._schema())
+        dset = ds.dataset(
+            self.base, format="parquet", partitioning="hive", schema=self._schema()
+        )
         schema = dset.schema
         from pyarrow.dataset import field
+
         expr = None
         for k, v in filters.items():
             if k not in schema.names:
                 continue
-            cond = field(k).isin(list(v)) if isinstance(v, (list, tuple, set)) else (field(k) == v)
+            cond = (
+                field(k).isin(list(v))
+                if isinstance(v, (list, tuple, set))
+                else (field(k) == v)
+            )
             expr = cond if expr is None else (expr & cond)
         cols = [c for c in (columns or schema.names) if c in schema.names]
         tbl = dset.to_table(filter=expr, columns=cols)

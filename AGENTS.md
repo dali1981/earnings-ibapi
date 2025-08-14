@@ -1,41 +1,48 @@
 # Repository Guidelines
 
+This guide helps contributors work consistently across the earnings/trading codebase and its IB integrations.
+
 ## Project Structure & Module Organization
-- Core modules: top-level Python files (e.g., `main.py`, `runner.py`, `config.py`).
+- Core modules at repo root: `main.py`, `runner.py`, `config.py`.
 - Domain packages: `earnings/`, `trading/`, `repositories/`, `api/`, `ib/`, `utils/`.
-- Tests: `tests/` with `unit/`, `integration/`, and `test_*.py` modules.
-- Scripts & examples: `scripts/` and `examples/` for runnable workflows.
-- Data & cache: `data/` (auto-created via `config.py`), plus `cache/`, `exports/`.
-- Docs & config: `docs/`, `config/portfolio.yaml` for portfolio inputs.
+- Tests: `tests/` with `unit/` and `integration/`; files named `test_*.py`.
+- Scripts & examples: `scripts/`, `examples/` (runnable workflows).
+- Data & outputs: `data/` (auto-created by `config.py`), plus `cache/`, `exports/`.
+- Config & docs: `config/portfolio.yaml`, `docs/`.
 
 ## Build, Test, and Development Commands
-- Environment: `python -m venv .venv && source .venv/bin/activate`
-- Install (tests/dev): `pip install -r requirements-test.txt`
-- Run tests: `pytest -q` (or `pytest -m "unit"`, `-m "integration"`)
-- Make targets: `make test`, `make coverage`, `make clean` (some targets assume optional configs).
-- Coverage report: `make coverage` then open `htmlcov/index.html`.
+- Create env: `python -m venv .venv && source .venv/bin/activate`.
+- Install (tests/dev): `pip install -r requirements-test.txt`.
+- Run tests: `pytest -q` (or `pytest -m "unit"`, `pytest -m "integration"`).
+- Make targets: `make test` (pytest + coverage), `make coverage` (HTML at `htmlcov/index.html`), `make clean` (purge caches/artifacts).
 - Run examples: `python scripts/export_earnings_calendar.py` or `python main.py`.
 
 ## Coding Style & Naming Conventions
 - Python 3.10+, PEP 8, 4-space indentation.
 - Naming: modules `snake_case.py`; classes `CamelCase`; functions/vars `snake_case`; constants `UPPER_SNAKE`.
-- Typing: prefer type hints and docstrings for public APIs.
-- Formatting: use `black .` and `isort .` if available; lint with `flake8`/`pylint` when configured.
+- Typing: add type hints and docstrings for public APIs.
+- Formatting: `black .` and `isort .`; lint with `flake8`/`pylint` if configured.
 
 ## Testing Guidelines
-- Framework: `pytest` configured via `pytest.ini`.
-- Coverage: enforced threshold `--cov-fail-under=80` (HTML in `htmlcov/`).
-- Markers: `unit`, `integration`, `api`, `data`, `streaming`, `slow`.
-- Conventions: files `tests/**/test_*.py`, functions `test_*`, classes `Test*`.
-- Examples: `pytest -m "unit"`, `pytest -m "integration and not slow"`.
+- Framework: `pytest`; markers: `unit`, `integration`, `api`, `data`, `streaming`, `slow`.
+- Coverage: enforce `--cov-fail-under=80`; view HTML via `make coverage` → `htmlcov/index.html`.
+- Conventions: files `tests/**/test_*.py`; functions `test_*`; classes `Test*`.
+- Mark external/IB-dependent tests as `integration` or `slow`.
 
 ## Commit & Pull Request Guidelines
-- Commits: imperative mood, concise summary (e.g., "Add historical earnings discovery"), optional scope.
-- Reference issues (e.g., `#123`) and explain rationale in the body when relevant.
+- Commits: imperative, concise (e.g., "Add historical earnings discovery"); reference issues (e.g., `#123`) and rationale when relevant.
 - PRs: clear description, linked issues, test plan/outputs, impact notes (data/IB usage), and small focused diffs.
-- Ensure tests pass and coverage remains ≥80% before requesting review.
+- Ensure tests pass locally and coverage ≥80% before requesting review.
 
 ## Security & Configuration Tips
-- Do not commit secrets or IB credentials; configure TWS/IB Gateway locally.
-- Edit settings in `config.py` and `config/portfolio.yaml`; data paths under `data/` are created automatically.
-- Avoid committing large generated data/logs; respect existing `.gitignore`.
+- Never commit secrets or IB credentials. Configure TWS/IB Gateway locally.
+- Edit settings in `config.py` and `config/portfolio.yaml`.
+- `config.py` creates `data/`; avoid committing large generated data/logs. Respect `.gitignore`.
+
+## Architecture & Ingestion
+- Local-first policy: producers always write to repositories, then notify via events; consumers read locally only.
+- Event bus: file-based JSONL under `data/cache/events/`; ready flags in `data/cache/ready/`.
+- Catch-up & recovery: see `docs/data_ingestion.md` for JSONL consumer, checkpoints, rotation, and reconciliation patterns.
+- Consumers:
+  - Option chain → option bars backfill: `jobs/option_chain_backfill_consumer.py`.
+  - Make targets: `make consume-option-chains`, `make consume-option-chains-demo`.

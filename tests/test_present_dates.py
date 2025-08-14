@@ -1,5 +1,6 @@
-import pandas as pd
 from datetime import date
+
+import pandas as pd
 from ibx_repos.equity_bars import EquityBarRepository
 from ibx_repos.option_bars import OptionBarRepository, OptionMeta
 

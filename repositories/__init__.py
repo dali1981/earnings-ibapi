@@ -4,17 +4,18 @@ Provides base repository functionality and specific implementations for differen
 """
 
 from .base import BaseRepository
+from .contract_descriptions import ContractDescriptionsRepository
 from .equity_bars import EquityBarRepository
 from .option_bars import OptionBarRepository
 from .option_chains import OptionChainSnapshotRepository
-from .contract_descriptions import ContractDescriptionsRepository
+
 
 __all__ = [
-    'BaseRepository',
-    'EquityBarRepository', 
-    'OptionBarRepository',
-    'OptionChainSnapshotRepository',
-    'ContractDescriptionsRepository'
+    "BaseRepository",
+    "EquityBarRepository",
+    "OptionBarRepository",
+    "OptionChainSnapshotRepository",
+    "ContractDescriptionsRepository",
 ]
 
 # Version info

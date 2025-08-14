@@ -1,8 +1,12 @@
 # ibx_repos/greeks.py
 from __future__ import annotations
+
 from pathlib import Path
+
 import pandas as pd
-import pyarrow as pa, pyarrow.parquet as pq
+import pyarrow as pa
+import pyarrow.parquet as pq
+
 
 class _BaseGreeksRepo:
     def __init__(self, root: Path, separate_subdirs: bool = True):

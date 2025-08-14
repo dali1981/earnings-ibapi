@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 import argparse
-import pandas as pd
+
 import numpy as np
+import pandas as pd
 from ibx_repos import ChainRepository
+
 
 def _to_list(x):
     """Return a Python list for any list-like; empty list for None/NA."""
@@ -26,11 +28,13 @@ def _to_list(x):
     except Exception:
         return [x]
 
+
 def _safe_len(x) -> int:
     try:
         return len(_to_list(x))
     except Exception:
         return 0
+
 
 def main():
     ap = argparse.ArgumentParser()
@@ -65,14 +69,17 @@ def main():
     # Small table preview
     rows = []
     for row in snap.head(args.rows).itertuples(index=False):
-        rows.append({
-            "exchange": row.exchange,
-            "trading_class": row.trading_class,
-            "expirations": _safe_len(getattr(row, "expirations", None)),
-            "strikes": _safe_len(getattr(row, "strikes", None)),
-        })
+        rows.append(
+            {
+                "exchange": row.exchange,
+                "trading_class": row.trading_class,
+                "expirations": _safe_len(getattr(row, "expirations", None)),
+                "strikes": _safe_len(getattr(row, "strikes", None)),
+            }
+        )
 
     print(pd.DataFrame(rows).to_string(index=False))
+
 
 if __name__ == "__main__":
     main()

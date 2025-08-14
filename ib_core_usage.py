@@ -1,4 +1,5 @@
-from api.ib_core import IBRuntime, ContractDetailsService, SecDefService, HistoricalService, make_stock
+from api.ib_core import (ContractDetailsService, HistoricalService, IBRuntime,
+                         SecDefService, make_stock)
 
 
 def main():
@@ -16,13 +17,19 @@ def main():
         conid = details[0].contract.conId
 
         params = secdef.option_params("AAPL", conid, timeout=10)
-        bars = hist.bars(aapl, endDateTime="", durationStr="2 D",
-                         barSizeSetting="1 hour", whatToShow="TRADES", useRTH=0, timeout=20)
+        bars = hist.bars(
+            aapl,
+            endDateTime="",
+            durationStr="2 D",
+            barSizeSetting="1 hour",
+            whatToShow="TRADES",
+            useRTH=0,
+            timeout=20,
+        )
 
         print(f"Contract Details: {details}")
         print(f"Option Parameters: {params}")
         print(f"Historical Bars: {bars}")
-
 
 
 if __name__ == "__main__":

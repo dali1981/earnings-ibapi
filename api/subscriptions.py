@@ -4,20 +4,23 @@ from __future__ import annotations
 import logging
 import queue
 import threading
-from typing import Callable, Optional, Dict, TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable, Dict, Optional
 
 from ibapi.client import EClient
-from ibapi.wrapper import EWrapper
 from ibapi.contract import Contract
 from ibapi.ticktype import TickTypeEnum
+from ibapi.wrapper import EWrapper
 
 if TYPE_CHECKING:  # avoid runtime circular imports
-    from api.ib_core import IBRuntime, RequestIdSequencer, FutureRegistry
+    from api.ib_core import FutureRegistry, IBRuntime, RequestIdSequencer
 
 
 class Subscription:
     """Open-ended event stream for a reqId. Thread-safe delivery + optional callback."""
-    def __init__(self, on_event: Optional[Callable[[dict], None]] = None, qsize: int = 1000):
+
+    def __init__(
+        self, on_event: Optional[Callable[[dict], None]] = None, qsize: int = 1000
+    ):
         self._q = queue.Queue(maxsize=qsize)
         self._on_event = on_event
         self._closed = threading.Event()
@@ -72,8 +75,10 @@ class Subscription:
                 break
             yield item
 
+
 class SubscriptionRegistry:
     """reqId -> Subscription routing for streaming endpoints."""
+
     def __init__(self):
         self._lock = threading.Lock()
         self._by_id: Dict[int, Subscription] = {}
@@ -102,8 +107,10 @@ class SubscriptionRegistry:
             sub.push({"type": "error", "code": code, "message": msg})
             sub.close()
 
+
 class SubscriptionHandle:
     """User handle to consume/cancel a subscription."""
+
     def __init__(self, rt: "IBRuntime", req_id: int, sub: Subscription):
         self._rt = rt
         self._req_id = req_id
@@ -125,6 +132,7 @@ class SubscriptionHandle:
     def __iter__(self):
         return iter(self._sub)
 
+
 # --- MODIFY: IBRuntime to create a SubscriptionRegistry and pass it to wrapper ---
 # class IBRuntime:  (add/modify lines shown)
 #   def __init__(...):
@@ -134,6 +142,7 @@ class SubscriptionHandle:
 #       self.subs = SubscriptionRegistry()                  # NEW
 #       self.wrapper = IBWrapperBridge(self.sequencer, self.registry, self.subs)  # changed ctor
 #       self.client = EClient(self.wrapper)
+
 
 # --- MODIFY: IBWrapperBridge to accept subscriptions and route streaming ticks ---
 class IBWrapperBridge(EWrapper):
@@ -145,7 +154,13 @@ class IBWrapperBridge(EWrapper):
 
     # ... existing methods (nextValidId, error → future, contractDetails*, historicalData*)
     # tweak error() to also route to subscriptions:
-    def error(self, reqId: int, errorCode: int, errorString: str, advancedOrderRejectJson: str = ""):
+    def error(
+        self,
+        reqId: int,
+        errorCode: int,
+        errorString: str,
+        advancedOrderRejectJson: str = "",
+    ):
         if reqId in (-1, 0):
             logging.getLogger("api.subscriptions").warning(
                 "IB error (no reqId) code=%s msg=%s", errorCode, errorString
@@ -169,87 +184,151 @@ class IBWrapperBridge(EWrapper):
         self._subs.dispatch(reqId, {"type": "marketDataType", "mode": marketDataType})
 
     def tickPrice(self, reqId, tickType, price, attrib):
-        self._subs.dispatch(reqId, {
-            "type": "tickPrice",
-            "tick": TickTypeEnum.to_str(tickType),
-            "price": price,
-            "attrib": {
-                "canAutoExecute": getattr(attrib, "canAutoExecute", None),
-                "pastLimit": getattr(attrib, "pastLimit", None),
-                "preOpen": getattr(attrib, "preOpen", None),
-            }
-        })
+        self._subs.dispatch(
+            reqId,
+            {
+                "type": "tickPrice",
+                "tick": TickTypeEnum.to_str(tickType),
+                "price": price,
+                "attrib": {
+                    "canAutoExecute": getattr(attrib, "canAutoExecute", None),
+                    "pastLimit": getattr(attrib, "pastLimit", None),
+                    "preOpen": getattr(attrib, "preOpen", None),
+                },
+            },
+        )
 
     def tickSize(self, reqId, tickType, size):
-        self._subs.dispatch(reqId, {
-            "type": "tickSize",
-            "tick": TickTypeEnum.to_str(tickType),
-            "size": size
-        })
+        self._subs.dispatch(
+            reqId,
+            {"type": "tickSize", "tick": TickTypeEnum.to_str(tickType), "size": size},
+        )
 
     def tickString(self, reqId, tickType, value):
-        self._subs.dispatch(reqId, {
-            "type": "tickString",
-            "tick": TickTypeEnum.to_str(tickType),
-            "value": value
-        })
+        self._subs.dispatch(
+            reqId,
+            {
+                "type": "tickString",
+                "tick": TickTypeEnum.to_str(tickType),
+                "value": value,
+            },
+        )
 
     def tickGeneric(self, reqId, tickType, value):
-        self._subs.dispatch(reqId, {
-            "type": "tickGeneric",
-            "tick": TickTypeEnum.to_str(tickType),
-            "value": value
-        })
+        self._subs.dispatch(
+            reqId,
+            {
+                "type": "tickGeneric",
+                "tick": TickTypeEnum.to_str(tickType),
+                "value": value,
+            },
+        )
 
-    def tickOptionComputation(self, reqId, tickType, impliedVol, delta, optPrice, pvDividend, gamma, vega, theta, undPrice):
-        self._subs.dispatch(reqId, {
-            "type": "tickOption",
-            "tick": TickTypeEnum.to_str(tickType),
-            "impliedVol": impliedVol, "delta": delta, "optPrice": optPrice,
-            "pvDividend": pvDividend, "gamma": gamma, "vega": vega, "theta": theta,
-            "underPrice": undPrice
-        })
+    def tickOptionComputation(
+        self,
+        reqId,
+        tickType,
+        impliedVol,
+        delta,
+        optPrice,
+        pvDividend,
+        gamma,
+        vega,
+        theta,
+        undPrice,
+    ):
+        self._subs.dispatch(
+            reqId,
+            {
+                "type": "tickOption",
+                "tick": TickTypeEnum.to_str(tickType),
+                "impliedVol": impliedVol,
+                "delta": delta,
+                "optPrice": optPrice,
+                "pvDividend": pvDividend,
+                "gamma": gamma,
+                "vega": vega,
+                "theta": theta,
+                "underPrice": undPrice,
+            },
+        )
 
     # Tick-by-tick (if you enable it)
-    def tickByTickAllLast(self, reqId, tickType, time, price, size, tickAttribLast, exchange, specialConditions):
-        self._subs.dispatch(reqId, {
-            "type": "tbtLast", "subtype": "all" if tickType == 1 else "last",
-            "time": time, "price": price, "size": size,
-            "attrib": {
-                "pastLimit": getattr(tickAttribLast, "pastLimit", None),
-                "unreported": getattr(tickAttribLast, "unreported", None),
+    def tickByTickAllLast(
+        self,
+        reqId,
+        tickType,
+        time,
+        price,
+        size,
+        tickAttribLast,
+        exchange,
+        specialConditions,
+    ):
+        self._subs.dispatch(
+            reqId,
+            {
+                "type": "tbtLast",
+                "subtype": "all" if tickType == 1 else "last",
+                "time": time,
+                "price": price,
+                "size": size,
+                "attrib": {
+                    "pastLimit": getattr(tickAttribLast, "pastLimit", None),
+                    "unreported": getattr(tickAttribLast, "unreported", None),
+                },
+                "exchange": exchange,
+                "special": specialConditions,
             },
-            "exchange": exchange, "special": specialConditions
-        })
+        )
 
-    def tickByTickBidAsk(self, reqId, time, bidPrice, askPrice, bidSize, askSize, tickAttribBidAsk):
-        self._subs.dispatch(reqId, {
-            "type": "tbtBidAsk", "time": time,
-            "bidPrice": bidPrice, "askPrice": askPrice,
-            "bidSize": bidSize, "askSize": askSize,
-            "attrib": {
-                "bidPastLow": getattr(tickAttribBidAsk, "bidPastLow", None),
-                "askPastHigh": getattr(tickAttribBidAsk, "askPastHigh", None),
-            }
-        })
+    def tickByTickBidAsk(
+        self, reqId, time, bidPrice, askPrice, bidSize, askSize, tickAttribBidAsk
+    ):
+        self._subs.dispatch(
+            reqId,
+            {
+                "type": "tbtBidAsk",
+                "time": time,
+                "bidPrice": bidPrice,
+                "askPrice": askPrice,
+                "bidSize": bidSize,
+                "askSize": askSize,
+                "attrib": {
+                    "bidPastLow": getattr(tickAttribBidAsk, "bidPastLow", None),
+                    "askPastHigh": getattr(tickAttribBidAsk, "askPastHigh", None),
+                },
+            },
+        )
 
     def tickByTickMidPoint(self, reqId, time, midPoint):
         self._subs.dispatch(reqId, {"type": "tbtMid", "time": time, "mid": midPoint})
+
 
 # --- NEW: Subscription service for reqMktData ---
 class SubscriptionService:
     def __init__(self, rt: IBRuntime):
         self.rt = rt
 
-    def market_data(self, contract: Contract, genericTicks: str = "",
-                    snapshot: bool = False, regulatorySnapshot: bool = False,
-                    mktDataOptions=None,
-                    on_event: Optional[Callable[[dict], None]] = None,
-                    qsize: int = 1000) -> SubscriptionHandle:
+    def market_data(
+        self,
+        contract: Contract,
+        genericTicks: str = "",
+        snapshot: bool = False,
+        regulatorySnapshot: bool = False,
+        mktDataOptions=None,
+        on_event: Optional[Callable[[dict], None]] = None,
+        qsize: int = 1000,
+    ) -> SubscriptionHandle:
         rid = self.rt.sequencer.next()
         sub = Subscription(on_event=on_event, qsize=qsize)
         self.rt.subs.register(rid, sub)
         self.rt.client.reqMktData(
-            rid, contract, genericTicks, snapshot, regulatorySnapshot, mktDataOptions or []
+            rid,
+            contract,
+            genericTicks,
+            snapshot,
+            regulatorySnapshot,
+            mktDataOptions or [],
         )
         return SubscriptionHandle(self.rt, rid, sub)

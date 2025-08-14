@@ -1,0 +1,20 @@
+[tool.black]
+target-version = ["py310"]
+line-length = 88
+exclude = '''
+(
+  ^/(\.venv|venv|env)/
+  | ^/build/
+  | ^/dist/
+  | ^/htmlcov/
+  | ^/\.git/
+)
+'''
+
+[tool.isort]
+profile = "black"
+py_version = 310
+skip = [".venv", "venv", "env"]
+skip_glob = [".venv/*", "venv/*", "env/*"]
+force_alphabetical_sort = true
+lines_after_imports = 2

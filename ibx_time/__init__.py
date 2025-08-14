@@ -33,12 +33,13 @@ Notes
   and "YYYYMMDD HH:MM:SS US/Eastern".
 - Includes validation to prevent common formatting errors.
 """
+
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Optional, Union
-import re
 
 import pandas as pd
 
@@ -81,10 +82,13 @@ def parse_ib_datetime_series(s: pd.Series) -> pd.Series:
 
 # ----------------------------- Formatting -----------------------------
 
+
 @dataclass
 class EndOptions:
-    tz: Optional[str] = None  # e.g., "US/Eastern" or "UTC"; if None, leave as-is when already present
-    hyphen: bool = False      # use 'YYYYMMDD-HH:MM:SS' instead of space
+    tz: Optional[str] = (
+        None  # e.g., "US/Eastern" or "UTC"; if None, leave as-is when already present
+    )
+    hyphen: bool = False  # use 'YYYYMMDD-HH:MM:SS' instead of space
 
 
 def _has_tz(s: str) -> bool:
@@ -96,12 +100,15 @@ def _fmt_datetime_str(as_of: str, hyphen: bool) -> str:
     # The hyphen format is used internally for UTC timestamps only
     if hyphen:
         # This format is for internal use only - IB API will reject this format
-        return as_of.replace(" ", "-") 
+        return as_of.replace(" ", "-")
     return as_of
 
 
 def ib_end_datetime(
-    as_of: Optional[Union[str, datetime]], *, tz: Optional[str] = "UTC", hyphen: bool = False
+    as_of: Optional[Union[str, datetime]],
+    *,
+    tz: Optional[str] = "UTC",
+    hyphen: bool = False,
 ) -> str:
     """Return an IB-ready endDateTime string.
 
@@ -129,6 +136,7 @@ def ib_end_datetime(
 
 # ---------------------- Instrument timezone ----------------------
 
+
 def instrument_timezone(rt, contract) -> str:
     """Lookup instrument time zone via ContractDetails. Fallback 'US/Eastern'."""
     try:
@@ -142,12 +150,14 @@ def instrument_timezone(rt, contract) -> str:
     return tz or "US/Eastern"
 
 
-def ib_end_datetime_instrument(rt, contract, as_of: Optional[Union[str, datetime]], *, hyphen: bool = False) -> str:
+def ib_end_datetime_instrument(
+    rt, contract, as_of: Optional[Union[str, datetime]], *, hyphen: bool = False
+) -> str:
     """Return 'endDateTime' using the instrument's time zone.
 
     - If `as_of` already contains a TZ, pass through.
     - Otherwise, append the instrument TZ (via ContractDetails).
-    
+
     IMPORTANT: For IB API reqHistoricalData, always use hyphen=False (default)
     as IB API requires space separator between date and time.
     """
@@ -166,109 +176,112 @@ def ib_end_datetime_instrument(rt, contract, as_of: Optional[Union[str, datetime
 
 # ---------------------- Enhanced Validation & Safety ----------------------
 
+
 def validate_ib_datetime_format(datetime_str: str) -> bool:
     """Validate that a datetime string conforms to IB API expectations.
-    
+
     Valid formats:
     - "20240105" (date only)
     - "20240105 15:30:00" (date and time with space)
     - "20240105 15:30:00 US/Eastern" (date, time, timezone with spaces)
-    
+
     Invalid formats:
     - "20240105-15:30:00" (hyphen separator - IB API will reject)
     - "2024-01-05" (ISO date format)
     """
     if not datetime_str or not isinstance(datetime_str, str):
         return False
-    
+
     datetime_str = datetime_str.strip()
-    
+
     # Check for invalid hyphen format that IB API rejects
-    if re.match(r'\d{8}-\d{2}:\d{2}:\d{2}', datetime_str):
+    if re.match(r"\d{8}-\d{2}:\d{2}:\d{2}", datetime_str):
         return False
-    
+
     # Valid patterns
     patterns = [
-        r'^\d{8}$',  # YYYYMMDD
-        r'^\d{8} \d{2}:\d{2}:\d{2}$',  # YYYYMMDD HH:MM:SS
-        r'^\d{8} \d{2}:\d{2}:\d{2} [A-Za-z]+/[A-Za-z_+\-0-9]+$',  # YYYYMMDD HH:MM:SS TZ
-        r'^\d{8} \d{2}:\d{2}:\d{2} UTC$',  # YYYYMMDD HH:MM:SS UTC
+        r"^\d{8}$",  # YYYYMMDD
+        r"^\d{8} \d{2}:\d{2}:\d{2}$",  # YYYYMMDD HH:MM:SS
+        r"^\d{8} \d{2}:\d{2}:\d{2} [A-Za-z]+/[A-Za-z_+\-0-9]+$",  # YYYYMMDD HH:MM:SS TZ
+        r"^\d{8} \d{2}:\d{2}:\d{2} UTC$",  # YYYYMMDD HH:MM:SS UTC
     ]
-    
+
     return any(re.match(pattern, datetime_str) for pattern in patterns)
 
 
 def safe_ib_end_datetime(
-    as_of: Optional[Union[str, datetime]], 
-    tz: str = "UTC",
-    validate: bool = True
+    as_of: Optional[Union[str, datetime]], tz: str = "UTC", validate: bool = True
 ) -> str:
     """Safe wrapper for ib_end_datetime with validation.
-    
+
     Returns a validated IB API compatible datetime string.
     Raises ValueError if validation fails and validate=True.
     """
-    result = ib_end_datetime(as_of, tz=tz, hyphen=False)  # Force hyphen=False for safety
-    
+    result = ib_end_datetime(
+        as_of, tz=tz, hyphen=False
+    )  # Force hyphen=False for safety
+
     if validate and result and not validate_ib_datetime_format(result):
         raise ValueError(
             f"Generated datetime string '{result}' is not valid for IB API. "
             f"Expected format: 'YYYYMMDD HH:MM:SS TZ' (with spaces, not hyphens)"
         )
-    
+
     return result
 
 
 def safe_ib_end_datetime_instrument(
-    rt, 
-    contract, 
-    as_of: Optional[Union[str, datetime]], 
-    validate: bool = True
+    rt, contract, as_of: Optional[Union[str, datetime]], validate: bool = True
 ) -> str:
     """Safe wrapper for ib_end_datetime_instrument with validation.
-    
+
     Returns a validated IB API compatible datetime string using instrument timezone.
     Raises ValueError if validation fails and validate=True.
     """
-    result = ib_end_datetime_instrument(rt, contract, as_of, hyphen=False)  # Force hyphen=False
-    
+    result = ib_end_datetime_instrument(
+        rt, contract, as_of, hyphen=False
+    )  # Force hyphen=False
+
     if validate and result and not validate_ib_datetime_format(result):
         raise ValueError(
             f"Generated datetime string '{result}' is not valid for IB API. "
             f"Expected format: 'YYYYMMDD HH:MM:SS TZ' (with spaces, not hyphens)"
         )
-    
+
     return result
 
 
 def format_date_for_ib(dt: Union[datetime, str]) -> str:
     """Format a date/datetime for IB API usage with proper timezone handling.
-    
+
     Args:
         dt: datetime object or ISO date string
-        
+
     Returns:
         IB API compatible date string (YYYYMMDD format)
     """
     if isinstance(dt, str):
-        if re.match(r'^\d{4}-\d{2}-\d{2}', dt):  # ISO format
-            dt = datetime.fromisoformat(dt.split('T')[0])  # Handle both date and datetime ISO strings
+        if re.match(r"^\d{4}-\d{2}-\d{2}", dt):  # ISO format
+            dt = datetime.fromisoformat(
+                dt.split("T")[0]
+            )  # Handle both date and datetime ISO strings
         else:
             dt = pd.to_datetime(dt).to_pydatetime()
-    
+
     return dt.strftime("%Y%m%d")
 
 
 def ensure_eastern_timezone(dt: datetime, symbol: str = "") -> datetime:
     """Ensure datetime is in US/Eastern timezone for US market operations.
-    
+
     Most US equity and option trading happens in Eastern time.
     This function helps standardize timezone handling.
     """
     try:
         import pytz
-        eastern = pytz.timezone('US/Eastern')
-        
+
+        eastern = pytz.timezone("US/Eastern")
+
         if dt.tzinfo is None:
             # Assume naive datetime is already in Eastern
             return eastern.localize(dt)
@@ -278,43 +291,51 @@ def ensure_eastern_timezone(dt: datetime, symbol: str = "") -> datetime:
     except ImportError:
         # Fallback if pytz not available
         import warnings
-        warnings.warn("pytz not available, returning datetime as-is. Install pytz for proper timezone handling.")
+
+        warnings.warn(
+            "pytz not available, returning datetime as-is. Install pytz for proper timezone handling."
+        )
         return dt
 
 
 # ---------------------- Logging and Debugging ----------------------
 
+
 def debug_datetime_format(datetime_str: str) -> dict:
     """Debug helper to analyze datetime string format issues.
-    
+
     Returns analysis of the datetime string for troubleshooting.
     """
     analysis = {
-        'input': datetime_str,
-        'is_valid_for_ib': validate_ib_datetime_format(datetime_str),
-        'has_timezone': _has_tz(datetime_str),
-        'format_issues': []
+        "input": datetime_str,
+        "is_valid_for_ib": validate_ib_datetime_format(datetime_str),
+        "has_timezone": _has_tz(datetime_str),
+        "format_issues": [],
     }
-    
+
     if not datetime_str:
-        analysis['format_issues'].append('Empty or None datetime string')
+        analysis["format_issues"].append("Empty or None datetime string")
         return analysis
-    
+
     # Check for common issues
-    if '-' in datetime_str and re.search(r'\d{8}-\d{2}:\d{2}:\d{2}', datetime_str):
-        analysis['format_issues'].append('Uses hyphen separator - IB API requires space')
-    
-    if re.match(r'\d{4}-\d{2}-\d{2}', datetime_str):
-        analysis['format_issues'].append('Uses ISO date format - IB API requires YYYYMMDD')
-    
+    if "-" in datetime_str and re.search(r"\d{8}-\d{2}:\d{2}:\d{2}", datetime_str):
+        analysis["format_issues"].append(
+            "Uses hyphen separator - IB API requires space"
+        )
+
+    if re.match(r"\d{4}-\d{2}-\d{2}", datetime_str):
+        analysis["format_issues"].append(
+            "Uses ISO date format - IB API requires YYYYMMDD"
+        )
+
     if len(datetime_str) > 30:
-        analysis['format_issues'].append('String too long - possible corruption')
-    
+        analysis["format_issues"].append("String too long - possible corruption")
+
     # Extract components
     parts = datetime_str.split()
     if parts:
-        analysis['date_part'] = parts[0] if parts else ''
-        analysis['time_part'] = parts[1] if len(parts) > 1 else ''
-        analysis['tz_part'] = ' '.join(parts[2:]) if len(parts) > 2 else ''
-    
+        analysis["date_part"] = parts[0] if parts else ""
+        analysis["time_part"] = parts[1] if len(parts) > 1 else ""
+        analysis["tz_part"] = " ".join(parts[2:]) if len(parts) > 2 else ""
+
     return analysis

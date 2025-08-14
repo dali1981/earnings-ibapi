@@ -1,10 +1,14 @@
+import queue
+import threading
+from typing import Any, Callable, Dict, Optional
 
-import threading, queue
-from typing import Any, Dict, Optional, Callable
 
 class Subscription:
     """Open-ended event stream for a reqId."""
-    def __init__(self, on_event: Optional[Callable[[dict], None]] = None, qsize: int = 1000):
+
+    def __init__(
+        self, on_event: Optional[Callable[[dict], None]] = None, qsize: int = 1000
+    ):
         self._q = queue.Queue(maxsize=qsize)
         self._on_event = on_event
         self._closed = threading.Event()
@@ -53,6 +57,7 @@ class Subscription:
                 break
             yield item
 
+
 class SubscriptionRegistry:
     def __init__(self):
         self._lock = threading.Lock()
@@ -81,6 +86,7 @@ class SubscriptionRegistry:
         if sub:
             sub.push({"type": "error", "code": code, "message": msg})
             sub.close()
+
 
 class SubscriptionHandle:
     def __init__(self, rt: "IBRuntime", req_id: int, sub: Subscription):

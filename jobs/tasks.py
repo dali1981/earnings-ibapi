@@ -2,13 +2,21 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date
-from pathlib import Path
-from typing import Optional
-
-from ibx_flows.backfill import BackfillConfig, backfill_equity_bars, backfill_option_bars
+from ibx_flows.backfill import (
+    backfill_equity_bars,
+    backfill_option_bars,
+    BackfillConfig,
+)
 from ibx_flows.source_ib import IBSource
+from pathlib import Path
+
 # Use new unified repository system
-from repositories import EquityBarRepository, OptionBarRepository, OptionChainSnapshotRepository
+from repositories import (
+    EquityBarRepository,
+    OptionBarRepository,
+    OptionChainSnapshotRepository,
+)
+from typing import Optional
 
 
 class Task:
@@ -93,4 +101,6 @@ class BackfillOptionBarsTask(Task):
         )
         repo = OptionBarRepository(self.out)
         src = IBSource()
-        backfill_option_bars(src, repo, chain_repo=self._chain_repo, eq_repo=None, cfg=cfg)
+        backfill_option_bars(
+            src, repo, chain_repo=self._chain_repo, eq_repo=None, cfg=cfg
+        )

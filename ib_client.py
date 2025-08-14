@@ -5,7 +5,7 @@ import logging
 import threading
 from collections import defaultdict
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import Any, Dict, List
 
 from ibapi.client import EClient
 from ibapi.utils import iswrapper
@@ -14,7 +14,7 @@ from ibapi.wrapper import EWrapper
 from request_sequencer import RequestSequencer
 from response_sequencer import ResponseSequencer
 from sink import Sink
-from utils import append_parquet, RateLimiter
+from utils import RateLimiter, append_parquet
 
 log = logging.getLogger(__name__)
 
@@ -24,10 +24,13 @@ class IBClient(EWrapper, EClient):
 
     TIMEOUT = 120  # seconds per request
 
-    def __init__(self,
-                 requests: RequestSequencer,
-                 responses: ResponseSequencer,
-                 sink: Sink, limiter: RateLimiter):
+    def __init__(
+        self,
+        requests: RequestSequencer,
+        responses: ResponseSequencer,
+        sink: Sink,
+        limiter: RateLimiter,
+    ):
         EWrapper.__init__(self)
         EClient.__init__(self, wrapper=self)
 
@@ -104,16 +107,19 @@ class IBClient(EWrapper, EClient):
     @iswrapper
     def historicalData(self, reqId: int, bar):  # type: ignore
         # self.sink.historical_data(reqId, bar)
-        self.responses.record(reqId, {
-            "datetime": bar.date,
-            "open": bar.open,
-            "high": bar.high,
-            "low": bar.low,
-            "close": bar.close,
-            "volume": bar.volume,
-            "wap": bar.wap,
-            "bar_count": bar.barCount,
-        })
+        self.responses.record(
+            reqId,
+            {
+                "datetime": bar.date,
+                "open": bar.open,
+                "high": bar.high,
+                "low": bar.low,
+                "close": bar.close,
+                "volume": bar.volume,
+                "wap": bar.wap,
+                "bar_count": bar.barCount,
+            },
+        )
 
     @iswrapper
     def historicalDataEnd(self, reqId: int, start: str, end: str):  # type: ignore
@@ -127,6 +133,7 @@ class IBClient(EWrapper, EClient):
         if tickType in (1, 2, 4, 6):
             # self.buffers[reqId].append({"tickType": tickType, "price": price})
             log.info(f"req id: {reqId} tickPrice received: {tickType}, price: {price}")
+
     @iswrapper
     def tickOptionComputation(self, reqId: int, tickType: int, *_):  # type: ignore
         self.sink.tick_option_computation(reqId, tickType)
@@ -137,20 +144,39 @@ class IBClient(EWrapper, EClient):
         self.requests.done(reqId)
 
     @iswrapper
-    def securityDefinitionOptionParameter(self, reqId: int, exchange: str, underlyingConId: int, tradingClass: str,
-                                 multiplier: str, expirations, strikes):
+    def securityDefinitionOptionParameter(
+        self,
+        reqId: int,
+        exchange: str,
+        underlyingConId: int,
+        tradingClass: str,
+        multiplier: str,
+        expirations,
+        strikes,
+    ):
         """Handles option secdef params request."""
-        log.info("Option secdef params for reqId %d: exchange=%s, underlyingConId=%d, tradingClass=%s, "
-                 "multiplier=%s, expirations=%s, strikes=%s", reqId, exchange, underlyingConId,
-                 tradingClass, multiplier, expirations, strikes)
-        self.sink.add_value(reqId,  {
-            "exchange": exchange,
-            "underlying_conid": underlyingConId,
-            "trading_class": tradingClass,
-            "multiplier": multiplier,
-            "expirations": expirations,
-            "strikes": strikes
-        } )
+        log.info(
+            "Option secdef params for reqId %d: exchange=%s, underlyingConId=%d, tradingClass=%s, "
+            "multiplier=%s, expirations=%s, strikes=%s",
+            reqId,
+            exchange,
+            underlyingConId,
+            tradingClass,
+            multiplier,
+            expirations,
+            strikes,
+        )
+        self.sink.add_value(
+            reqId,
+            {
+                "exchange": exchange,
+                "underlying_conid": underlyingConId,
+                "trading_class": tradingClass,
+                "multiplier": multiplier,
+                "expirations": expirations,
+                "strikes": strikes,
+            },
+        )
 
     @iswrapper
     def securityDefinitionOptionParameterEnd(self, reqId: int):

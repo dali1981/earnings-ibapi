@@ -1,20 +1,20 @@
-
 from __future__ import annotations
-from pathlib import Path
-from typing import Optional, Union, List, Iterable, Dict, Set
+
 from datetime import date, datetime
+from pathlib import Path
+from typing import Dict, Iterable, List, Optional, Set, Union
+
 import pandas as pd
 import pyarrow as pa
-import pyarrow.parquet as pq
-
 import pyarrow.dataset as ds
-import pandas as pd
-from datetime import date, datetime
+import pyarrow.parquet as pq
 
 from ._util import _write_empty_dataset
 
+
 def _dataset_hive(path: str, schema: pa.Schema | None = None):
     return ds.dataset(path, format="parquet", partitioning="hive", schema=schema)
+
 
 def _build_filter(**kwargs):
     """
@@ -41,8 +41,11 @@ def _build_filter(**kwargs):
         expr = term if expr is None else (expr & term)
     return expr
 
-import pandas as pd
+
 from datetime import date
+
+import pandas as pd
+
 
 def _build_filter(**kwargs):
     """
@@ -63,7 +66,11 @@ def _build_filter(**kwargs):
                     pass
             if hasattr(value, "isoformat"):
                 # date or datetime
-                value = value if isinstance(value, date) else getattr(value, "date", lambda: value)()
+                value = (
+                    value
+                    if isinstance(value, date)
+                    else getattr(value, "date", lambda: value)()
+                )
         term = ds.field(key) == value
         expr = term if expr is None else (expr & term)
     return expr
@@ -71,17 +78,19 @@ def _build_filter(**kwargs):
 
 import pandas as pd
 
+
 def _rename_standard_cols(df: pd.DataFrame) -> pd.DataFrame:
     cols = {c: c for c in df.columns}
     lower = {c.lower(): c for c in df.columns}
     # barCount -> bar_count (case-insensitive)
-    if 'barcount' in lower:
-        cols[ lower['barcount'] ] = 'bar_count'
+    if "barcount" in lower:
+        cols[lower["barcount"]] = "bar_count"
     # WAP -> wap (case-insensitive)
-    if 'wap' in lower and lower['wap'] != 'wap':
-        cols[ lower['wap'] ] = 'wap'
+    if "wap" in lower and lower["wap"] != "wap":
+        cols[lower["wap"]] = "wap"
     # ensure rename
-    return df.rename(columns=cols, errors='ignore')
+    return df.rename(columns=cols, errors="ignore")
+
 
 def _ensure_schema_columns(df: pd.DataFrame, required: list) -> pd.DataFrame:
     for name in required:
@@ -90,25 +99,29 @@ def _ensure_schema_columns(df: pd.DataFrame, required: list) -> pd.DataFrame:
     return df
 
 
-import pandas as pd
 import re
+
+import pandas as pd
+
 
 def _parse_ib_datetime_series(s):
     """Parse IB 'date' strings like 'YYYYMMDD' or 'YYYYMMDD HH:MM:SS [TZ]'. Returns pandas.DatetimeIndex."""
     if s is None:
         return pd.Series(pd.NaT)
     s = s.astype(str)
+
     # Fast path: tokenise and rebuild canonical form
     def _canon(x: str) -> str:
         # e.g., '20250807 04:00:00 US/Eastern' -> '20250807 04:00:00'
         parts = x.split()
         if len(parts) >= 2 and len(parts[0]) == 8 and parts[0].isdigit():
             # parts[1] expected HH:MM:SS
-            if re.match(r'^\d{2}:\d{2}:\d{2}$', parts[1]):
+            if re.match(r"^\d{2}:\d{2}:\d{2}$", parts[1]):
                 return parts[0] + " " + parts[1]
             # daily
             return parts[0]
         return x
+
     canon = s.map(_canon)
     # Two attempts: intraday, then daily
     ts = pd.to_datetime(canon, format="%Y%m%d %H:%M:%S", errors="coerce")
@@ -137,92 +150,124 @@ class EquityBarRepository:
       - For daily:    ['date','symbol','open','high','low','close','volume']
     We'll derive/normalize 'time'/'date' and add 'bar_size' as a column.
     """
+
     def __init__(self, base_path: Union[str, Path]):
         self.base_path = Path(base_path)
         self.base_path.mkdir(parents=True, exist_ok=True)
-        self.schema = pa.schema([
-            pa.field('time', pa.timestamp('ns')),
-            pa.field('date', pa.date32()),
-            pa.field('trade_date', pa.date32()),
-            pa.field('symbol', pa.string()),
-            pa.field('bar_size', pa.string()),
-            pa.field('open', pa.float64()),
-            pa.field('high', pa.float64()),
-            pa.field('low', pa.float64()),
-            pa.field('close', pa.float64()),
-            pa.field('volume', pa.float64()),
-            pa.field('wap', pa.float64()).with_nullable(True),
-            pa.field('bar_count', pa.int64()).with_nullable(True),
-            pa.field('what_to_show', pa.string()).with_nullable(True),
-        ])
+        self.schema = pa.schema(
+            [
+                pa.field("time", pa.timestamp("ns")),
+                pa.field("date", pa.date32()),
+                pa.field("trade_date", pa.date32()),
+                pa.field("symbol", pa.string()),
+                pa.field("bar_size", pa.string()),
+                pa.field("open", pa.float64()),
+                pa.field("high", pa.float64()),
+                pa.field("low", pa.float64()),
+                pa.field("close", pa.float64()),
+                pa.field("volume", pa.float64()),
+                pa.field("wap", pa.float64()).with_nullable(True),
+                pa.field("bar_count", pa.int64()).with_nullable(True),
+                pa.field("what_to_show", pa.string()).with_nullable(True),
+            ]
+        )
         if not any(self.base_path.rglob("*.parquet")):
             _write_empty_dataset(self.base_path, self.schema)
 
-    def _normalize(self, df: pd.DataFrame, symbol: str, bar_size: str, what_to_show: Optional[str]) -> pd.DataFrame:
+    def _normalize(
+        self, df: pd.DataFrame, symbol: str, bar_size: str, what_to_show: Optional[str]
+    ) -> pd.DataFrame:
         out = df.copy()
         out = _rename_standard_cols(out)
-        out['symbol'] = symbol
-        out['bar_size'] = bar_size
+        out["symbol"] = symbol
+        out["bar_size"] = bar_size
         if what_to_show:
-            out['what_to_show'] = what_to_show
+            out["what_to_show"] = what_to_show
 
         # Normalize time/date
-        if 'time' not in out.columns and 'datetime' in out.columns:
-            out['time'] = pd.to_datetime(out['datetime'])
-        elif 'time' in out.columns:
-            out['time'] = pd.to_datetime(out['time'])
+        if "time" not in out.columns and "datetime" in out.columns:
+            out["time"] = pd.to_datetime(out["datetime"])
+        elif "time" in out.columns:
+            out["time"] = pd.to_datetime(out["time"])
         else:
             # daily bars may only have 'date'
             pass
 
-        if 'date' not in out.columns:
-            if 'time' in out.columns:
-                out['date'] = out['time'].dt.date
-            elif 'datetime' in out.columns:
-                out['date'] = pd.to_datetime(out['datetime']).dt.date
+        if "date" not in out.columns:
+            if "time" in out.columns:
+                out["date"] = out["time"].dt.date
+            elif "datetime" in out.columns:
+                out["date"] = pd.to_datetime(out["datetime"]).dt.date
 
-        ts = _parse_ib_datetime_series(out['date'])
-        out['time'] = ts
-        out['date'] = ts.dt.date
-        out['trade_date'] = ts.dt.date
+        ts = _parse_ib_datetime_series(out["date"])
+        out["time"] = ts
+        out["date"] = ts.dt.date
+        out["trade_date"] = ts.dt.date
         # Cast numerics
-        for c in ['open','high','low','close','volume']:
+        for c in ["open", "high", "low", "close", "volume"]:
             if c in out.columns:
-                out[c] = pd.to_numeric(out[c], errors='coerce')
-        if 'bar_count' in out.columns:
-            out['bar_count'] = pd.to_numeric(out['bar_count'], errors='coerce').astype('Int64')
-        if 'wap' in out.columns:
-            out['wap'] = pd.to_numeric(out['wap'], errors='coerce')
+                out[c] = pd.to_numeric(out[c], errors="coerce")
+        if "bar_count" in out.columns:
+            out["bar_count"] = pd.to_numeric(out["bar_count"], errors="coerce").astype(
+                "Int64"
+            )
+        if "wap" in out.columns:
+            out["wap"] = pd.to_numeric(out["wap"], errors="coerce")
         # Ensure all schema columns exist
-        required = ['time','date','trade_date','symbol','bar_size','open','high','low','close','volume','wap','bar_count','what_to_show']
+        required = [
+            "time",
+            "date",
+            "trade_date",
+            "symbol",
+            "bar_size",
+            "open",
+            "high",
+            "low",
+            "close",
+            "volume",
+            "wap",
+            "bar_count",
+            "what_to_show",
+        ]
         out = _ensure_schema_columns(out, required)
         return out
 
-    def save(self, df: pd.DataFrame, symbol: str, bar_size: str, what_to_show: Optional[str] = None) -> None:
+    def save(
+        self,
+        df: pd.DataFrame,
+        symbol: str,
+        bar_size: str,
+        what_to_show: Optional[str] = None,
+    ) -> None:
         out = self._normalize(df, symbol, bar_size, what_to_show)
         table = pa.Table.from_pandas(out, schema=self.schema, preserve_index=False)
         if bar_size.strip().lower() == "1 day":
-            parts = ['symbol']
+            parts = ["symbol"]
         else:
-            parts = ['symbol','trade_date']
+            parts = ["symbol", "trade_date"]
         pq.write_to_dataset(
             table,
             root_path=str(self.base_path),
             partition_cols=parts,
             use_dictionary=True,
-            compression='snappy'
+            compression="snappy",
         )
 
-    def load(self, symbol: Optional[str] = None, trade_date: Optional[Union[str,date]] = None) -> pd.DataFrame:
+    def load(
+        self,
+        symbol: Optional[str] = None,
+        trade_date: Optional[Union[str, date]] = None,
+    ) -> pd.DataFrame:
         dataset = _dataset_hive(str(self.base_path), self.schema)
         expr = _build_filter(symbol=symbol)
         table = dataset.to_table(filter=expr)
         df = table.to_pandas()
         if trade_date is not None and not df.empty:
             import pandas as pd
+
             try:
                 td = pd.to_datetime(trade_date).date()
-                df = df[df['trade_date'] == td]
+                df = df[df["trade_date"] == td]
             except Exception:
                 pass
         return df
@@ -242,7 +287,7 @@ class EquityBarRepository:
         if df.empty:
             return set()
         s = pd.to_datetime(df["trade_date"])
-        mask = (
-            s >= pd.to_datetime(start).normalize()
-        ) & (s <= pd.to_datetime(end).normalize())
+        mask = (s >= pd.to_datetime(start).normalize()) & (
+            s <= pd.to_datetime(end).normalize()
+        )
         return set(s[mask].dt.date)

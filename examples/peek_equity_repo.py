@@ -1,14 +1,20 @@
 #!/usr/bin/env python3
 import argparse
+
 import pandas as pd
 from ibx_repos import EquityBarRepository
+
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--base", default="data/equity_bars")
     ap.add_argument("--symbol", default=None)
-    ap.add_argument("--trade-date", dest="trade_date", default=None,
-                    help="YYYY-MM-DD (only for intraday partitions)")
+    ap.add_argument(
+        "--trade-date",
+        dest="trade_date",
+        default=None,
+        help="YYYY-MM-DD (only for intraday partitions)",
+    )
     ap.add_argument("--rows", type=int, default=10)
     args = ap.parse_args()
 
@@ -25,6 +31,7 @@ def main():
         print(df.head(args.rows).to_string(index=False))
     else:
         print("(empty)")
+
 
 if __name__ == "__main__":
     main()

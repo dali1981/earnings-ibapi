@@ -9,6 +9,7 @@ Changes in this patch
 
 Drop-in replacement for your existing ibx/greeks_repo_first.py.
 """
+
 from __future__ import annotations
 
 import math
@@ -18,11 +19,11 @@ from dataclasses import dataclass
 from typing import Iterable, List, Optional, Sequence, Tuple
 
 import pandas as pd
-
 from ibx import HistoricalService, SubscriptionService, make_option
 from ibx.time import ib_end_datetime_instrument, parse_ib_datetime_series
 
 # ---------------- Black–Scholes helpers ----------------
+
 
 def _norm_cdf(x: float) -> float:
     return 0.5 * (1.0 + math.erf(x / math.sqrt(2.0)))
@@ -32,7 +33,9 @@ def _norm_pdf(x: float) -> float:
     return math.exp(-0.5 * x * x) / math.sqrt(2.0 * math.pi)
 
 
-def _bs_price(S: float, K: float, r: float, q: float, sigma: float, T: float, right: str) -> float:
+def _bs_price(
+    S: float, K: float, r: float, q: float, sigma: float, T: float, right: str
+) -> float:
     if sigma <= 0 or T <= 0 or S <= 0 or K <= 0:
         return max(0.0, (S - K) if right == "C" else (K - S))
     fwd = S * math.exp((r - q) * T)
@@ -52,7 +55,9 @@ def _vega(S: float, K: float, r: float, q: float, sigma: float, T: float) -> flo
     return math.exp(-r * T) * fwd * _norm_pdf(d1) * math.sqrt(T)
 
 
-def _bs_delta(S: float, K: float, r: float, q: float, sigma: float, T: float, right: str) -> float:
+def _bs_delta(
+    S: float, K: float, r: float, q: float, sigma: float, T: float, right: str
+) -> float:
     if sigma <= 0 or T <= 0 or S <= 0 or K <= 0:
         return 0.0 if right == "C" else -1.0
     fwd = S * math.exp((r - q) * T)
@@ -63,9 +68,26 @@ def _bs_delta(S: float, K: float, r: float, q: float, sigma: float, T: float, ri
         return math.exp(-q * T) * (_norm_cdf(d1) - 1.0)
 
 
-def _implied_vol_from_price(price: float, S: float, K: float, r: float, q: float, T: float, right: str,
-                            *, tol: float = 1e-6, max_iter: int = 60) -> Optional[float]:
-    if price is None or not (price == price) or price <= 0 or T <= 0 or S <= 0 or K <= 0:
+def _implied_vol_from_price(
+    price: float,
+    S: float,
+    K: float,
+    r: float,
+    q: float,
+    T: float,
+    right: str,
+    *,
+    tol: float = 1e-6,
+    max_iter: int = 60,
+) -> Optional[float]:
+    if (
+        price is None
+        or not (price == price)
+        or price <= 0
+        or T <= 0
+        or S <= 0
+        or K <= 0
+    ):
         return None
     intrinsic = max(0.0, (S - K) if right == "C" else (K - S))
     p = min(max(price, intrinsic), S)
@@ -93,12 +115,16 @@ def _implied_vol_from_price(price: float, S: float, K: float, r: float, q: float
                 if abs(f_mid) < tol:
                     return max(mid, 1e-6)
         if f_lo * f_mid <= 0:
-            hi = mid; f_hi = f_mid
+            hi = mid
+            f_hi = f_mid
         else:
-            lo = mid; f_lo = f_mid
+            lo = mid
+            f_lo = f_mid
     return max(mid, 1e-6)
 
+
 # ---------------- Repo-first helpers ----------------
+
 
 @dataclass
 class AsOfBar:
@@ -106,26 +132,42 @@ class AsOfBar:
     ts: Optional[pd.Timestamp]
 
 
-def _load_repo_bar(opt_repo, symbol: str, expiry: str, strike: float, right: str,
-                   as_of: Optional[str], *, bar_size: str = "1 min") -> AsOfBar:
+def _load_repo_bar(
+    opt_repo,
+    symbol: str,
+    expiry: str,
+    strike: float,
+    right: str,
+    as_of: Optional[str],
+    *,
+    bar_size: str = "1 min",
+) -> AsOfBar:
     """Load the last bar <= as_of from the options repo for this contract.
     Returns (price, ts) or (None, None) if not found.
     """
     try:
-        df = opt_repo.load(underlying=symbol, expiry=expiry, right=right, strike=float(strike))
+        df = opt_repo.load(
+            underlying=symbol, expiry=expiry, right=right, strike=float(strike)
+        )
     except TypeError:
         df = opt_repo.load()
         if not df.empty:
-            for col, val in (("underlying", symbol), ("expiry", expiry), ("right", right), ("strike", float(strike))):
+            for col, val in (
+                ("underlying", symbol),
+                ("expiry", expiry),
+                ("right", right),
+                ("strike", float(strike)),
+            ):
                 if col in df.columns:
                     df = df[df[col] == val]
     if df.empty:
         return AsOfBar(price=None, ts=None)
 
     tcol = None
-    for c in ("time","date","datetime","bar_time"):
+    for c in ("time", "date", "datetime", "bar_time"):
         if c in df.columns:
-            tcol = c; break
+            tcol = c
+            break
     if tcol is None:
         return AsOfBar(price=None, ts=None)
 
@@ -146,7 +188,7 @@ def _load_repo_bar(opt_repo, symbol: str, expiry: str, strike: float, right: str
         if df.empty:
             return AsOfBar(price=None, ts=None)
 
-    for col in ("close","wap","open"):
+    for col in ("close", "wap", "open"):
         if col in df.columns:
             s = pd.to_numeric(df[col], errors="coerce").dropna()
             if not s.empty:
@@ -155,9 +197,20 @@ def _load_repo_bar(opt_repo, symbol: str, expiry: str, strike: float, right: str
     return AsOfBar(price=None, ts=df["_ts"].iloc[-1])
 
 
-def _fetch_and_persist_bars(hist: HistoricalService, opt_repo, symbol: str, expiry: str, strike: float, right: str,
-                             as_of: Optional[str], *, duration: str = "1 D", bar_size: str = "1 min",
-                             what_to_show: str = "TRADES", timeout: float = 120.0) -> AsOfBar:
+def _fetch_and_persist_bars(
+    hist: HistoricalService,
+    opt_repo,
+    symbol: str,
+    expiry: str,
+    strike: float,
+    right: str,
+    as_of: Optional[str],
+    *,
+    duration: str = "1 D",
+    bar_size: str = "1 min",
+    what_to_show: str = "TRADES",
+    timeout: float = 120.0,
+) -> AsOfBar:
     contract = make_option(symbol, expiry, strike, right)
     end = ib_end_datetime_instrument(hist.rt, contract, as_of)
     rows = hist.bars(
@@ -189,12 +242,13 @@ def _fetch_and_persist_bars(hist: HistoricalService, opt_repo, symbol: str, expi
 
     # Extract last timestamp/price (IB-aware parsing first)
     t = None
-    for c in ("time","date","datetime","bar_time"):
+    for c in ("time", "date", "datetime", "bar_time"):
         if c in df.columns:
             s = df[c].astype(str)
             ts = parse_ib_datetime_series(s)
             if ts.notna().any():
-                t = ts.dropna(); break
+                t = ts.dropna()
+                break
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore", UserWarning)
                 t = pd.to_datetime(s, errors="coerce").dropna()
@@ -202,15 +256,18 @@ def _fetch_and_persist_bars(hist: HistoricalService, opt_repo, symbol: str, expi
                 break
 
     price = None
-    for col in ("close","wap","open"):
+    for col in ("close", "wap", "open"):
         if col in df.columns:
             s = pd.to_numeric(df[col], errors="coerce").dropna()
             if s.size:
-                price = float(s.iloc[-1]); break
+                price = float(s.iloc[-1])
+                break
 
     return AsOfBar(price=price, ts=t.iloc[-1] if t is not None and t.size else None)
 
+
 # ---------------- Public APIs ----------------
+
 
 def option_greeks_repo_first(
     hist: HistoricalService,
@@ -228,35 +285,64 @@ def option_greeks_repo_first(
     timeout: float = 120.0,
 ) -> Tuple[Optional[float], Optional[float]]:
     # 1) Repo first
-    q = _load_repo_bar(opt_repo, symbol, expiry, strike, right, as_of, bar_size=bar_size)
+    q = _load_repo_bar(
+        opt_repo, symbol, expiry, strike, right, as_of, bar_size=bar_size
+    )
     if q.price is not None:
         T = _ttm_years(expiry, as_of)
         iv = _implied_vol_from_price(q.price, S_asof, float(strike), 0.0, 0.0, T, right)
-        d = None if iv is None else _bs_delta(S_asof, float(strike), 0.0, 0.0, iv, T, right)
+        d = (
+            None
+            if iv is None
+            else _bs_delta(S_asof, float(strike), 0.0, 0.0, iv, T, right)
+        )
         return iv, d
 
     # 2) Fetch minimal bars from IB and persist
-    q = _fetch_and_persist_bars(hist, opt_repo, symbol, expiry, strike, right, as_of,
-                                duration="1 D", bar_size=bar_size, what_to_show=what_to_show, timeout=timeout)
+    q = _fetch_and_persist_bars(
+        hist,
+        opt_repo,
+        symbol,
+        expiry,
+        strike,
+        right,
+        as_of,
+        duration="1 D",
+        bar_size=bar_size,
+        what_to_show=what_to_show,
+        timeout=timeout,
+    )
     if q.price is not None:
         T = _ttm_years(expiry, as_of)
         iv = _implied_vol_from_price(q.price, S_asof, float(strike), 0.0, 0.0, T, right)
-        d = None if iv is None else _bs_delta(S_asof, float(strike), 0.0, 0.0, iv, T, right)
+        d = (
+            None
+            if iv is None
+            else _bs_delta(S_asof, float(strike), 0.0, 0.0, iv, T, right)
+        )
         return iv, d
 
     # 3) Last resort (only when as_of is None): brief streaming greeks
     if as_of is None:
         try:
-            h = subs.market_data(make_option(symbol, expiry, strike, right), genericTicks="106", snapshot=False)
+            h = subs.market_data(
+                make_option(symbol, expiry, strike, right),
+                genericTicks="106",
+                snapshot=False,
+            )
             deadline = time.time() + 4.0
             iv = delta = None
             try:
                 for evt in h:
                     if evt.get("type") == "tickOption":
-                        if evt.get("impliedVol") is not None: iv = float(evt["impliedVol"])  # decimal
-                        if evt.get("delta") is not None:      delta = float(evt["delta"])   # decimal
-                        if iv is not None and delta is not None: break
-                    if time.time() > deadline: break
+                        if evt.get("impliedVol") is not None:
+                            iv = float(evt["impliedVol"])  # decimal
+                        if evt.get("delta") is not None:
+                            delta = float(evt["delta"])  # decimal
+                        if iv is not None and delta is not None:
+                            break
+                    if time.time() > deadline:
+                        break
             finally:
                 h.cancel()
             return iv, delta
@@ -284,20 +370,34 @@ def compute_deltas_asof_repo_first(
     T = _ttm_years(expiry, as_of)
     for k in sorted({float(s) for s in strikes}):
         iv, d = option_greeks_repo_first(
-            hist, opt_repo, None, symbol, expiry, k, right, as_of, S_asof,
-            bar_size=bar_size, what_to_show=what_to_show, timeout=timeout,
+            hist,
+            opt_repo,
+            None,
+            symbol,
+            expiry,
+            k,
+            right,
+            as_of,
+            S_asof,
+            bar_size=bar_size,
+            what_to_show=what_to_show,
+            timeout=timeout,
         )
         q = _load_repo_bar(opt_repo, symbol, expiry, k, right, as_of, bar_size=bar_size)
-        out.append({
-            "strike": float(k),
-            "price": q.price,
-            "iv": iv,
-            "delta": d,
-            "ts": q.ts,
-        })
+        out.append(
+            {
+                "strike": float(k),
+                "price": q.price,
+                "iv": iv,
+                "delta": d,
+                "ts": q.ts,
+            }
+        )
     return pd.DataFrame(out)
 
+
 # ---------------- time to maturity ----------------
+
 
 def _ttm_years(expiry_yyyymmdd: str, as_of: Optional[str]) -> float:
     asof_dt = pd.to_datetime(as_of) if as_of else pd.Timestamp.now()

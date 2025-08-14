@@ -1,20 +1,19 @@
-
 from __future__ import annotations
+
+from config import CONTRACTS_PATH, IB_CLIENT_IDS, IB_HOST, IB_PORT
+from dataclasses import asdict, dataclass, field
+from pathlib import Path
+from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Set
 
 import argparse
 import json
 import logging
-from dataclasses import dataclass, field, asdict
-from pathlib import Path
-from typing import Iterable, List, Optional, Sequence, Set, Dict, Any, Callable
-
 import pandas as pd
 
-from config import IB_HOST, IB_PORT, IB_CLIENT_IDS, CONTRACTS_PATH
 
 # --- ibx runtime/services (kept as-is to match your project layout) ---
 try:
-    from ibx import IBRuntime, ContractDetailsService
+    from ibx import ContractDetailsService, IBRuntime
 except Exception:
     from ibx.runtime import IBRuntime  # type: ignore
     from ibx.services import ContractDetailsService  # type: ignore
@@ -31,6 +30,7 @@ log = logging.getLogger("contracts_backfill")
 # Data model & config
 # ---------------------------------------------------------------------
 
+
 @dataclass
 class BackfillConfig:
     # IB connection
@@ -39,13 +39,17 @@ class BackfillConfig:
     client_id: int = IB_CLIENT_IDS["contracts_backfill"]
 
     # Filters
-    exchanges: Sequence[str] = field(default_factory=lambda: ["NYSE", "NASDAQ", "ARCA", "BATS", "ISLAND", "SMART"])
+    exchanges: Sequence[str] = field(
+        default_factory=lambda: ["NYSE", "NASDAQ", "ARCA", "BATS", "ISLAND", "SMART"]
+    )
     currencies: Sequence[str] = field(default_factory=lambda: ["USD"])
     sec_types: Sequence[str] = field(default_factory=lambda: ["STK"])
 
     # Input universe
     symbols: Sequence[str] = field(default_factory=list)
-    symbols_file: Optional[str] = None  # CSV or newline file with a 'symbol' column or one symbol per line
+    symbols_file: Optional[str] = (
+        None  # CSV or newline file with a 'symbol' column or one symbol per line
+    )
     limit: Optional[int] = None  # stop after N symbols (for testing)
 
     # Execution
@@ -68,11 +72,21 @@ class BackfillConfig:
 #   base/primary_exchange=NYSE/symbol=AAPL/part-*.parquet
 # ---------------------------------------------------------------------
 
+
 class ContractsRepository:
     REQUIRED_COLS = [
-        "conid", "symbol", "local_symbol", "sec_type", "currency",
-        "primary_exchange", "exchange", "trading_class", "description",
-        "min_tick", "price_magnifier", "md_size_multiplier"
+        "conid",
+        "symbol",
+        "local_symbol",
+        "sec_type",
+        "currency",
+        "primary_exchange",
+        "exchange",
+        "trading_class",
+        "description",
+        "min_tick",
+        "price_magnifier",
+        "md_size_multiplier",
     ]
 
     def __init__(self, base_path: str):
@@ -81,11 +95,14 @@ class ContractsRepository:
 
     def _dataset(self):
         import pyarrow.dataset as ds
+
         return ds.dataset(self.base, format="parquet", partitioning="hive")
 
     def existing_conids(self) -> Set[int]:
         try:
-            import pyarrow.dataset as ds, pyarrow.compute as pc
+            import pyarrow.compute as pc
+            import pyarrow.dataset as ds
+
             dset = self._dataset()
             # only scan conid column to keep it fast
             tbl = dset.to_table(columns=["conid"])
@@ -110,7 +127,9 @@ class ContractsRepository:
 
         # partition columns
         part_cols = ["primary_exchange", "symbol"]
-        table = pa.Table.from_pandas(df[self.REQUIRED_COLS + part_cols], preserve_index=False)
+        table = pa.Table.from_pandas(
+            df[self.REQUIRED_COLS + part_cols], preserve_index=False
+        )
         pq.write_to_dataset(
             table,
             root_path=str(self.base),
@@ -124,6 +143,7 @@ class ContractsRepository:
 # ---------------------------------------------------------------------
 # Mappers
 # ---------------------------------------------------------------------
+
 
 def _row_from_contract_details(cd: Any) -> Dict[str, Any]:
     """
@@ -151,6 +171,7 @@ def _row_from_contract_details(cd: Any) -> Dict[str, Any]:
 # Fetcher
 # ---------------------------------------------------------------------
 
+
 class ContractDetailsFetcher:
     def __init__(self, rt: IBRuntime, timeout_sec: float = 20.0):
         self.rt = rt
@@ -176,6 +197,7 @@ class ContractDetailsFetcher:
 # Backfill Job
 # ---------------------------------------------------------------------
 
+
 class ContractsBackfillJob:
     def __init__(self, cfg: BackfillConfig, repo: ContractsRepository):
         self.cfg = cfg.normalized()
@@ -190,13 +212,15 @@ class ContractsBackfillJob:
             p = Path(cfg.symbols_file)
             if not p.exists():
                 raise FileNotFoundError(f"symbols_file not found: {p}")
-            if p.suffix.lower() in {'.csv', '.tsv'}:
+            if p.suffix.lower() in {".csv", ".tsv"}:
                 df = pd.read_csv(p)
                 col = "symbol" if "symbol" in df.columns else df.columns[0]
                 symbols.extend(df[col].astype(str).str.strip().tolist())
             else:
                 # one per line
-                symbols.extend(x.strip() for x in p.read_text().splitlines() if x.strip())
+                symbols.extend(
+                    x.strip() for x in p.read_text().splitlines() if x.strip()
+                )
 
         # unique, uppercase
         uniq = []
@@ -275,8 +299,11 @@ class ContractsBackfillJob:
 # CLI
 # ---------------------------------------------------------------------
 
+
 def _parse_args() -> BackfillConfig:
-    p = argparse.ArgumentParser(description="Backfill/refresh IB contract details into a Parquet dataset.")
+    p = argparse.ArgumentParser(
+        description="Backfill/refresh IB contract details into a Parquet dataset."
+    )
     p.add_argument("--host", default="127.0.0.1")
     p.add_argument("--port", type=int, default=7497)
     p.add_argument("--client-id", type=int, default=1)
@@ -286,7 +313,11 @@ def _parse_args() -> BackfillConfig:
     p.add_argument("--sec-types", default="STK")
 
     p.add_argument("--symbols", default="", help="Comma-separated list of symbols")
-    p.add_argument("--symbols-file", default=None, help="CSV with a 'symbol' column, or newline-delimited file")
+    p.add_argument(
+        "--symbols-file",
+        default=None,
+        help="CSV with a 'symbol' column, or newline-delimited file",
+    )
     p.add_argument("--limit", type=int, default=None)
 
     p.add_argument("--chunk-size", type=int, default=50)
@@ -312,21 +343,28 @@ def _parse_args() -> BackfillConfig:
     )
     return cfg
 
+
 def _setup_logging():
     import sys
+
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s %(levelname)s %(name)s %(message)s",
         handlers=[logging.StreamHandler(sys.stdout)],
     )
 
+
 def main() -> None:
     _setup_logging()
     cfg = _parse_args()
     repo = ContractsRepository(cfg.out_path)
     job = ContractsBackfillJob(cfg, repo)
-    log.info("Starting contracts backfill with config: %s", json.dumps(asdict(cfg), indent=2, default=str))
+    log.info(
+        "Starting contracts backfill with config: %s",
+        json.dumps(asdict(cfg), indent=2, default=str),
+    )
     job.run()
+
 
 if __name__ == "__main__":
     main()

@@ -6,5 +6,6 @@ with IBRuntime(port=4002, client_id=42) as rt:
     handle = subs.market_data(aapl)
     for i, evt in enumerate(handle):
         print(evt)
-        if i == 10: break
+        if i == 10:
+            break
     handle.cancel()

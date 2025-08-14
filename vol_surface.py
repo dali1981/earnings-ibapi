@@ -1,4 +1,3 @@
-
 """
 Standalone script to fetch implied and historical volatilities for an option vol surface from Interactive Brokers.
 
@@ -7,18 +6,19 @@ Usage:
         --host 127.0.0.1 --port 7497 --client-id 17 \
         --expirations 20250117,20250221 --strikes 100,110,120
 """
+
 import argparse
 import datetime as dt
 from typing import List
 
 from ibapi.contract import Contract
 
-from request_sequencer import RequestSequencer
 from ib_client import IBClient
+from ibx_time import ib_end_datetime
+from request_sequencer import RequestSequencer
 from sink import Sink
 from streamer import Config
 from utils import RateLimiter, make_option
-from ibx_time import ib_end_datetime
 
 
 def parse_args() -> argparse.Namespace:
@@ -29,26 +29,29 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--port", type=int, default=7497, help="IB gateway port")
     parser.add_argument("--client-id", type=int, default=17, help="IB client ID")
     parser.add_argument(
-        "--expirations", required=True,
-        help="Comma-separated list of expiration dates (YYYYMMDD)"
+        "--expirations",
+        required=True,
+        help="Comma-separated list of expiration dates (YYYYMMDD)",
     )
     parser.add_argument(
-        "--strikes", required=True,
-        help="Comma-separated list of strike prices"
+        "--strikes", required=True, help="Comma-separated list of strike prices"
     )
     return parser.parse_args()
 
 
 def main():
     args = parse_args()
-    expirations = [e.strip() for e in args.expirations.split(',') if e.strip()]
-    strikes: List[float] = [float(s) for s in args.strikes.split(',') if s.strip()]
+    expirations = [e.strip() for e in args.expirations.split(",") if e.strip()]
+    strikes: List[float] = [float(s) for s in args.strikes.split(",") if s.strip()]
 
-    cfg = Config(symbol='IBM',  # Example symbol, adjust as needed
-                 date=dt.datetime.strptime("2024-07-10", "%Y-%m-%d").date(),
-                 client_id=args.client_id,
-                 port=4002,  # TWS paper trading port
-                 days_before=5, days_after=5)
+    cfg = Config(
+        symbol="IBM",  # Example symbol, adjust as needed
+        date=dt.datetime.strptime("2024-07-10", "%Y-%m-%d").date(),
+        client_id=args.client_id,
+        port=4002,  # TWS paper trading port
+        days_before=5,
+        days_after=5,
+    )
     # Initialize requests, sink (prints to console), limiter, and IB client
     sequencer = RequestSequencer()
     sink = Sink(out_dir=cfg.out_dir)  # adjust Sink implementation to log/print
@@ -87,7 +90,7 @@ def main():
                     useRTH=0,
                     formatDate=1,
                     keepUpToDate=False,
-                    chartOptions=[]
+                    chartOptions=[],
                 )
         # Disconnect after all requests complete
         sequencer.register_on_all_done(client.disconnect)
@@ -96,5 +99,6 @@ def main():
     sequencer.when_ready(on_ready)
     client.run()
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()

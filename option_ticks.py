@@ -1,23 +1,25 @@
 # ib_vol_live.py
 # pip install ibapi
-import time
 import logging
-from enum import IntEnum
+import time
 from dataclasses import dataclass
+from enum import IntEnum
 from typing import Dict, List
 
 from ibapi.client import EClient
-from ibapi.wrapper import EWrapper
 from ibapi.contract import Contract
+from ibapi.wrapper import EWrapper
+
 
 # -------- Enums (minimal subset you actually use) --------
 class TickSizeType(IntEnum):
     BID_SIZE = 0
     ASK_SIZE = 3
     LAST_SIZE = 5
-    VOLUME   = 8
+    VOLUME = 8
     CALL_OPEN_INT = 27
-    PUT_OPEN_INT  = 28
+    PUT_OPEN_INT = 28
+
 
 class TickPriceType(IntEnum):
     BID = 1
@@ -25,26 +27,32 @@ class TickPriceType(IntEnum):
     LAST = 4
     CLOSE = 9
 
+
 class TickStringType(IntEnum):
     LAST_TIMESTAMP = 45
 
+
 class TickGenericType(IntEnum):
-    HISTORICAL_VOLATILITY_30D = 23     # via generic "104"
-    OPTION_IMPLIED_VOL_30D    = 24     # via generic "106"
-    REALTIME_HISTORICAL_VOL   = 58     # via generic "411"
+    HISTORICAL_VOLATILITY_30D = 23  # via generic "104"
+    OPTION_IMPLIED_VOL_30D = 24  # via generic "106"
+    REALTIME_HISTORICAL_VOL = 58  # via generic "411"
+
 
 class TickOptionCompType(IntEnum):
-    BID   = 10
-    ASK   = 11
-    LAST  = 12
+    BID = 10
+    ASK = 11
+    LAST = 12
     MODEL = 13
-    DELAYED_BID   = 80
-    DELAYED_ASK   = 81
-    DELAYED_LAST  = 82
+    DELAYED_BID = 80
+    DELAYED_ASK = 81
+    DELAYED_LAST = 82
     DELAYED_MODEL = 83
 
+
 # -------- Contracts helpers --------
-def make_stock(symbol: str, exchange="SMART", currency="USD", primaryExchange: str | None = None) -> Contract:
+def make_stock(
+    symbol: str, exchange="SMART", currency="USD", primaryExchange: str | None = None
+) -> Contract:
     c = Contract()
     c.symbol = symbol
     c.secType = "STK"
@@ -54,6 +62,7 @@ def make_stock(symbol: str, exchange="SMART", currency="USD", primaryExchange: s
         c.primaryExchange = primaryExchange  # e.g. "NASDAQ"
     return c
 
+
 @dataclass
 class OptionSpec:
     symbol: str
@@ -62,6 +71,7 @@ class OptionSpec:
     right: str  # "C" or "P"
     exchange: str = "SMART"
     currency: str = "USD"
+
 
 def make_option(spec: OptionSpec) -> Contract:
     c = Contract()
@@ -75,49 +85,85 @@ def make_option(spec: OptionSpec) -> Contract:
     c.multiplier = "100"
     return c
 
+
 # -------- App --------
 class LiveVolTap(EWrapper, EClient):
     def __init__(self):
         EClient.__init__(self, self)
         self.log = logging.getLogger("LiveVolTap")
-        self._labels: Dict[int, str] = {}   # reqId -> human label
+        self._labels: Dict[int, str] = {}  # reqId -> human label
 
     # housekeeping
-    def error(self, reqId:int, code:int, msg:str, advancedOrderRejectJson:str=""):
+    def error(self, reqId: int, code: int, msg: str, advancedOrderRejectJson: str = ""):
         self.log.error(f"ERR code={code} reqId={reqId} msg={msg}")
 
-    def marketDataType(self, reqId:int, mktDataType:int):
+    def marketDataType(self, reqId: int, mktDataType: int):
         # 1=live, 2=frozen, 3=delayed, 4=delayed-frozen
         self.log.info(f"marketDataType for reqId={reqId}: {mktDataType}")
 
     # sizes, prices, strings
-    def tickSize(self, reqId:int, tickType:int, size:int):
-        if tickType in (TickSizeType.BID_SIZE, TickSizeType.ASK_SIZE, TickSizeType.LAST_SIZE,
-                        TickSizeType.VOLUME, TickSizeType.CALL_OPEN_INT, TickSizeType.PUT_OPEN_INT):
-            self.log.info(f"id{reqId} : {self._labels.get(reqId, reqId)} size {TickSizeType(tickType).name} = {size}")
+    def tickSize(self, reqId: int, tickType: int, size: int):
+        if tickType in (
+            TickSizeType.BID_SIZE,
+            TickSizeType.ASK_SIZE,
+            TickSizeType.LAST_SIZE,
+            TickSizeType.VOLUME,
+            TickSizeType.CALL_OPEN_INT,
+            TickSizeType.PUT_OPEN_INT,
+        ):
+            self.log.info(
+                f"id{reqId} : {self._labels.get(reqId, reqId)} size {TickSizeType(tickType).name} = {size}"
+            )
 
-    def tickPrice(self, reqId:int, tickType:int, price:float, attrib):
-        if tickType in (TickPriceType.BID, TickPriceType.ASK, TickPriceType.LAST, TickPriceType.CLOSE):
-            self.log.info(f"id{reqId} : {self._labels.get(reqId, reqId)} price {TickPriceType(tickType).name} = {price}")
+    def tickPrice(self, reqId: int, tickType: int, price: float, attrib):
+        if tickType in (
+            TickPriceType.BID,
+            TickPriceType.ASK,
+            TickPriceType.LAST,
+            TickPriceType.CLOSE,
+        ):
+            self.log.info(
+                f"id{reqId} : {self._labels.get(reqId, reqId)} price {TickPriceType(tickType).name} = {price}"
+            )
 
-    def tickString(self, reqId:int, tickType:int, value:str):
+    def tickString(self, reqId: int, tickType: int, value: str):
         if tickType == TickStringType.LAST_TIMESTAMP:
-            self.log.info(f"id{reqId} : {self._labels.get(reqId, reqId)} last_ts = {value}")
+            self.log.info(
+                f"id{reqId} : {self._labels.get(reqId, reqId)} last_ts = {value}"
+            )
 
     # underlying-level vols (not contract-specific)
-    def tickGeneric(self, reqId:int, tickType:int, value:float):
-        if tickType in (TickGenericType.HISTORICAL_VOLATILITY_30D,
-                        TickGenericType.OPTION_IMPLIED_VOL_30D,
-                        TickGenericType.REALTIME_HISTORICAL_VOL):
+    def tickGeneric(self, reqId: int, tickType: int, value: float):
+        if tickType in (
+            TickGenericType.HISTORICAL_VOLATILITY_30D,
+            TickGenericType.OPTION_IMPLIED_VOL_30D,
+            TickGenericType.REALTIME_HISTORICAL_VOL,
+        ):
             name = TickGenericType(tickType).name
-            self.log.info(f"id{reqId} : {self._labels.get(reqId, reqId)} generic {name} = {value:.6f}")
+            self.log.info(
+                f"id{reqId} : {self._labels.get(reqId, reqId)} generic {name} = {value:.6f}"
+            )
 
     # per-contract IV & Greeks
-    def tickOptionComputation(self, reqId:int, tickType:int,
-                              impliedVol:float, delta:float, optPrice:float, pvDividend:float,
-                              gamma:float, vega:float, theta:float, undPrice:float):
+    def tickOptionComputation(
+        self,
+        reqId: int,
+        tickType: int,
+        impliedVol: float,
+        delta: float,
+        optPrice: float,
+        pvDividend: float,
+        gamma: float,
+        vega: float,
+        theta: float,
+        undPrice: float,
+    ):
         # Handle both live (10-13) and delayed (80-83)
-        name = TickOptionCompType(tickType).name if tickType in TickOptionCompType._value2member_map_ else str(tickType)
+        name = (
+            TickOptionCompType(tickType).name
+            if tickType in TickOptionCompType._value2member_map_
+            else str(tickType)
+        )
         self.log.info(
             f"id{reqId} : "
             f"{self._labels.get(reqId, reqId)} {name} "
@@ -125,8 +171,11 @@ class LiveVolTap(EWrapper, EClient):
             f"OptPx={optPrice:.4f} PVdiv={pvDividend:.4f} Und={undPrice:.4f}"
         )
 
+
 def main():
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s"
+    )
     app = LiveVolTap()
     app.connect("127.0.0.1", 4002, clientId=42)
     time.sleep(1)
@@ -159,6 +208,7 @@ def main():
     # Let it stream a bit
     time.sleep(25)
     app.disconnect()
+
 
 if __name__ == "__main__":
     main()

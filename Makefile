@@ -1,10 +1,12 @@
 # Makefile for Trading Project
 
-.PHONY: help install install-dev test test-unit test-integration test-data test-api test-performance clean lint format coverage docs
+.PHONY: help install install-dev test test-unit test-integration test-data test-api test-performance clean lint format coverage docs dev consume-option-chains consume-option-chains-demo
 
 # Default target
 help:
 	@echo "Available targets:"
+	@echo "  dev            Bootstrap local dev venv + deps"
+	@echo "  dev-rebuild    Recreate ./venv and install deps"
 	@echo "  install        Install production dependencies"
 	@echo "  install-dev    Install development dependencies"
 	@echo "  test           Run all tests"
@@ -19,6 +21,8 @@ help:
 	@echo "  format         Format code"
 	@echo "  clean          Clean up artifacts"
 	@echo "  docs           Generate documentation"
+	@echo "  consume-option-chains   Run option chain backfill consumer once"
+	@echo "  consume-option-chains-demo  Run consumer on demo topic once"
 	@echo "  from-earnings  Bootstrap data for symbols with earning dates"
 	@echo "  from-earnings-dry  Show planned actions without execution"
 
@@ -70,6 +74,23 @@ format:
 	black --config pyproject.toml .
 	isort --settings-path pyproject.toml .
 
+# Local development (creates ./venv if missing, installs core libs)
+dev:
+	@if [ ! -d venv ]; then \
+		python3 -m venv venv; \
+		echo "Created virtualenv at ./venv"; \
+	fi
+	. venv/bin/activate && \
+	python -m pip install --upgrade pip && \
+	python -m pip install -r requirements-test.txt && \
+	python -m pip install -r requirements-local.txt && \
+	python -m pip install black isort && \
+	echo "Dev environment ready. Activate with: source venv/bin/activate"
+
+dev-rebuild:
+	rm -rf venv
+	$(MAKE) dev
+
 # Cleanup
 clean:
 	python tests/test_runner.py --clean
@@ -114,3 +135,10 @@ reset-test-data:
 profile-tests:
 	python -m cProfile -o profile.stats tests/test_runner.py --performance
 	python -c "import pstats; p = pstats.Stats('profile.stats'); p.sort_stats('cumulative'); p.print_stats(20)"
+
+# Event consumers
+consume-option-chains:
+	python jobs/option_chain_backfill_consumer.py --service backfill-broker --topic option_chains --bar-size "1 day" --once
+
+consume-option-chains-demo:
+	python jobs/option_chain_backfill_consumer.py --service backfill-broker --topic option_chains.demo --bar-size "1 day" --once

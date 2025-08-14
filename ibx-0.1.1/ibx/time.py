@@ -12,12 +12,13 @@ Notes
 - IB now prefers explicit time zones and the hyphen format (YYYYMMDD-HH:MM:SS).
 - If you pass an empty string to endDateTime, IB interprets it as "now" (which is allowed).
 """
+
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional, Union
-import re
 
 import pandas as pd
 
@@ -67,12 +68,16 @@ def parse_ib_datetime_series(s: pd.Series) -> pd.Series:
         ts = pd.to_datetime(canon, errors="coerce")
     return ts
 
+
 # ----------------------------- Formatting -----------------------------
+
 
 @dataclass
 class EndOptions:
-    tz: Optional[str] = None  # e.g., "US/Eastern" or "UTC"; if None, keep existing tz in string
-    hyphen: bool = True       # use 'YYYYMMDD-HH:MM:SS' by default (IB-preferred)
+    tz: Optional[str] = (
+        None  # e.g., "US/Eastern" or "UTC"; if None, keep existing tz in string
+    )
+    hyphen: bool = True  # use 'YYYYMMDD-HH:MM:SS' by default (IB-preferred)
 
 
 def _has_tz(s: str) -> bool:
@@ -84,7 +89,10 @@ def _fmt_datetime_str(as_of: str, hyphen: bool) -> str:
 
 
 def ib_end_datetime(
-    as_of: Optional[Union[str, datetime]], *, tz: Optional[str] = "UTC", hyphen: bool = True
+    as_of: Optional[Union[str, datetime]],
+    *,
+    tz: Optional[str] = "UTC",
+    hyphen: bool = True,
 ) -> str:
     """Return an IB-ready endDateTime string.
 
@@ -106,7 +114,9 @@ def ib_end_datetime(
     tzid = tz or "UTC"
     return _fmt_datetime_str(s, hyphen) + (f" {tzid}" if tzid else "")
 
+
 # ---------------------- Instrument timezone ----------------------
+
 
 def instrument_timezone(rt, contract) -> str:
     """Lookup instrument time zone via ContractDetails. Fallback 'US/Eastern'."""

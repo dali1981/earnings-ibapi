@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-import argparse
 from datetime import datetime
+from jobs.tasks import BackfillOptionBarsTask
 from pathlib import Path
 
-from jobs.tasks import BackfillOptionBarsTask
+import argparse
 
 
 if __name__ == "__main__":
@@ -16,9 +16,26 @@ if __name__ == "__main__":
     parser.add_argument("--out", type=Path, default=Path("data/option_bars"))
     parser.add_argument("--expiries-max", type=int, default=8)
     parser.add_argument("--strikes-per-side", type=int, default=6)
-    parser.add_argument("--mode", choices=["k_around_atm", "moneyness_bands"], default="k_around_atm")
-    parser.add_argument("--chains", type=Path, default=Path("data"), help="Base path for chain repository")
+    parser.add_argument(
+        "--mode", choices=["k_around_atm", "moneyness_bands"], default="k_around_atm"
+    )
+    parser.add_argument(
+        "--chains",
+        type=Path,
+        default=Path("data"),
+        help="Base path for chain repository",
+    )
+    parser.add_argument(
+        "--demo", action="store_true", help="Write under data/exports/demo"
+    )
     args = parser.parse_args()
+
+    if args.demo:
+        from utils.demo_mode import demo_base
+
+        demo = demo_base()
+        args.out = demo / "option_bars"
+        args.chains = demo
 
     task = BackfillOptionBarsTask(
         symbol=args.symbol,
