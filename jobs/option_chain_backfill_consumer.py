@@ -31,8 +31,8 @@ sys.path.append(str(Path(__file__).parent.parent))
 from ibx_flows.backfill import backfill_option_bars, BackfillConfig
 from ibx_flows.source_ib import IBSource
 from repositories.option_bars import OptionBarRepository
-from utils.event_bus_consumer import JSONLConsumer
-from utils.processed_index import ProcessedIndex
+from utils.events.consumer import JSONLConsumer
+from utils.events.processed_index import ProcessedIndex
 
 import config
 import pandas as pd

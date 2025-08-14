@@ -230,3 +230,10 @@ class BarRepository:
 #         contract_ids=[123456, 234567],
 #         as_of_date=date.today()
 #     )
+import warnings
+
+warnings.warn(
+    "option_repositories.py is deprecated. Prefer repositories/ package classes.",
+    DeprecationWarning,
+    stacklevel=2,
+)

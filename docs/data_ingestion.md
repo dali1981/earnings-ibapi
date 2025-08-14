@@ -13,7 +13,7 @@ This project enforces a local-first workflow: every external read (historical AP
 - Access: via repository classes (e.g., `EquityBarRepository.load(symbol=...)`).
 
 ## Events (Filesystem Bus)
-- Publisher: `utils/event_bus.FileEventBus` writes JSONL under `data/cache/events/<topic>.jsonl` and touches `data/cache/ready/<topic>.flag` to signal availability.
+- Publisher: `utils.events.bus.FileEventBus` writes JSONL under `data/cache/events/<topic>.jsonl` and touches `data/cache/ready/<topic>.flag` to signal availability.
 - Topics: `equity_bars`, `option_chains`, `option_bars`, `earnings`. Demo runs use a `.demo` suffix.
 - Payload example: `{ "symbol": "AAPL", "bar_size": "1 day", "rows": 390, "start": "2024-01-01", "end": "2024-01-31" }`.
 
@@ -39,11 +39,11 @@ This project enforces a local-first workflow: every external read (historical AP
 
 ## Recovery & Catch-Up
 - Durable log + checkpoint: consumers track `<file, offset, last_ts>` under `data/cache/state/<service>/<topic>.json` and resume from there.
-- JSONL consumer utility: `utils/event_bus_consumer.JSONLConsumer(topic)` reads new events and advances the checkpoint per service.
+- JSONL consumer utility: `utils.events.consumer.JSONLConsumer(topic)` reads new events and advances the checkpoint per service.
 
 Example (consumer loop):
 ```python
-from utils.event_bus_consumer import JSONLConsumer
+from utils.events.consumer import JSONLConsumer
 
 cons = JSONLConsumer("equity_bars")
 while True:
@@ -74,3 +74,21 @@ while True:
 - Make targets:
   - `make consume-option-chains`
   - `make consume-option-chains-demo`
+
+### systemd sample
+Create `option-chain-backfill.service`:
+```
+[Unit]
+Description=Option Chain Backfill Consumer
+After=network.target
+
+[Service]
+WorkingDirectory=/path/to/earnings_ibapi
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/usr/bin/env python jobs/option_chain_backfill_consumer.py --service backfill-broker --topic option_chains --bar-size "1 day"
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+```
+For periodic runs, use a timer unit or cron. The consumer uses checkpoints, so repeated runs catch up and process idempotently.

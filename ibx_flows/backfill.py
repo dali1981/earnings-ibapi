@@ -14,7 +14,7 @@ from repositories import (
 )
 from utils.demo_mode import dataset_topic as topic_for
 from utils.demo_mode import demo_base
-from utils.event_bus import FileEventBus
+from utils.events.bus import FileEventBus
 
 import pandas as pd
 

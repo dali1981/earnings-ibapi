@@ -16,7 +16,7 @@ from typing import List, Optional
 from config import DATA_ROOT
 from earnings.fetcher import EarningsEvent
 from repositories.earnings import EarningsRepository
-from utils.event_bus import EventBus, FileEventBus
+from utils.events.bus import EventBus, FileEventBus
 
 
 logger = logging.getLogger(__name__)

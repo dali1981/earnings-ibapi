@@ -9,6 +9,7 @@ exclude = '''
   | ^/htmlcov/
   | ^/\.git/
   | ^/new/
+  | ^/experimental/
 )
 '''
 

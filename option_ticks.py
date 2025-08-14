@@ -221,3 +221,10 @@ if __name__ == "__main__":
 # # before logging sizes:
 # if _is_valid_size(size):
 #     log(...)
+import warnings
+
+warnings.warn(
+    "option_ticks.py is deprecated. Prefer repositories/option_bars and streaming flow.",
+    DeprecationWarning,
+    stacklevel=2,
+)

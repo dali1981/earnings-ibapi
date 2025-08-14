@@ -6,7 +6,7 @@ import pytest
 
 @pytest.mark.unit
 def test_jsonl_consumer_checkpoint_and_read(tmp_path):
-    from utils.event_bus_consumer import JSONLConsumer
+    from utils.events.consumer import JSONLConsumer
 
     events_dir = tmp_path / "cache" / "events"
     state_root = tmp_path / "cache" / "state"
@@ -36,4 +36,3 @@ def test_jsonl_consumer_checkpoint_and_read(tmp_path):
     write_evt({"symbol": "CCC"}, 3.0)
     out3 = cons.read(service="svc")
     assert [e["payload"]["symbol"] for e in out3] == ["CCC"]
-

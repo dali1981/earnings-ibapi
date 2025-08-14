@@ -10,7 +10,7 @@ from __future__ import annotations
 from pathlib import Path
 from repositories.equity_bars import EquityBarRepository
 from typing import Any, Dict, Optional
-from utils.event_bus import EventBus, FileEventBus
+from utils.events.bus import EventBus, FileEventBus
 
 import config
 import pandas as pd

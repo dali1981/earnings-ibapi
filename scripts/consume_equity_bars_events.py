@@ -23,8 +23,8 @@ import sys
 sys.path.append(str(Path(__file__).parent.parent))
 
 from repositories.equity_bars import EquityBarRepository
-from utils.event_bus_consumer import JSONLConsumer
-from utils.processed_index import ProcessedIndex
+from utils.events.consumer import JSONLConsumer
+from utils.events.processed_index import ProcessedIndex
 
 import config
 import pandas as pd
