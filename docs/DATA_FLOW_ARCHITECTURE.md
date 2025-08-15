@@ -140,6 +140,15 @@ def smart_backfill(symbol: str, start: date, end: date) -> None:
         repo.save(data, symbol=symbol, bar_size="1 day")
 ```
 
+### 🧭 Local-First + Event Bus (Updated)
+
+- Producers must always persist to repositories first (Parquet under `data/…`).
+- After writing, publish a `data.available` event via the file-based bus:
+  - `utils.events.bus.FileEventBus().notify_data_available(dataset=..., **meta)`
+  - Topics: `equity_bars`, `option_chains`, `option_bars`, `earnings` (+ `.demo` for demo runs)
+- Consumers never forward API data; they consume from repositories using events as triggers.
+- Scripts are guarded from writing to production paths by default (see `utils/safety.py`). Use `--demo` paths or set `ALLOW_PROD_WRITES=1` explicitly.
+
 ### 🔄 **Update Frequency Guidelines**
 
 | Data Type | Update Frequency | Rationale |
@@ -175,6 +184,9 @@ class DataPipelineOrchestrator:
         # Step 4: Option bars (Requires all above)
         if self.all_prerequisites_met(symbol):
             self.run_job("backfill_option_bars", symbol=symbol)
+
+        # Event-driven notifications are emitted by backfill jobs on completion
+        # Downstream services catch up via durable JSONL and process idempotently
     
     def daily_update(self, symbol: str) -> None:
         """Incremental updates - validate before processing."""
@@ -188,6 +200,8 @@ class DataPipelineOrchestrator:
         # Update historical data (incremental)
         self.run_job("backfill_equity_bars", symbol=symbol, incremental=True)
         self.run_job("backfill_option_bars", symbol=symbol, incremental=True)
+
+        # Notifications are emitted for each dataset written
 ```
 
 ### Validation Framework
@@ -238,6 +252,70 @@ class DataValidation:
 - **Data Types**: Live quotes, option chains, Greeks
 
 ### Snapshot Data Pipeline (Scheduled Processing)
+
+## Event-Driven Consumers & Catch-Up (New)
+
+- Durable JSONL log per topic at `data/cache/events/<topic>.jsonl`.
+- Per-service checkpoints at `data/cache/state/<service>/<topic>.json` track `<file, offset, last_ts>`.
+- Use `utils.events.consumer.JSONLConsumer(topic)` to read new events and advance checkpoints.
+- Idempotency with `utils.events.processed_index.ProcessedIndex(service, topic)` using deterministic keys (e.g., `underlying:start:end:bar_size`).
+
+Example loop (option bars consumer):
+```python
+from utils.events.consumer import JSONLConsumer
+from utils.events.processed_index import ProcessedIndex
+from repositories.option_bars import OptionBarRepository
+
+cons = JSONLConsumer("option_chains")
+idx = ProcessedIndex("backfill-broker", "option_chains")
+repo = OptionBarRepository("data")
+
+for evt in cons.read(service="backfill-broker", limit=100):
+    p = evt["payload"]
+    key = f"{p.get('underlying')}:{p.get('start')}:{p.get('end')}:1 day"
+    if idx.is_processed(key):
+        continue
+    # run backfill_option_bars(...) then mark processed
+    idx.mark_processed(key)
+```
+
+Ready-to-run consumer: `jobs/option_chain_backfill_consumer.py` (see Make targets). For systemd/cron samples, see `docs/data_ingestion.md`.
+
+### Data Flow Diagrams
+
+Historical (backfill) sequence:
+```mermaid
+sequenceDiagram
+    participant P as Producer (Backfill Job)
+    participant R as Repository (Parquet)
+    participant B as Event Bus (JSONL)
+    participant C as Consumer Service
+    participant A as Analysis/Downstream
+
+    P->>R: Write historical dataset (e.g., equity_bars)
+    P->>B: Publish data.available (topic=equity_bars)
+    C->>B: Read new events with checkpoint
+    C->>R: Load persisted data (idempotent key)
+    C->>R: Write derived data (e.g., option_bars)
+    C->>B: Publish data.available (topic=option_bars)
+    A->>R: Read for analytics/tests
+```
+
+Streaming (subscription flush) sequence:
+```mermaid
+sequenceDiagram
+    participant S as Stream (Subscription)
+    participant R as Repository (Parquet)
+    participant B as Event Bus (JSONL)
+    participant C as Consumer Service
+
+    loop at cadence (e.g., 1m)
+        S->>R: Append small batch (e.g., 1m bar)
+        S->>B: Publish data.available (topic=equity_bars)
+        C->>B: Read new events (checkpointed)
+        C->>R: Load window and process
+    end
+```
 - **Purpose**: Current market structure (chains, contracts)
 - **API Calls**: `reqSecDefOptParams`, `reqContractDetails`
 - **Frequency**: Multiple times per day
