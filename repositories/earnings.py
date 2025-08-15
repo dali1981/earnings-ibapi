@@ -167,23 +167,39 @@ class EarningsRepository(BaseRepository):
             )
             partition_path.mkdir(parents=True, exist_ok=True)
 
-            # Generate unique filename
-            timestamp = datetime.now().strftime("%H%M%S")
-            filename = f"earnings_{timestamp}.parquet"
-            file_path = partition_path / filename
+            # Load existing partition files, dedupe, and write a deterministic single file
+            frames = [source_df]
+            existing_files = list(partition_path.glob("*.parquet"))
+            for f in existing_files:
+                try:
+                    frames.append(pd.read_parquet(f))
+                except Exception:
+                    logger.warning(f"Could not read existing parquet: {f}")
+            combined = pd.concat(frames, ignore_index=True)
+            before = len(combined)
+            combined = combined.drop_duplicates(subset=["symbol", "earnings_date", "source"])  # idempotent key
+            after = len(combined)
 
-            # Write parquet file
-            table = pa.Table.from_pandas(source_df)
+            # Overwrite partition atomically: remove old files then write one consolidated file
+            for f in existing_files:
+                try:
+                    f.unlink()
+                except Exception:
+                    logger.warning(f"Could not remove file during overwrite: {f}")
+
+            file_path = partition_path / "earnings.parquet"
+            table = pa.Table.from_pandas(combined)
             pq.write_table(table, file_path)
 
             results[source] = {
                 "file_path": str(file_path),
-                "events_count": len(source_df),
+                "events_count": int(len(source_df)),
                 "file_size_bytes": file_path.stat().st_size,
+                "dedup_removed": int(before - after),
             }
 
             logger.info(
-                f"💾 Stored {len(source_df)} {source} earnings events to {file_path}"
+                f"💾 Stored {len(source_df)} {source} earnings events to {file_path} (dedup removed={before - after})"
             )
 
         # Store metadata
