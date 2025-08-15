@@ -11,28 +11,26 @@ This document defines the critical data flow architecture, dependencies, and ope
 ```mermaid
 graph TD
     A[Contract Descriptions] --> B[Option Chain Snapshots]
-    B --> C[Equity Spot Data]
-    C --> D[Option Bars Historical Data]
-    
-    A --> E[Equity Bars Historical Data]
-    
-    subgraph "Prerequisites for Option Data"
+    E[Equity Bars (Spot/History)] --> D[Option Bars Historical Data]
+    B --> D
+
+    subgraph "Prerequisites for Option Bars"
     A
-    B  
-    C
+    B
+    E
     end
 ```
 
 1. **Contracts First**: Contract descriptions must exist before requesting any derivative data
 2. **Chains Required**: Option chain snapshots are mandatory before option bar data
-3. **Spot Price Needed**: Current equity price required for strike selection
+3. **Spot/Reference Price Needed**: Equity price (from Equity Bars) is required for strike selection
 4. **No Historical Chains**: TWS API only provides current option chain snapshots
 
 ### 🚫 **Critical Constraints**
 
-- **DO NOT** request option bars without contract descriptions
+- **DO NOT** request option bars without contract descriptions (often fetched implicitly during chain resolution)
 - **DO NOT** request option bars without option chain snapshots  
-- **DO NOT** request option bars without current spot price
+- **DO NOT** request option bars without spot/reference price from equity bars
 - **DO NOT** assume historical option chains are available from TWS API
 
 ## Data Types & Characteristics
@@ -40,7 +38,7 @@ graph TD
 ### Historical Data (Backfillable)
 - ✅ **Equity Bars**: Full historical data available via TWS API
 - ✅ **Option Bars**: Historical data available for specific contracts
-- ❌ **Option Chains**: NOT historically available - snapshots only
+- ❌ **Option Chains**: NOT historically available - snapshots only (use latest snapshot for selection)
 
 ### Live/Current Data (Real-time snapshots)
 - ✅ **Option Chains**: Current snapshot only via `reqSecDefOptParams` or `reqContractDetails`

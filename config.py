@@ -20,7 +20,9 @@ IB_CLIENT_IDS = {
 IB_CLIENT_ID = IB_CLIENT_IDS["default"]
 
 # --- Data Paths ---
-DATA_ROOT = Path("data")
+# Anchor all paths to the repository root (directory containing this file)
+PROJECT_ROOT = Path(__file__).resolve().parent
+DATA_ROOT = PROJECT_ROOT / "data"
 EQUITY_BARS_PATH = DATA_ROOT / "equity_bars"
 OPTION_BARS_PATH = DATA_ROOT / "option_bars"
 OPTION_CHAINS_PATH = DATA_ROOT / "option_chains"

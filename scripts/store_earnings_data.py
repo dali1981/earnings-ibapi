@@ -171,11 +171,15 @@ def main():
 
     if result["status"] == "success":
         print(f"Events collected: {result['events_collected']}")
-        print(f"Unique symbols: {result['unique_symbols']}")
-        print(
-            f"Date range: {result['date_range']['start']} to {result['date_range']['end']}"
-        )
-        print(f"Sources used: {result['sources_successful']}")
+        # Derive summary from fetched batch
+        unique_symbols = meta.get("total_symbols", 0)
+        print(f"Unique symbols: {unique_symbols}")
+        if raw:
+            start = min(e.earnings_date for e in raw).isoformat()
+            end = max(e.earnings_date for e in raw).isoformat()
+            print(f"Date range: {start} to {end}")
+            sources_used = sorted(set(e.source for e in raw))
+            print(f"Sources used: {sources_used}")
 
     elif result["status"] == "skipped":
         print(f"Reason: {result['reason']}")
