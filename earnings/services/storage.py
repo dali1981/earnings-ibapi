@@ -2,7 +2,7 @@
 Library component for earnings data persistence (repository-only).
 
 This module does not call external APIs. It exposes a small facade over
-the EarningsRepository so callers can persist provided batches and read
+the EarningsCalendarRepository so callers can persist provided batches and read
 local summaries.
 """
 
@@ -15,8 +15,8 @@ from typing import List, Optional
 
 from config import DATA_ROOT
 from earnings.fetcher import EarningsEvent
-from repositories.earnings import EarningsRepository
-from utils.events.bus import EventBus, FileEventBus
+from common.repositories.earnings import EarningsCalendarRepository
+from common.utils.events.bus import EventBus, FileEventBus
 
 
 logger = logging.getLogger(__name__)
@@ -44,7 +44,7 @@ class EarningsPersistence:
             earnings_path = Path("data/earnings")
             logger.warning("Using fallback data path: %s", earnings_path)
 
-        self.repository = EarningsRepository(earnings_path.parent)
+        self.repository = EarningsCalendarRepository(earnings_path.parent)
         logger.info("Earnings persistence initialized (repository-backed)")
 
     def persist_earnings_batch(

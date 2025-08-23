@@ -471,7 +471,7 @@ class EarningsPriorityScheduler:
 
 def main():
     """Test the earnings scheduler."""
-    from utils.logging_setup import setup_logging
+    from common.utils.logging_setup import setup_logging
 
     setup_logging()
 

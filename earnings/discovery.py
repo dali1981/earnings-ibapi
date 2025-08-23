@@ -35,8 +35,8 @@ from config import DISCOVERY_CONFIG, EARNINGS_CONFIG, EARNINGS_PATH, EXPORTS_PAT
 
 # Import our earnings fetcher and repository
 from earnings.fetcher import EarningsCalendarFetcher, EarningsEvent
-from repositories.earnings import EarningsRepository
-from utils.logging_setup import get_logger
+from common.repositories.earnings import EarningsCalendarRepository
+from common.utils.logging_setup import get_logger
 
 import argparse
 
@@ -83,7 +83,7 @@ class EarningsDiscoveryEngine:
 
         self.config = config or DISCOVERY_CONFIG
         self.earnings_fetcher = EarningsCalendarFetcher()
-        self.earnings_repository = EarningsRepository()
+        self.earnings_repository = EarningsCalendarRepository()
 
         # Discovery timing windows (how far ahead to look)
         self.discovery_min_days = self.config["discovery_min_days"]
@@ -376,7 +376,7 @@ def main():
 
     Defaults use EARNINGS_CONFIG unless --days-ahead / --days-back are provided.
     """
-    from utils.logging_setup import setup_logging
+    from common.utils.logging_setup import setup_logging
 
     setup_logging()
 

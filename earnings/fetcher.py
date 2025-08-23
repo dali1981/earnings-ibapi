@@ -21,13 +21,15 @@ from typing import Any, Dict, List, Optional
 import json
 import os
 import pandas as pd
-import requests
+import asyncio
+import httpx
 import sys
+import time
 
 
 # Add path for centralized logging
 sys.path.append(str(Path(__file__).parent.parent))
-from utils.logging_setup import get_logger
+from common.utils.logging_setup import get_logger
 
 
 logger = get_logger(__name__)
@@ -120,8 +122,31 @@ class EarningsCalendarFetcher:
             },
         }
 
-        self.session = requests.Session()
-        self.session.headers.update({"User-Agent": "Trading-Data-System/1.0"})
+        self._default_headers = {"User-Agent": "Trading-Data-System/1.0"}
+        # Async rate limiters initialized lazily to avoid importing config at import-time
+        self._rate_limits = {
+            "nasdaq": float(os.getenv("RATE_LIMIT_NASDAQ", "0.3")),
+            "fmp": float(os.getenv("RATE_LIMIT_FMP", "0.25")),
+            "finnhub": float(os.getenv("RATE_LIMIT_FINNHUB", "1.0")),
+        }
+        self._rl = {
+            EarningsSource.NASDAQ: _AsyncRateLimiter(self._rate_limits["nasdaq"]),
+            EarningsSource.FMP: _AsyncRateLimiter(self._rate_limits["fmp"]),
+            EarningsSource.FINNHUB: _AsyncRateLimiter(self._rate_limits["finnhub"]),
+        }
+
+        self._async_client: Optional[httpx.AsyncClient] = None
+
+    async def _async_get_json(self, url: str, params: Dict[str, Any], timeout: float = 30.0, headers: Optional[Dict[str, str]] = None) -> Any:
+        if self._async_client is None:
+            self._async_client = httpx.AsyncClient(headers=self._default_headers, timeout=timeout)
+        h = {**self._default_headers, **(headers or {})}
+        resp = await self._async_client.get(url, params=params, headers=h, timeout=timeout)
+        resp.raise_for_status()
+        return resp.json()
+
+    def _get_json(self, url: str, params: Dict[str, Any], timeout: float = 30.0, headers: Optional[Dict[str, str]] = None) -> Any:
+        return asyncio.run(self._async_get_json(url, params, timeout=timeout, headers=headers))
 
     def get_earnings_range(
         self,
@@ -326,10 +351,7 @@ class EarningsCalendarFetcher:
             if api_key:
                 params["apikey"] = api_key
 
-            response = self.session.get(url, params=params, timeout=30)
-            response.raise_for_status()
-
-            data = response.json()
+            data = self._get_json(url, params, timeout=30)
 
             for event in data:
                 # Filter by symbols if specified
@@ -357,7 +379,7 @@ class EarningsCalendarFetcher:
                 )
                 earnings.append(earnings_event)
 
-        except requests.exceptions.RequestException as e:
+        except (httpx.RequestError, httpx.HTTPStatusError) as e:
             logger.error(f"FMP API request failed: {e}")
         except (ValueError, KeyError) as e:
             logger.error(f"FMP data parsing failed: {e}")
@@ -379,10 +401,7 @@ class EarningsCalendarFetcher:
                 "apikey": self.api_configs[EarningsSource.FMP]["api_key"],
             }
 
-            response = self.session.get(url, params=params, timeout=30)
-            response.raise_for_status()
-
-            data = response.json()
+            data = self._get_json(url, params, timeout=30)
 
             for event in data:
                 symbol = event.get("symbol", "").upper()
@@ -415,7 +434,7 @@ class EarningsCalendarFetcher:
                     )
                 )
 
-        except requests.exceptions.RequestException as e:
+        except (httpx.RequestError, httpx.HTTPStatusError) as e:
             logger.error(f"FMP range API request failed: {e}")
         except (ValueError, KeyError) as e:
             logger.error(f"FMP range data parsing failed: {e}")
@@ -442,10 +461,7 @@ class EarningsCalendarFetcher:
             if api_key:
                 params["token"] = api_key
 
-            response = self.session.get(url, params=params, timeout=30)
-            response.raise_for_status()
-
-            data = response.json()
+            data = self._get_json(url, params, timeout=30)
             earnings_list = data.get("earningsCalendar", [])
 
             for event in earnings_list:
@@ -474,7 +490,7 @@ class EarningsCalendarFetcher:
                 )
                 earnings.append(earnings_event)
 
-        except requests.exceptions.RequestException as e:
+        except (httpx.RequestError, httpx.HTTPStatusError) as e:
             logger.error(f"Finnhub API request failed: {e}")
         except (ValueError, KeyError) as e:
             logger.error(f"Finnhub data parsing failed: {e}")
@@ -496,10 +512,7 @@ class EarningsCalendarFetcher:
                 "token": self.api_configs[EarningsSource.FINNHUB]["api_key"],
             }
 
-            response = self.session.get(url, params=params, timeout=30)
-            response.raise_for_status()
-
-            data = response.json()
+            data = self._get_json(url, params, timeout=30)
 
             # Parse earnings events
             if "earningsCalendar" in data:
@@ -532,7 +545,7 @@ class EarningsCalendarFetcher:
 
                     earnings.append(earnings_event)
 
-        except requests.exceptions.RequestException as e:
+        except (httpx.RequestError, httpx.HTTPStatusError) as e:
             logger.error(f"Finnhub range API request failed: {e}")
         except (ValueError, KeyError) as e:
             logger.error(f"Finnhub range data parsing failed: {e}")
@@ -565,7 +578,7 @@ class EarningsCalendarFetcher:
                 # Be respectful to NASDAQ servers - small delay
                 import time
 
-                time.sleep(0.3)
+                time.sleep(1.0)
 
             except Exception as e:
                 logger.error(f"NASDAQ single day fetch failed for {current_date}: {e}")
@@ -595,16 +608,12 @@ class EarningsCalendarFetcher:
             "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
             "Accept": "application/json, text/plain, */*",
             "Accept-Language": "en-US,en;q=0.9",
-            "Accept-Encoding": "gzip, deflate, br",
             "Referer": "https://www.nasdaq.com/",
             "Origin": "https://www.nasdaq.com",
         }
 
         try:
-            response = self.session.get(url, params=params, headers=headers, timeout=30)
-            response.raise_for_status()
-
-            data = response.json()
+            data = self._get_json(url, params, timeout=30, headers=headers)
             daily_earnings = []
 
             # Parse NASDAQ response format
@@ -831,7 +840,7 @@ class EarningsCalendarFetcher:
 
 def main():
     """Test the earnings fetcher."""
-    from utils.logging_setup import setup_logging
+    from common.utils.logging_setup import setup_logging
 
     setup_logging()
 
@@ -863,3 +872,22 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+# Simple async rate limiter enforcing a minimum interval between calls
+class _AsyncRateLimiter:
+    def __init__(self, min_interval_seconds: float) -> None:
+        self.min_interval = max(0.0, float(min_interval_seconds))
+        self._lock = asyncio.Lock()
+        self._last = 0.0
+
+    async def acquire(self) -> None:
+        if self.min_interval <= 0:
+            return
+        async with self._lock:
+            now = time.monotonic()
+            elapsed = now - self._last
+            wait = self.min_interval - elapsed
+            if wait > 0:
+                await asyncio.sleep(wait)
+            self._last = time.monotonic()
