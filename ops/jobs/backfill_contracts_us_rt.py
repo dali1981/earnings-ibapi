@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import argparse
-import os
 from pathlib import Path
 from typing import Iterable, List, Sequence
 
@@ -100,9 +99,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    # Ensure Celery picks up configuration if set via env vars when called via python
-    os.environ.setdefault("CELERY_BROKER_URL", os.environ.get("CELERY_BROKER_URL", "redis://localhost:6379/0"))
-    os.environ.setdefault(
-        "CELERY_RESULT_BACKEND", os.environ.get("CELERY_RESULT_BACKEND", "redis://localhost:6379/1")
-    )
     main()

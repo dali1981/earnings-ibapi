@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import atexit
-import os
 from typing import Optional
 
 try:
@@ -22,10 +21,9 @@ def get_runtime() -> IBRuntime:
     global _rt_singleton
     if _rt_singleton is None:
         s = get_settings()
-        # Allow env overrides as a last resort
-        host = os.environ.get("IB_HOST", s.ib.host)
-        port = int(os.environ.get("IB_PORT", s.ib.port))
-        client_id = int(os.environ.get("IB_CLIENT_ID", s.ib.client_id_contracts))
+        host = s.ib.host
+        port = int(s.ib.port)
+        client_id = int(s.ib.client_id_contracts)
         _rt_singleton = IBRuntime(host=host, port=port, client_id=client_id)
         _rt_singleton.start()
     return _rt_singleton

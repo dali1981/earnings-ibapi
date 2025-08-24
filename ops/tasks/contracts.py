@@ -18,7 +18,6 @@ except Exception:  # pragma: no cover - fallback for vendored layout
     from ibx.runtime import IBRuntime  # type: ignore
 
 from ops.ib_service import get_runtime
-import os
 import httpx
 import pandas as pd
 
@@ -68,7 +67,7 @@ def backfill_contracts_task(
     ).normalized()
 
     if use_api:
-        base_url = api_base or os.environ.get("IB_API_BASE", str(settings.api.contracts_service_base))
+        base_url = api_base or str(settings.api.contracts_service_base)
         _backfill_via_api(base, cfg, base_url)
     elif use_service:
         rt = get_runtime()
