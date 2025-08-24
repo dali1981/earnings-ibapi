@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel, Field
 
-from ops.ib_service import get_runtime
+from services.ib_api.service.ib_runtime import get_runtime
 from vendors.ibx.services import (
     ContractDetailsService,
     HistoricalService,

@@ -67,9 +67,9 @@ services:
     ports: ["9010:9010"]
     environment:
       - SERVICE_NAME=ib_api
-      - IB_HOST=${IB_HOST:-host.docker.internal}
-      - IB_PORT=${IB_PORT:-4002}
-      - IB_CLIENT_ID=${IB_CLIENT_ID:-101}
+      - IBX_IB__HOST=${IBX_IB__HOST:-host.docker.internal}
+      - IBX_IB__PORT=${IBX_IB__PORT:-4002}
+      - IBX_IB__CLIENT_ID_CONTRACTS=${IBX_IB__CLIENT_ID_CONTRACTS:-101}
     volumes:
       - .:/app
       - ./data:/app/data
