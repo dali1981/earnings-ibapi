@@ -6,8 +6,8 @@ from typing import Any, Dict, List
 import pandas as pd
 
 from option_repositories import BarRepository, ChainRepository
-from repos.equities import EquityBarRepository
-from utils import append_parquet
+from common.repos.equities import EquityBarRepository
+from common.utils import append_parquet
 
 
 class Sink:

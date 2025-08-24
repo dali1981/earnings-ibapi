@@ -1,5 +1,6 @@
 # config.py
 import logging.config
+import os
 from pathlib import Path
 
 # --- IB Connection ---
@@ -22,7 +23,25 @@ IB_CLIENT_ID = IB_CLIENT_IDS["default"]
 # --- Data Paths ---
 # Anchor all paths to the repository root (directory containing this file)
 PROJECT_ROOT = Path(__file__).resolve().parent
-DATA_ROOT = PROJECT_ROOT / "data"
+# Resolve DATA_ROOT with flexible defaults
+# Priority:
+# 1) Explicit DATA_ROOT env var
+# 2) SERVICE_NAME maps to data/<service> both locally and in containers
+# 3) Default to data/ (inside container this resolves to /app/data)
+_DATA_ROOT_ENV = os.environ.get("DATA_ROOT")
+_SERVICE_NAME = os.environ.get("SERVICE_NAME")
+_IN_DOCKER = Path("/.dockerenv").exists()
+
+REPO_DATA = PROJECT_ROOT / "data"
+CONTAINER_DATA = Path("/app/data")
+
+if _DATA_ROOT_ENV:
+    DATA_ROOT = Path(_DATA_ROOT_ENV)
+elif _SERVICE_NAME:
+    base = CONTAINER_DATA if _IN_DOCKER else REPO_DATA
+    DATA_ROOT = base / _SERVICE_NAME
+else:
+    DATA_ROOT = CONTAINER_DATA if _IN_DOCKER else REPO_DATA
 EQUITY_BARS_PATH = DATA_ROOT / "equity_bars"
 OPTION_BARS_PATH = DATA_ROOT / "option_bars"
 OPTION_CHAINS_PATH = DATA_ROOT / "option_chains"

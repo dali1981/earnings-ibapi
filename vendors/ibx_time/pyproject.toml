@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ibx-time"
+version = "0.1.1"
+description = "IB time utilities (vendor shim)"
+authors = [{ name = "Vendor" }]
+requires-python = ">=3.10"
+readme = "README.md"
+dependencies = []
+
+[tool.setuptools]
+packages = ["ibx_time"]
+
+[tool.setuptools.package-dir]
+ibx_time = "."
+

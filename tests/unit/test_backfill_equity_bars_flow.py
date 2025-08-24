@@ -5,7 +5,7 @@ from datetime import date, timedelta
 
 @pytest.mark.unit
 def test_backfill_equity_bars_writes_and_notifies(tmp_path, monkeypatch):
-    from repositories.equity_bars import EquityBarRepository
+    from common.repositories.equity_bars import EquityBarRepository
     from ibx_flows.backfill import BackfillConfig, backfill_equity_bars
 
     # Fake source implementing get_equity_bars

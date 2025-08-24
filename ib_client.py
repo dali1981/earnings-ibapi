@@ -14,7 +14,7 @@ from ibapi.wrapper import EWrapper
 from request_sequencer import RequestSequencer
 from response_sequencer import ResponseSequencer
 from sink import Sink
-from utils import RateLimiter, append_parquet
+from common.utils import RateLimiter, append_parquet
 
 log = logging.getLogger(__name__)
 

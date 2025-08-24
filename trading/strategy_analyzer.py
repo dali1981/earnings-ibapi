@@ -34,7 +34,7 @@ sys.path.append(str(Path(__file__).parent.parent))
 from config import DISCOVERY_CONFIG, EXPORTS_PATH
 # Import earnings discovery module
 from earnings.discovery import EarningsDiscovery, EarningsDiscoveryEngine
-from utils.logging_setup import get_logger
+from common.utils.logging_setup import get_logger
 
 logger = get_logger(__name__)
 
@@ -370,7 +370,7 @@ class OptionsStrategyAnalyzer:
 
 def main():
     """Test the options strategy analyzer."""
-    from utils.logging_setup import setup_logging
+    from common.utils.logging_setup import setup_logging
 
     setup_logging()
 

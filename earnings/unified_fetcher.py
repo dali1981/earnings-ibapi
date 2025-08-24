@@ -19,7 +19,7 @@ from earnings.models import (
     EarningsSource,
     EarningsCalendarResponse,
 )
-from earnings.async_calendar_fetcher import AsyncEarningsCalendarFetcher
+from earnings.async_fetcher import AsyncEarningsCalendarFetcher
 
 logger = get_logger(__name__)
 
@@ -35,7 +35,7 @@ class UnifiedEarningsCalendarFetcher:
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         
         # Async fetcher for async operations
-        self._async_fetcher = AsyncEarningsCalendarFetcher(cache_dir)
+        self._async_fetcher = AsyncEarningsCalendarFetcher()
         
         # Sync client (created on demand)
         self._sync_client: Optional[httpx.Client] = None

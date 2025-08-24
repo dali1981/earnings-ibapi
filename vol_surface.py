@@ -18,7 +18,7 @@ from ibx_time import ib_end_datetime
 from request_sequencer import RequestSequencer
 from sink import Sink
 from streamer import Config
-from utils import RateLimiter, make_option
+from common.utils import RateLimiter, make_option
 
 
 def parse_args() -> argparse.Namespace:

@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ibx"
+version = "0.1.1"
+description = "IB API helpers (vendor shim)"
+authors = [{ name = "Vendor" }]
+requires-python = ">=3.10"
+readme = "README.md"
+dependencies = []
+
+[tool.setuptools]
+packages = ["ibx"]
+
+[tool.setuptools.package-dir]
+ibx = "."
+

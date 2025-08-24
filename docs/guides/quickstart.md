@@ -40,7 +40,7 @@ python -m earnings.fetcher
 
 ### 3. Compare Data Sources (optional)
 ```bash
-python scripts/compare_earnings_sources.py
+python ops/scripts/compare_earnings_sources.py
 ```
 
 ## 📊 Understanding the Results (pure collection)
@@ -151,10 +151,10 @@ make from-earnings-dry
 make from-earnings
 
 # Custom bootstrap with specific parameters
-python jobs/run_from_earnings.py --max-symbols 10 --lookback-days 365 --option-bar-size "1 min"
+python ops/jobs/run_from_earnings.py --max-symbols 10 --lookback-days 365 --option-bar-size "1 min"
 
 # Bootstrap specific symbols
-python jobs/run_from_earnings.py --symbols AAPL,MSFT,NVDA --lookback-days 180
+python ops/jobs/run_from_earnings.py --symbols AAPL,MSFT,NVDA --lookback-days 180
 ```
 
 ### Bootstrap Process
@@ -185,14 +185,14 @@ For detailed options analysis:
 ```bash
 # Get option chains for top opportunities
 # optional later when trading is enabled
-# python examples/complete_workflow_example.py
+# python ops/examples/complete_workflow_example.py
 ```
 
 ### 3. Historical Analysis
 Compare current opportunities with historical patterns:
 ```bash
 # requires enabling extra sources via EARNINGS_ALLOWED_SOURCES
-python scripts/compare_earnings_sources.py --compare-historical 30
+python ops/scripts/compare_earnings_sources.py --compare-historical 30
 ```
 
 ## 🚨 Troubleshooting

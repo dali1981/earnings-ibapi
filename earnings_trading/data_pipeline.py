@@ -26,7 +26,7 @@ from earnings_trading.discovery import (EarningsCandidate,
 # Import existing components
 from jobs.orchestrator import (DataPipelineOrchestrator, DataValidation,
                                JobResult, JobType)
-from utils.logging_setup import get_logger
+from common.utils.logging_setup import get_logger
 
 logger = get_logger(__name__)
 
@@ -384,7 +384,7 @@ class EarningsDataPipeline:
 
 def main():
     """Test the earnings-driven data pipeline."""
-    from utils.logging_setup import setup_logging
+    from common.utils.logging_setup import setup_logging
 
     setup_logging()
 

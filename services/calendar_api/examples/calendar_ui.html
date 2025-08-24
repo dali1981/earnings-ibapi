@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Earnings Calendar UI</title>
+    <style>
+      body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 24px; }
+      h1 { margin-bottom: 8px; }
+      fieldset { margin-bottom: 16px; }
+      label { display: inline-block; min-width: 120px; }
+      input, select { padding: 6px 8px; margin: 4px 0; }
+      button { padding: 8px 12px; margin-right: 8px; }
+      .row { margin: 6px 0; }
+      table { border-collapse: collapse; width: 100%; margin-top: 16px; }
+      th, td { border: 1px solid #ddd; padding: 6px 8px; font-size: 14px; }
+      th { background: #f7f7f7; text-align: left; }
+      .muted { color: #666; font-size: 12px; }
+      .tag { display: inline-block; padding: 2px 6px; background: #eef; border-radius: 4px; margin-left: 6px; font-size: 12px; }
+      .error { color: #b00020; }
+      .ok { color: #0b8e2c; }
+    </style>
+  </head>
+  <body>
+    <h1>Earnings Calendar</h1>
+    <div class="muted">Targets API at http://127.0.0.1:8000</div>
+
+    <fieldset>
+      <legend>Read from repository</legend>
+      <div class="row">
+        <label for="r-days">Days ahead</label>
+        <input id="r-days" type="number" min="0" max="180" value="14" />
+      </div>
+      <div class="row">
+        <label for="r-symbols">Symbols</label>
+        <input id="r-symbols" type="text" placeholder="e.g. AAPL, MSFT (optional)" />
+      </div>
+      <div class="row">
+        <button id="btn-read">Load upcoming (repo)</button>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Fetch from external and save</legend>
+      <div class="row">
+        <label for="f-days">Days ahead</label>
+        <input id="f-days" type="number" min="0" max="180" value="7" />
+      </div>
+      <div class="row">
+        <label for="f-source">Source</label>
+        <select id="f-source">
+          <option value="nasdaq" selected>nasdaq</option>
+          <option value="yahoo">yahoo</option>
+          <option value="all">all</option>
+        </select>
+      </div>
+      <div class="row">
+        <label for="f-symbols">Symbols</label>
+        <input id="f-symbols" type="text" placeholder="Required for yahoo (e.g. AAPL, MSFT)" />
+      </div>
+      <div class="row">
+        <button id="btn-fetch">Fetch & Save</button>
+        <button id="btn-fetch-yahoo">Yahoo Only (requires symbols)</button>
+      </div>
+      <div class="row muted" id="hint"></div>
+    </fieldset>
+
+    <div id="status" class="muted"></div>
+    <div id="headers" class="muted"></div>
+    <div id="error" class="error"></div>
+    <div id="ok" class="ok"></div>
+    <div id="results"></div>
+
+    <script>
+      const api = 'http://127.0.0.1:8000';
+      const $ = (id) => document.getElementById(id);
+
+      function parseSymbols(val) {
+        if (!val) return null;
+        return val.split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
+      }
+
+      function renderTable(events) {
+        if (!events || events.length === 0) return '<div>No events</div>';
+        const cols = ['symbol','company_name','earnings_date','time','eps_estimate','revenue_estimate','source'];
+        const head = '<tr>' + cols.map(c => `<th>${c}</th>`).join('') + '</tr>';
+        const rows = events.map(e => '<tr>' + cols.map(c => `<td>${(e[c] ?? '')}</td>`).join('') + '</tr>').join('');
+        return `<table>${head}${rows}</table>`;
+      }
+
+      function setStatus(text) { $('status').textContent = text || ''; }
+      function setHeaders(h) {
+        if (!h) { $('headers').textContent = ''; return; }
+        const src = h.get('x-calendar-source');
+        const cd = h.get('x-calendar-collection-date');
+        $('headers').textContent = src || cd ? `Source: ${src || ''}  ${cd ? ' | Collection: ' + cd : ''}` : '';
+      }
+      function setError(text) { $('error').textContent = text || ''; }
+      function setOk(text) { $('ok').textContent = text || ''; }
+
+      $('f-source').addEventListener('change', () => {
+        const src = $('f-source').value;
+        $('hint').textContent = src === 'yahoo' ? 'Yahoo requires symbols.' : (src === 'all' ? 'Yahoo will be used only if symbols provided.' : '');
+      });
+
+      $('btn-read').addEventListener('click', async () => {
+        setError(''); setOk(''); setStatus('Loading...'); $('results').innerHTML = '';
+        try {
+          const days = Number($('r-days').value) || 14;
+          const symbols = $('r-symbols').value.trim();
+          const qs = new URLSearchParams({ days: String(days) });
+          if (symbols) qs.append('symbols', symbols);
+          const res = await fetch(`${api}/calendar/upcoming?${qs.toString()}`);
+          const json = await res.json();
+          setHeaders(res.headers);
+          $('results').innerHTML = renderTable(json);
+          setStatus(`Loaded ${Array.isArray(json) ? json.length : 0} event(s).`);
+        } catch (e) {
+          setError(String(e)); setStatus('');
+        }
+      });
+
+      $('btn-fetch').addEventListener('click', async () => {
+        setError(''); setOk(''); setStatus('Fetching...'); $('results').innerHTML = '';
+        try {
+          const days = Number($('f-days').value) || 7;
+          const source = $('f-source').value;
+          const symbols = $('f-symbols').value.trim();
+          const qs = new URLSearchParams({ days: String(days), source });
+          if (symbols) qs.append('symbols', symbols);
+          const res = await fetch(`${api}/calendar/fetch-upcoming?${qs.toString()}`, { method: 'POST' });
+          if (!res.ok) {
+            const body = await res.json().catch(() => ({}));
+            throw new Error(body.detail || `HTTP ${res.status}`);
+          }
+          const json = await res.json();
+          setHeaders(res.headers);
+          $('results').innerHTML = renderTable(json);
+          setOk(`Fetched ${Array.isArray(json) ? json.length : 0} event(s) and attempted to save.`);
+          setStatus('');
+        } catch (e) {
+          setError(String(e)); setStatus('');
+        }
+      });
+
+      $('btn-fetch-yahoo').addEventListener('click', async () => {
+        setError(''); setOk(''); setStatus('Fetching (Yahoo)...'); $('results').innerHTML = '';
+        try {
+          const days = Number($('f-days').value) || 7;
+          const symbols = $('f-symbols').value.trim();
+          if (!symbols) throw new Error('Yahoo requires symbols');
+          const qs = new URLSearchParams({ days: String(days), symbols });
+          const res = await fetch(`${api}/calendar/fetch-upcoming/yahoo?${qs.toString()}`, { method: 'POST' });
+          if (!res.ok) {
+            const body = await res.json().catch(() => ({}));
+            throw new Error(body.detail || `HTTP ${res.status}`);
+          }
+          const json = await res.json();
+          setHeaders(res.headers);
+          $('results').innerHTML = renderTable(json);
+          setOk(`Fetched ${Array.isArray(json) ? json.length : 0} event(s) and attempted to save.`);
+          setStatus('');
+        } catch (e) {
+          setError(String(e)); setStatus('');
+        }
+      });
+    </script>
+  </body>
+  </html>
+

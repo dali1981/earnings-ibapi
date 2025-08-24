@@ -6,7 +6,7 @@ import pytest
 
 @pytest.mark.unit
 def test_jsonl_consumer_checkpoint_and_read(tmp_path):
-    from utils.events.consumer import JSONLConsumer
+    from common.utils.events.consumer import JSONLConsumer
 
     events_dir = tmp_path / "cache" / "events"
     state_root = tmp_path / "cache" / "state"

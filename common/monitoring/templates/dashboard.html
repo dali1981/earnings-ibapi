@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Trading Monitoring Dashboard</title>
+    <link rel="stylesheet" href="/static/css/dashboard.css" />
+  </head>
+  <body>
+    <header class="app-header">
+      <div class="branding">
+        <div class="logo" aria-hidden="true">📈</div>
+        <h1>Trading Monitoring</h1>
+      </div>
+      <div class="controls">
+        <label class="toggle">
+          <input type="checkbox" id="autoRefresh" checked />
+          <span>Auto Refresh</span>
+        </label>
+        <select id="refreshInterval" aria-label="Refresh Interval">
+          <option value="5">5s</option>
+          <option value="10" selected>10s</option>
+          <option value="30">30s</option>
+          <option value="60">60s</option>
+        </select>
+      </div>
+    </header>
+
+    <nav class="tabs" role="tablist">
+      <button class="tab active" data-tab="overview" role="tab" aria-selected="true">Overview</button>
+      <button class="tab" data-tab="events" role="tab">Events</button>
+      <button class="tab" data-tab="alerts" role="tab">Alerts</button>
+      <button class="tab" data-tab="metrics" role="tab">Metrics</button>
+      <button class="tab" data-tab="report" role="tab">Report</button>
+      <button class="tab" data-tab="jobs" role="tab">Jobs</button>
+      <button class="tab" data-tab="config" role="tab">Config</button>
+    </nav>
+
+    <main class="tab-content">
+      <!-- Overview -->
+      <section id="overview" class="panel active" role="tabpanel">
+        <div class="cards" id="statusCards"></div>
+      </section>
+
+      <!-- Events -->
+      <section id="events" class="panel" role="tabpanel">
+        <form id="eventFilters" class="filters" onsubmit="return false;">
+          <div class="field">
+            <label>Topic</label>
+            <input type="text" id="evTopic" placeholder="option_bars, equity_bars, ..." />
+          </div>
+          <div class="field">
+            <label>Type</label>
+            <input type="text" id="evType" placeholder="data.available" />
+          </div>
+          <div class="field">
+            <label>Hours</label>
+            <input type="number" id="evHours" value="24" min="1" />
+          </div>
+          <div class="field">
+            <label>Aggregate</label>
+            <input type="checkbox" id="evAggregate" />
+          </div>
+          <div class="field grow">
+            <label>Correlation ID</label>
+            <input type="text" id="evCorrelation" placeholder="Search correlation_id" />
+          </div>
+          <button id="evApply" class="btn">Apply</button>
+        </form>
+
+        <div id="eventsSummary" class="summary"></div>
+        <div id="eventsTableWrap" class="table-wrap">
+          <table class="data-table" id="eventsTable" aria-label="Events">
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Topic</th>
+                <th>Type</th>
+                <th>Correlation</th>
+                <th>Payload</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Alerts -->
+      <section id="alerts" class="panel" role="tabpanel">
+        <div class="filters">
+          <div class="field">
+            <label>Lookback (h)</label>
+            <input type="number" id="alertHours" value="24" min="1" />
+          </div>
+          <div class="field">
+            <label>Severity</label>
+            <select id="alertSeverity">
+              <option value="">All</option>
+              <option>critical</option>
+              <option>high</option>
+              <option>medium</option>
+              <option>low</option>
+            </select>
+          </div>
+          <button id="alertApply" class="btn">Apply</button>
+        </div>
+        <div id="alertsTableWrap" class="table-wrap">
+          <table class="data-table" id="alertsTable" aria-label="Alerts">
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Type</th>
+                <th>Severity</th>
+                <th>Message</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Metrics -->
+      <section id="metrics" class="panel" role="tabpanel">
+        <div class="filters">
+          <div class="field">
+            <label>Lookback (h)</label>
+            <input type="number" id="metricsHours" value="24" min="1" />
+          </div>
+          <button id="metricsApply" class="btn">Apply</button>
+        </div>
+        <div id="metricsTableWrap" class="table-wrap">
+          <table class="data-table" id="metricsTable" aria-label="Metrics">
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Symbols</th>
+                <th>Success</th>
+                <th>Failed</th>
+                <th>Duration (m)</th>
+                <th>Success Rate</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Report -->
+      <section id="report" class="panel" role="tabpanel">
+        <div class="filters">
+          <div class="field">
+            <label>Days</label>
+            <input type="number" id="reportDays" value="7" min="1" />
+          </div>
+          <button id="reportApply" class="btn">Generate</button>
+        </div>
+        <pre id="reportJson" class="json-view" aria-label="Report JSON"></pre>
+      </section>
+
+      <!-- Jobs -->
+      <section id="jobs" class="panel" role="tabpanel">
+        <div class="filters">
+          <div class="field">
+            <label>Symbol</label>
+            <input type="text" id="jobSymbol" placeholder="AAPL" />
+          </div>
+          <div class="field">
+            <label>Lookback (days)</label>
+            <input type="number" id="jobLookback" value="365" min="1" />
+          </div>
+          <div class="field grow">
+            <label>Job ID (optional)</label>
+            <input type="text" id="jobCorrelation" placeholder="job-1234 (for correlation)" />
+          </div>
+          <button id="jobSetupBtn" class="btn">Run: Setup New Symbol</button>
+        </div>
+
+        <div class="filters">
+          <div class="field grow">
+            <label>Symbols (comma or space separated)</label>
+            <input type="text" id="jobSymbolsList" placeholder="AAPL, MSFT, NVDA" />
+          </div>
+          <button id="jobDailyBtn" class="btn">Run: Daily Update</button>
+        </div>
+
+        <pre id="jobsResult" class="json-view" aria-label="Jobs Output"></pre>
+      </section>
+
+      <!-- Config -->
+      <section id="config" class="panel" role="tabpanel">
+        <div class="cards" id="configCards"></div>
+        <h3>portfolio.yaml</h3>
+        <pre id="portfolioYaml" class="json-view" aria-label="Portfolio YAML"></pre>
+      </section>
+    </main>
+
+    <footer class="app-footer">
+      <span id="statusMessage" aria-live="polite"></span>
+    </footer>
+
+    <script src="/static/js/dashboard.js"></script>
+  </body>
+  </html>

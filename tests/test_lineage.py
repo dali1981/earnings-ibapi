@@ -10,12 +10,12 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from lineage.core import (DataOperation, DataSource, LineageNode,
+from common.lineage.core import (DataOperation, DataSource, LineageNode,
                           LineageTracker, OperationType)
-from lineage.decorators import set_global_tracker, track_lineage
-from lineage.metadata import LineageMetadataRepository
-from lineage.query import LineageQueryEngine
-from lineage.visualizer import LineageVisualizer
+from common.lineage.decorators import set_global_tracker, track_lineage
+from common.lineage.metadata import LineageMetadataRepository
+from common.lineage.query import LineageQueryEngine
+from common.lineage.visualizer import LineageVisualizer
 
 
 class TestLineageCore:
@@ -490,7 +490,7 @@ class TestIntegrationWithRepositories:
 
     def test_repository_integration(self):
         """Test that repository operations are tracked."""
-        from repositories.equity_bars import EquityBarRepository
+        from common.repositories.equity_bars import EquityBarRepository
 
         # Create repository
         repo = EquityBarRepository(self.temp_dir)

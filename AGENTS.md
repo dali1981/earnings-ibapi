@@ -46,3 +46,11 @@ This guide helps contributors work consistently across the earnings/trading code
 - Consumers:
   - Option chain → option bars backfill: `jobs/option_chain_backfill_consumer.py`.
   - Make targets: `make consume-option-chains`, `make consume-option-chains-demo`.
+
+## Jobs
+- See `docs/jobs.md` for an overview of active vs. deprecated jobs and usage.
+
+## Scripts vs. Jobs vs. Examples
+- `scripts/`: Small, focused utilities that operate on the local repository only (no external calls by default). These are developer-facing helpers (e.g., `show_upcoming_earnings.py`, `dedup_earnings.py`).
+- `jobs/`: Operational workflows that may call external services (IB, APIs), run on schedules, or perform backfills. These emit events after writing to repos and are designed for cron/systemd orchestration.
+- `examples/`: Read-only demonstrations that show how to use repositories and utilities in a simple, reproducible way (no side effects, no network). Good for learning and quick inspection.

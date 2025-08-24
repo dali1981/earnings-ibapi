@@ -122,6 +122,7 @@ def daily_update(symbol: str):
 2. **Check Before Request**: Always verify data doesn't exist before API calls
 3. **Incremental Updates**: Only request missing date ranges
 4. **Metadata Tracking**: Store request metadata to avoid redundant calls
+5. **Deterministic Writes**: For daily/partitioned data, consolidate and deduplicate within the partition and write a single deterministic file to prevent duplicate growth across runs. Earnings repository dedup key: `(symbol, earnings_date, source)`.
 
 ```python
 def smart_backfill(symbol: str, start: date, end: date) -> None:
@@ -250,6 +251,26 @@ class DataValidation:
 - **Data Types**: Live quotes, option chains, Greeks
 
 ### Snapshot Data Pipeline (Scheduled Processing)
+
+## Correlation IDs & Observability
+
+- Each event on the file-based bus includes a `payload.correlation_id` to enable end-to-end tracing of a job across producers and consumers.
+- Correlation derivation order on publish: explicit `payload.correlation_id` → `payload.job_id` → active `reliability.logging.log_context` → `JOB_ID` environment variable.
+- Consumers should process within a `log_context(correlation_id=...)` extracted from inbound events to preserve trace continuity.
+- The monitoring dashboard provides an `/events` endpoint and an Events UI with a correlation filter and aggregate mode for quick investigations.
+
+### Example
+```
+# Producer
+FileEventBus().notify_data_available(
+  dataset="option_bars", symbol="AAPL", start="2024-01-01", end="2024-01-31", job_id="job-1234"
+)
+
+# Consumer propagation
+with log_context(correlation_id=evt["payload"].get("correlation_id") or evt["payload"].get("job_id")):
+    # do work, emit downstream events; correlation is preserved automatically
+```
+
 
 ## Event-Driven Consumers & Catch-Up (New)
 

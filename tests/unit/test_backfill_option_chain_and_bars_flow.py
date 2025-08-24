@@ -5,7 +5,7 @@ from datetime import date, datetime, timedelta
 
 @pytest.mark.unit
 def test_backfill_option_chain_snapshot_writes_and_notifies(tmp_path, monkeypatch):
-    from repositories.option_chains import OptionChainSnapshotRepository
+    from common.repositories.option_chains import OptionChainSnapshotRepository
     from ibx_flows.backfill import BackfillConfig, backfill_option_chain_daily
 
     class FakeSource:
@@ -60,7 +60,7 @@ def test_backfill_option_chain_snapshot_writes_and_notifies(tmp_path, monkeypatc
 
 @pytest.mark.unit
 def test_backfill_option_bars_writes_and_notifies(tmp_path, monkeypatch):
-    from repositories.option_bars import OptionBarRepository
+    from common.repositories.option_bars import OptionBarRepository
     from ibx_flows.backfill import BackfillConfig, backfill_option_bars
 
     class FakeSource:

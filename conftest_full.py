@@ -25,7 +25,7 @@ from ibx_repos.option_bars import OptionBarRepository
 from config import IB_CLIENT_IDS, IB_HOST, IB_PORT, LOGGING_CONFIG
 # from api.ib_core import IBRuntime, RequestIdSequencer, FutureRegistry, IBWrapperBridge
 from streamer import Config, EarningsStreamer
-from utils import RateLimiter
+from common.utils import RateLimiter
 
 # ============================================================================
 # Test Configuration Fixtures

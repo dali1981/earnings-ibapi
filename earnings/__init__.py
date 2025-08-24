@@ -29,7 +29,14 @@ from .unified_fetcher import (
 )
 
 # Async fetcher for advanced usage
-from .async_calendar_fetcher import AsyncEarningsCalendarFetcher
+from .async_fetcher import AsyncEarningsCalendarFetcher
+
+# Source abstractions and implementations
+from .sources import (
+    EarningsCalendarSource,
+    NasdaqEarningsSource,
+    YahooEarningsSource,
+)
 
 # Storage
 from .services.storage import EarningsPersistence
@@ -50,6 +57,10 @@ __all__ = [
     "AsyncEarningsCalendarFetcher",
     "EarningsCalendarFetcher",  # Backward compatibility
     "LegacyEarningsCalendarFetcher",
+    # Sources
+    "EarningsCalendarSource",
+    "NasdaqEarningsSource", 
+    "YahooEarningsSource",
     # Convenience functions
     "get_default_fetcher",
     "get_upcoming_earnings",

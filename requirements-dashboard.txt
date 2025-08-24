@@ -1,0 +1,4 @@
+# Web dashboard and visualization
+flask>=2.3
+plotly>=5.20
+

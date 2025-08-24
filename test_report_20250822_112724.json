@@ -1,0 +1,27 @@
+{
+  "timestamp": "20250822_112724",
+  "project_root": "/Users/mohamedali/trading_project/earnings_ibapi",
+  "test_results": {
+    "unit": {
+      "exit_code": 2,
+      "duration": 1.373159,
+      "status": "FAILED"
+    },
+    "integration": {
+      "exit_code": 2,
+      "duration": 12.024932,
+      "status": "FAILED"
+    },
+    "data": {
+      "exit_code": 2,
+      "duration": 11.479783,
+      "status": "FAILED"
+    },
+    "api": {
+      "exit_code": 2,
+      "duration": 11.516297,
+      "status": "FAILED"
+    }
+  },
+  "overall_status": "FAILED"
+}

@@ -6,10 +6,10 @@ from datetime import date, timedelta
 def test_earnings_persistence_writes_and_notifies(tmp_path, monkeypatch):
     from earnings.fetcher import EarningsEvent
     from earnings.services.storage import EarningsPersistence
-    import repositories.earnings as earnings_mod
+    import common.repositories.earnings as earnings_mod
 
     # Prevent retention cleanup from deleting just-written files
-    monkeypatch.setattr(earnings_mod.EarningsRepository, "_cleanup_old_data", lambda self: None, raising=True)
+    monkeypatch.setattr(earnings_mod.EarningsCalendarRepository, "_cleanup_old_data", lambda self: None, raising=True)
 
     class CapturingBus:
         def __init__(self):

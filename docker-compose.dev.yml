@@ -1,0 +1,97 @@
+version: "3.9"
+
+services:
+  calendar:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    command: ["uvicorn", "services.calendar_api.app:app", "--host", "0.0.0.0", "--port", "9001", "--reload"]
+    ports: ["9001:9001"]
+    environment:
+      - SERVICE_NAME=calendar
+    volumes:
+      - .:/app
+      - ./data:/app/data
+
+  equity:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    command: ["uvicorn", "services.equity_api.app:app", "--host", "0.0.0.0", "--port", "9002", "--reload"]
+    ports: ["9002:9002"]
+    environment:
+      - SERVICE_NAME=equity
+    volumes:
+      - .:/app
+      - ./data:/app/data
+
+  options:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    command: ["uvicorn", "services.option_history_api.app:app", "--host", "0.0.0.0", "--port", "9003", "--reload"]
+    ports: ["9003:9003"]
+    environment:
+      - SERVICE_NAME=options
+    volumes:
+      - .:/app
+      - ./data:/app/data
+
+  chains:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    command: ["uvicorn", "services.option_chain_api.app:app", "--host", "0.0.0.0", "--port", "9004", "--reload"]
+    ports: ["9004:9004"]
+    environment:
+      - SERVICE_NAME=chains
+    volumes:
+      - .:/app
+      - ./data:/app/data
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    command: ["uvicorn", "services.frontend.main:app", "--host", "0.0.0.0", "--port", "9000", "--reload"]
+    ports: ["9000:9000"]
+    volumes:
+      - .:/app
+      - ./data:/app/data
+
+  ib_api:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    command: ["uvicorn", "services.ib_api.app:app", "--host", "0.0.0.0", "--port", "9010", "--reload"]
+    ports: ["9010:9010"]
+    environment:
+      - SERVICE_NAME=ib_api
+      - IB_HOST=${IB_HOST:-host.docker.internal}
+      - IB_PORT=${IB_PORT:-4002}
+      - IB_CLIENT_ID=${IB_CLIENT_ID:-101}
+    volumes:
+      - .:/app
+      - ./data:/app/data
+
+  redis:
+    image: redis:7-alpine
+    ports: ["6379:6379"]
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+
+  celery_worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    command: ["celery", "-A", "ibx_celery.app", "worker", "--loglevel=INFO"]
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/1
+      - IBX_API__CONTRACTS_SERVICE_BASE=http://ib_api:9010
+    depends_on:
+      - redis
+      - ib_api
+    volumes:
+      - .:/app
+
+volumes: {}

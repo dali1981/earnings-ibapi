@@ -17,6 +17,35 @@ This project enforces a local-first workflow: every external read (historical AP
 - Topics: `equity_bars`, `option_chains`, `option_bars`, `earnings`. Demo runs use a `.demo` suffix.
 - Payload example: `{ "symbol": "AAPL", "bar_size": "1 day", "rows": 390, "start": "2024-01-01", "end": "2024-01-31" }`.
 
+### Correlation IDs (Tracing Jobs)
+- Correlation IDs are automatically propagated on publish. The bus injects `payload.correlation_id` if missing using, in order:
+  1) `payload.correlation_id` (explicit)
+  2) `payload.job_id` (treated as correlation)
+  3) `reliability.logging` context `correlation_id` (if a `log_context` is active)
+  4) `JOB_ID` environment variable
+
+- Producers should include a `job_id` or run within `reliability.logging.log_context(correlation_id=...)` for consistent tracing.
+- Consumers should preserve correlation by processing within the same `log_context` when emitting downstream events.
+
+Example (producer):
+```python
+from utils.events.bus import FileEventBus
+ebus = FileEventBus()
+ebus.notify_data_available(dataset="option_bars", symbol="AAPL", start="2024-01-01", end="2024-01-31", job_id="job-1234")
+```
+
+Example (consumer propagation):
+```python
+from reliability.logging import log_context
+
+for evt in cons.read(service="backfill", limit=50):
+    payload = evt.get("payload", {})
+    corr = payload.get("correlation_id") or payload.get("job_id")
+    with log_context(correlation_id=corr):
+        # do work, and when publishing, the bus will attach the same correlation_id
+        ebus.notify_data_available(dataset="option_bars", symbol=payload["underlying"], start=payload["start"], end=payload["end"]) 
+```
+
 ## Historical vs. Streaming
 - Historical (backfill):
   1) Fetch a bounded window from the source.
@@ -28,6 +57,7 @@ This project enforces a local-first workflow: every external read (historical AP
   3) Publish a `data.available` event per flush (small payload).
 
 ## Safety & Isolation
+- Path anchoring: all `data/`, `cache/`, and `logs/` live under the repository root (via `config.PROJECT_ROOT`). Running scripts from subfolders will not create nested `data/` in those subfolders.
 - Scripts are guarded from writing to production data without `ALLOW_PROD_WRITES=1`.
 - Example/demo scripts write under `data/exports/demo` and use namespaced topics (`*.demo`).
 
@@ -36,6 +66,17 @@ This project enforces a local-first workflow: every external read (historical AP
   - Files under `data/equity_bars/symbol=<SYM>/...`
   - Event appended to `data/cache/events/equity_bars.jsonl`
 - Streaming: register a `Subscription` handler that writes to a repo and calls `FileEventBus().notify_data_available(...)` per flush.
+
+### Event Introspection API
+- The monitoring dashboard exposes `GET /events` for recent events:
+  - Query params: `topic`, `type`, `hours` (default 24), `aggregate` (truthy for counts by topic/type)
+  - Example: `/events?topic=option_bars&hours=6`
+  - Aggregate example: `/events?aggregate=1&hours=24`
+  - Filter by correlation on the UI via the “Correlation ID” search box
+
+## Idempotency & Deduplication
+- Earnings persistence is idempotent per `(collection_date, source)`: re-running the storage on the same day merges with any existing file and drops duplicates by `(symbol, earnings_date, source)`, writing a single deterministic `earnings.parquet` in the partition.
+- For other datasets, follow the same pattern where relevant (e.g., consolidated files per partition) to avoid duplicate growth across runs.
 
 ## Recovery & Catch-Up
 - Durable log + checkpoint: consumers track `<file, offset, last_ts>` under `data/cache/state/<service>/<topic>.json` and resume from there.

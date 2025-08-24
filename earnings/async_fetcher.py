@@ -1,31 +1,27 @@
 #!/usr/bin/env python3
 """
-Simple async NASDAQ earnings fetcher.
+Multi-source async earnings calendar fetcher using source abstraction.
 """
 
-import asyncio
-import random
 from datetime import date, timedelta
-from typing import Optional, List
-
-import httpx
+from typing import Optional, List, Dict
 
 from common.utils import get_logger
 from earnings import EarningsEvent, EarningsSource
+from earnings.sources import EarningsCalendarSource, SourceRegistry
 
 logger = get_logger(__name__)
 
 
 class AsyncEarningsCalendarFetcher:
-    """Simple async fetcher for NASDAQ earnings."""
+    """Multi-source async fetcher for earnings calendars."""
     
-    def __init__(self):
-        self.base_url = "https://api.nasdaq.com/api/calendar/earnings"
-        self.headers = {
-            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)",
-            "Accept": "application/json, text/plain, */*",
-            "Referer": "https://www.nasdaq.com/",
-        }
+    def __init__(self, sources: Optional[List[EarningsSource]] = None):
+        """Initialize with specified sources or default to all supported.
+
+        Uses SourceRegistry to construct concrete source implementations.
+        """
+        self._sources: Dict[EarningsSource, EarningsCalendarSource] = SourceRegistry.get_instances(sources)
 
     async def get_earnings_range(
         self, 
@@ -33,7 +29,7 @@ class AsyncEarningsCalendarFetcher:
         start_date: date = None, 
         end_date: date = None
     ) -> List[EarningsEvent]:
-        """Fetch earnings for date range."""
+        """Fetch earnings for date range from all sources."""
         if start_date is None:
             start_date = date.today()
         if end_date is None:
@@ -41,70 +37,61 @@ class AsyncEarningsCalendarFetcher:
             
         all_events = []
         
-        async with httpx.AsyncClient(
-            headers=self.headers,
-            timeout=30.0
-        ) as client:
-            current = start_date
-            while current <= end_date:
-                if current.weekday() < 5:  # Skip weekends
-                    events = await self._fetch_day(client, current, symbols)
-                    all_events.extend(events)
-                    await asyncio.sleep(0.5 + random.random() * 0.5)
-                current += timedelta(days=1)
+        # Fetch from all configured sources
+        import asyncio
+        tasks = []
+        for source_type, source in self._sources.items():
+            task = source.fetch_earnings_range(start_date, end_date, symbols)
+            tasks.append(task)
         
-        return all_events
+        if tasks:
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            for result in results:
+                if isinstance(result, list):
+                    all_events.extend(result)
+                elif isinstance(result, Exception):
+                    logger.error(f"Source fetch failed: {result}")
+        
+        return self._deduplicate_events(all_events)
 
-    async def _fetch_day(
-        self, 
-        client: httpx.AsyncClient, 
-        day: date, 
-        symbols: Optional[List[str]]
+    async def a_get_upcoming_earnings(
+        self,
+        symbols: Optional[List[str]] = None,
+        days_ahead: int = 7,
+        sources: Optional[List[EarningsSource]] = None
     ) -> List[EarningsEvent]:
-        """Fetch earnings for single day."""
-        try:
-            response = await client.get(
-                self.base_url,
-                params={"date": day.strftime("%Y-%m-%d")}
-            )
-            response.raise_for_status()
-            data = response.json()
-            return self._parse_response(data, day, symbols)
-        except Exception as e:
-            logger.error(f"Failed to fetch {day}: {e}")
-            return []
+        """Get upcoming earnings for the next N days."""
+        start_date = date.today()
+        end_date = start_date + timedelta(days=days_ahead)
+        if sources:
+            # Build a temporary fetcher constrained to the requested sources
+            temp = AsyncEarningsCalendarFetcher(sources=sources)
+            return await temp.get_earnings_range(symbols, start_date, end_date)
+        return await self.get_earnings_range(symbols, start_date, end_date)
 
-    def _parse_response(
-        self, 
-        data: dict, 
-        day: date, 
-        symbols: Optional[List[str]]
-    ) -> List[EarningsEvent]:
-        """Parse NASDAQ response to EarningsEvent list."""
-        try:
-            from earnings.models import NasdaqEarningsRow
+    def _deduplicate_events(self, events: List[EarningsEvent]) -> List[EarningsEvent]:
+        """Remove duplicate events, preferring higher quality data."""
+        seen = {}
+        unique = []
+        
+        for event in events:
+            key = (event.symbol, event.earnings_date)
             
-            rows = data.get("data", {}).get("rows", [])
-            if not rows:
-                return []
-            
-            symbol_set = {s.upper() for s in symbols} if symbols else None
-            events = []
-            
-            for row_data in rows:
-                try:
-                    symbol = row_data.get("symbol", "").upper()
-                    if symbol_set and symbol not in symbol_set:
-                        continue
-                    
-                    row = NasdaqEarningsRow(**row_data)
-                    event = row.to_earnings_event(day)
-                    events.append(event)
-                except Exception:
-                    continue
-            
-            return events
-            
-        except Exception as e:
-            logger.error(f"Parse failed for {day}: {e}")
-            return []
+            if key not in seen:
+                seen[key] = event
+                unique.append(event)
+            else:
+                # Keep the one with more data
+                existing = seen[key]
+                
+                # Prefer events with EPS estimates
+                if event.eps_estimate is not None and existing.eps_estimate is None:
+                    seen[key] = event
+                    unique[unique.index(existing)] = event
+                # Prefer events with revenue estimates
+                elif (event.revenue_estimate is not None and existing.revenue_estimate is None
+                      and event.eps_estimate == existing.eps_estimate):
+                    seen[key] = event
+                    unique[unique.index(existing)] = event
+        
+        return unique

@@ -8,8 +8,7 @@ exclude = '''
   | ^/dist/
   | ^/htmlcov/
   | ^/\.git/
-  | ^/new/
-  | ^/experimental/
+  | ^/labs/
 )
 '''
 

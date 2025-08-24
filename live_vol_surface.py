@@ -18,7 +18,7 @@ from ib_client import IBClient
 from ibx_time import ib_end_datetime
 from request_sequencer import RequestSequencer
 from sink import Sink
-from utils import RateLimiter, make_option, make_stock
+from common.utils import RateLimiter, make_option, make_stock
 
 
 def parse_args() -> argparse.Namespace:

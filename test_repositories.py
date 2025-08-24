@@ -9,7 +9,7 @@ from pathlib import Path
 import pandas as pd
 
 # Test the new repositories
-from repositories import EquityBarRepository
+from common.repositories import EquityBarRepository
 
 
 def test_equity_bars_repository():
