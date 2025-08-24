@@ -3,10 +3,11 @@ from __future__ import annotations
 import asyncio
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException, status
 from pydantic import BaseModel, Field
 
 from services.ib_api.service.ib_runtime import get_runtime
+from ibx_config.settings import get_settings
 from vendors.ibx.services import (
     ContractDetailsService,
     HistoricalService,
@@ -44,6 +45,25 @@ def _serialize(obj: Any) -> Any:
     return str(obj)
 
 
+def _ensure_connected(rt) -> None:
+    try:
+        if hasattr(rt, "client") and not rt.client.isConnected():
+            s = get_settings()
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=(
+                    f"IB runtime not connected. Ensure IB Gateway/TWS is running and reachable at "
+                    f"{s.ib.host}:{s.ib.port}, or update IBX_IB__HOST/PORT settings."
+                ),
+            )
+    except AttributeError:
+        # If client attribute missing, treat as unavailable
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="IB runtime unavailable (client missing).",
+        )
+
+
 class MatchingSymbolsRequest(BaseModel):
     pattern: str = Field(..., description="Symbol search pattern", examples=["AAPL"])
     timeout: float = Field(10.0, examples=[10.0])
@@ -52,6 +72,7 @@ class MatchingSymbolsRequest(BaseModel):
 @router.post("/matching-symbols")
 def matching_symbols(req: MatchingSymbolsRequest) -> List[Dict[str, Any]]:
     rt = get_runtime()
+    _ensure_connected(rt)
     service = MatchingSymbolService(rt)
     res = service.fetch(req.pattern, timeout=req.timeout)
     return [_serialize(x) for x in res]
@@ -72,6 +93,7 @@ class ContractDetailsRequest(BaseModel):
 @router.post("/contract-details")
 def contract_details(req: ContractDetailsRequest) -> List[Dict[str, Any]]:
     rt = get_runtime()
+    _ensure_connected(rt)
     service = ContractDetailsService(rt)
     contract = _build_contract(req.contract)
     res = service.fetch(contract, timeout=req.timeout)
@@ -89,6 +111,7 @@ class SecDefParamsRequest(BaseModel):
 @router.post("/secdef/option-params")
 def secdef_option_params(req: SecDefParamsRequest) -> List[Dict[str, Any]]:
     rt = get_runtime()
+    _ensure_connected(rt)
     service = SecDefService(rt)
     return service.option_params(
         symbol=req.symbol,
@@ -114,9 +137,41 @@ class HistoricalBarsRequest(BaseModel):
     timeout: float = Field(20.0, examples=[20.0])
 
 
+class HealthResponse(BaseModel):
+    connected: bool
+    host: str
+    port: int
+    client_id: int
+    message: Optional[str] = None
+
+
+@router.get("/health", response_model=HealthResponse)
+def health() -> HealthResponse:
+    s = get_settings()
+    msg: Optional[str] = None
+    connected = False
+    try:
+        rt = get_runtime()
+        try:
+            connected = bool(getattr(rt.client, "isConnected", lambda: False)())
+        except Exception as e:  # pragma: no cover - defensive
+            msg = f"error checking connection: {e}"
+    except Exception as e:
+        msg = str(e)
+        connected = False
+    return HealthResponse(
+        connected=connected,
+        host=s.ib.host,
+        port=s.ib.port,
+        client_id=s.ib.client_id_contracts,
+        message=msg,
+    )
+
+
 @router.post("/historical/bars")
 def historical_bars(req: HistoricalBarsRequest) -> List[Dict[str, Any]]:
     rt = get_runtime()
+    _ensure_connected(rt)
     service = HistoricalService(rt)
     contract = _build_contract(req.contract)
     rows = service.bars(
@@ -137,6 +192,12 @@ def historical_bars(req: HistoricalBarsRequest) -> List[Dict[str, Any]]:
 async def ws_market_data(ws: WebSocket):
     await ws.accept()
     rt = get_runtime()
+    try:
+        _ensure_connected(rt)
+    except HTTPException as exc:
+        await ws.send_json({"error": exc.detail})
+        await ws.close(code=1013)
+        return
     service = SubscriptionService(rt)
 
     # First message must be a JSON config with contract and options
