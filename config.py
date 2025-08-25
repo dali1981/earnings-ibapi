@@ -4,17 +4,20 @@ import os
 from pathlib import Path
 
 # --- IB Connection ---
-IB_HOST = "127.0.0.1"
-IB_PORT = 4002  # Paper trading port
+from app_settings.settings import get_settings  # centralized settings
 
-# Dedicated client IDs for different jobs/examples
+_S = get_settings()
+IB_HOST = _S.ib.host
+IB_PORT = _S.ib.port
+
+# Dedicated client IDs for different jobs/examples (legacy map, kept for compatibility)
 IB_CLIENT_IDS = {
-    "default": 77,
-    "streamer": 17,
-    "contract_details_backfill": 8,
-    "ib_source": 101,
-    "contracts_backfill": 1,
-    "fundamental_data": 200,
+    "default": _S.ib.client_id_contracts,
+    "streamer": _S.ib.client_id_contracts,
+    "contract_details_backfill": _S.ib.client_id_contracts,
+    "ib_source": _S.ib.client_id_contracts,
+    "contracts_backfill": _S.ib.client_id_contracts,
+    "fundamental_data": _S.ib.client_id_contracts,
 }
 
 # Fallback client id
@@ -45,7 +48,7 @@ else:
 EQUITY_BARS_PATH = DATA_ROOT / "equity_bars"
 OPTION_BARS_PATH = DATA_ROOT / "option_bars"
 OPTION_CHAINS_PATH = DATA_ROOT / "option_chains"
-CONTRACTS_PATH = DATA_ROOT / "contracts"
+CONTRACTS_PATH = _S.paths.contracts
 EARNINGS_PATH = DATA_ROOT / "earnings"
 EXPORTS_PATH = DATA_ROOT / "exports"
 CACHE_PATH = DATA_ROOT / "cache"

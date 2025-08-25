@@ -7,7 +7,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException, st
 from pydantic import BaseModel, Field
 
 from services.ib_api.service.ib_runtime import get_runtime
-from ibx_settings.settings import get_settings
+from app_settings.settings import get_settings
 from vendors.ibx.services import (
     ContractDetailsService,
     HistoricalService,

@@ -3,7 +3,7 @@ from __future__ import annotations
 import atexit
 from typing import Optional
 
-from ibx_settings.settings import get_settings
+from app_settings.settings import get_settings
 
 
 from ibx import IBRuntime

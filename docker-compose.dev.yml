@@ -67,9 +67,9 @@ services:
     ports: ["9010:9010"]
     environment:
       - SERVICE_NAME=ib_api
-      - IBX_IB__HOST=${IBX_IB__HOST:-host.docker.internal}
-      - IBX_IB__PORT=${IBX_IB__PORT:-4002}
-      - IBX_IB__CLIENT_ID_CONTRACTS=${IBX_IB__CLIENT_ID_CONTRACTS:-101}
+      - APP_IB__HOST=${APP_IB__HOST:-host.docker.internal}
+      - APP_IB__PORT=${APP_IB__PORT:-4002}
+      - APP_IB__CLIENT_IDS__contracts_backfill=${APP_IB__CLIENT_IDS__contracts_backfill:-101}
     volumes:
       - .:/app
       - ./data:/app/data
@@ -87,7 +87,7 @@ services:
     environment:
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/1
-      - IBX_API__CONTRACTS_SERVICE_BASE=http://ib_api:9010
+      - APP_API__CONTRACTS_SERVICE_BASE=http://ib_api:9010
     depends_on:
       - redis
       - ib_api

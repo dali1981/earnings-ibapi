@@ -5,7 +5,7 @@ from typing import Iterable, List, Optional, Sequence
 
 from celery import shared_task
 
-from ibx_settings.settings import get_settings
+from app_settings.settings import get_settings
 from ibx_flows.contracts_backfill import ContractsConfig, backfill_us_equity_contracts
 try:
     from ibx_repos.contracts import ContractRepository  # type: ignore
