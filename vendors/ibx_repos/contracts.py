@@ -79,7 +79,7 @@ class ContractRepository:
             filters["sec_type"] = sec_type
         if primary_exchange:
             filters["primary_exchange"] = primary_exchange
-        return read_dataset(self.base_path, **filters)
+        return read_dataset(self.base_path, self._contracts_schema(), **filters)
 
     def present_conids(self) -> Set[int]:
         df = read_dataset(

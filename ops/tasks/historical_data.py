@@ -56,7 +56,8 @@ def fetch_historical_bars_task(
     settings = get_settings()
     base_url = api_base or str(settings.api.services.ib_api.url)
     
-    logger.info(f"Fetching historical bars for contract: {contract.get('symbol', 'N/A')}")
+    logger.info(f"📡 FETCH: Fetching historical bars for contract: {contract.get('symbol', 'N/A')} (conid: {contract.get('conId')})")
+    logger.info(f"📡 URL: {base_url}/ib/historical/bars")
     
     payload = {
         "contract": contract,
@@ -70,13 +71,20 @@ def fetch_historical_bars_task(
         "timeout": timeout_seconds,
     }
     
+    logger.info(f"📡 PAYLOAD: {payload}")
+    
     try:
         with httpx.Client(base_url=base_url, timeout=30.0) as client:
+            logger.info(f"📡 Making POST request to {base_url}/ib/historical/bars...")
             resp = client.post("/ib/historical/bars", json=payload)
+            logger.info(f"📡 Response status: {resp.status_code}")
+            
             resp.raise_for_status()
             bars = resp.json()
             
-            logger.info(f"Fetched {len(bars)} bars for {contract.get('symbol', 'N/A')}")
+            logger.info(f"📡 SUCCESS: Fetched {len(bars)} bars for {contract.get('symbol', 'N/A')}")
+            if bars:
+                logger.info(f"📡 Sample bar: {bars[0] if bars else 'None'}")
             
             return {
                 "bars": bars,
@@ -89,7 +97,7 @@ def fetch_historical_bars_task(
                 },
             }
     except Exception as e:
-        logger.error(f"Error fetching historical bars for {contract.get('symbol', 'N/A')}: {e}")
+        logger.error(f"📡 ERROR: Error fetching historical bars for {contract.get('symbol', 'N/A')}: {e}")
         return {
             "bars": [],
             "contract": contract,
@@ -134,31 +142,44 @@ def save_historical_bars_task(
     contract = fetch_result.get("contract", {})
     parameters = fetch_result.get("parameters", {})
     
+    logger.info(f"💾 SAVE: Starting save for {contract.get('symbol', 'N/A')}, {len(bars)} bars, repository_type={repository_type}")
+    logger.info(f"💾 Base path: {base}")
+    
     if not bars:
-        logger.warning(f"No bars to save for {contract.get('symbol', 'N/A')}")
+        logger.warning(f"💾 WARNING: No bars to save for {contract.get('symbol', 'N/A')}")
         return {"saved_count": 0, "error": fetch_result.get("error")}
     
     try:
         # Convert bars to DataFrame
+        logger.info(f"💾 Normalizing {len(bars)} bars...")
+        logger.info(f"💾 Sample raw bar: {bars[0] if bars else 'None'}")
+        
         df = _normalize_historical_bars(bars, contract, parameters)
         
+        logger.info(f"💾 After normalization: {len(df)} rows, columns: {list(df.columns) if not df.empty else 'empty'}")
+        if not df.empty:
+            logger.info(f"💾 Sample normalized row: {df.iloc[0].to_dict()}")
+        
         if df.empty:
-            logger.warning(f"No valid bars after normalization for {contract.get('symbol', 'N/A')}")
+            logger.warning(f"💾 WARNING: No valid bars after normalization for {contract.get('symbol', 'N/A')}")
             return {"saved_count": 0}
         
         # Choose appropriate repository
         if repository_type == "equity":
             from common.repositories.equity_bars import EquityBarRepository
             repo = EquityBarRepository(base)
+            logger.info(f"💾 Using EquityBarRepository at {base}")
         elif repository_type == "option":
             from common.repositories.option_bars import OptionBarRepository
             repo = OptionBarRepository(base)
+            logger.info(f"💾 Using OptionBarRepository at {base}")
         else:
             raise ValueError(f"Unknown repository type: {repository_type}")
         
         # Save to repository
+        logger.info(f"💾 Calling repo.save() with DataFrame shape: {df.shape}")
         repo.save(df)
-        logger.info(f"Saved {len(df)} bars for {contract.get('symbol', 'N/A')}")
+        logger.info(f"💾 SUCCESS: Saved {len(df)} bars for {contract.get('symbol', 'N/A')}")
         
         return {
             "saved_count": len(df),
@@ -171,7 +192,9 @@ def save_historical_bars_task(
         }
         
     except Exception as e:
-        logger.error(f"Error saving historical bars for {contract.get('symbol', 'N/A')}: {e}")
+        logger.error(f"💾 ERROR: Error saving historical bars for {contract.get('symbol', 'N/A')}: {e}")
+        import traceback
+        logger.error(f"💾 TRACEBACK: {traceback.format_exc()}")
         return {"saved_count": 0, "error": str(e)}
 
 
@@ -224,7 +247,11 @@ def resolve_contracts_for_symbols_task(
         contracts_repo = ContractRepository(base / "contracts")
         
         # Read contract descriptions for symbols
-        desc_df = desc_repo.read(symbol=symbols)
+        desc_df = desc_repo.read(columns=["conid", "symbol"])
+        
+        # Filter by symbols if any exist
+        if not desc_df.empty and symbols:
+            desc_df = desc_df[desc_df["symbol"].isin(symbols)]
         
         if not desc_df.empty:
             # Get unique conids from descriptions
@@ -270,6 +297,158 @@ def resolve_contracts_for_symbols_task(
             "missing_symbols": symbols,
             "error": str(e),
         }
+
+
+@shared_task(
+    bind=True,
+    name="historical.process_for_resolved_contracts",
+    queue="historical",
+)
+def process_historical_data_for_resolved_contracts_task(
+    self,
+    symbols: List[str],
+    end_date_time: str,
+    duration_str: str,
+    bar_size_setting: str,
+    what_to_show: str = "TRADES",
+    use_rth: int = 1,
+    repository_type: str = "equity",
+    timeout_seconds: float = 20.0,
+    root: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Process historical data for resolved contracts.
+    
+    This task:
+    1. Resolves contracts for symbols
+    2. For each resolved contract, fetches historical bars
+    3. Saves bars to repository
+    
+    Args:
+        symbols: List of ticker symbols
+        end_date_time: End date/time for historical data
+        duration_str: Duration string
+        bar_size_setting: Bar size setting
+        what_to_show: Data type to retrieve
+        use_rth: Regular trading hours only flag
+        repository_type: Repository type for saving
+        timeout_seconds: Request timeout
+        root: Base path override
+        
+    Returns:
+        Dict with processing results
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    logger.info(f"🔄 STARTING: Processing historical data for symbols: {symbols}")
+    logger.info(f"📋 PARAMS: end_date={end_date_time}, duration={duration_str}, bar_size={bar_size_setting}, repository={repository_type}")
+    
+    # Step 1: Resolve contracts for symbols
+    logger.info(f"📍 STEP 1: Resolving contracts for symbols: {symbols}")
+    resolve_result = resolve_contracts_for_symbols_task(symbols, root)
+    logger.info(f"✅ RESOLVED: {resolve_result}")
+    
+    resolved_contracts = resolve_result.get("resolved_contracts", [])
+    missing_symbols = resolve_result.get("missing_symbols", [])
+    
+    if resolve_result.get("error"):
+        logger.error(f"❌ ERROR in contract resolution: {resolve_result['error']}")
+        return {
+            "processed": 0,
+            "saved": 0,
+            "failed": len(symbols),
+            "error": resolve_result["error"]
+        }
+    
+    if not resolved_contracts:
+        logger.warning(f"⚠️  NO CONTRACTS resolved for symbols: {symbols}, missing: {missing_symbols}")
+        return {
+            "processed": len(symbols),
+            "saved": 0,
+            "failed": 0,
+            "missing_symbols": missing_symbols
+        }
+    
+    logger.info(f"📍 STEP 2: Resolved {len(resolved_contracts)} contracts, processing historical data...")
+    for i, contract in enumerate(resolved_contracts):
+        logger.info(f"   Contract {i+1}: {contract.get('symbol')} (conid: {contract.get('conId')})")
+    
+    # Step 2: Process each resolved contract
+    processed_count = 0
+    saved_count = 0
+    failed_count = 0
+    results = []
+    
+    for i, contract in enumerate(resolved_contracts):
+        contract_symbol = contract.get('symbol', 'N/A')
+        logger.info(f"📍 STEP 3.{i+1}: Processing contract {contract_symbol}")
+        
+        try:
+            # Fetch historical bars
+            logger.info(f"   🔄 Fetching historical bars for {contract_symbol}...")
+            fetch_result = fetch_historical_bars_task(
+                contract=contract,
+                end_date_time=end_date_time,
+                duration_str=duration_str,
+                bar_size_setting=bar_size_setting,
+                what_to_show=what_to_show,
+                use_rth=use_rth,
+                timeout_seconds=timeout_seconds,
+            )
+            
+            logger.info(f"   📊 Fetch result for {contract_symbol}: {len(fetch_result.get('bars', []))} bars, error: {fetch_result.get('error', 'None')}")
+            
+            if fetch_result.get("error"):
+                logger.error(f"   ❌ Failed to fetch bars for {contract_symbol}: {fetch_result['error']}")
+                failed_count += 1
+                results.append({
+                    "symbol": contract_symbol,
+                    "saved_count": 0,
+                    "fetch_error": fetch_result['error']
+                })
+                continue
+                
+            # Save bars to repository
+            logger.info(f"   💾 Saving {len(fetch_result.get('bars', []))} bars for {contract_symbol} to {repository_type} repository...")
+            save_result = save_historical_bars_task(
+                fetch_result=fetch_result,
+                repository_type=repository_type,
+                root=root,
+            )
+            
+            logger.info(f"   💾 Save result for {contract_symbol}: {save_result}")
+            
+            processed_count += 1
+            if save_result.get("saved_count", 0) > 0:
+                saved_count += save_result["saved_count"]
+                logger.info(f"   ✅ Saved {save_result['saved_count']} bars for {contract_symbol}")
+            else:
+                logger.warning(f"   ⚠️  No bars saved for {contract_symbol}: {save_result}")
+            
+            results.append({
+                "symbol": contract_symbol,
+                "saved_count": save_result.get("saved_count", 0),
+                "error": save_result.get("error")
+            })
+            
+        except Exception as e:
+            logger.error(f"   ❌ Exception processing contract {contract_symbol}: {e}")
+            failed_count += 1
+            results.append({
+                "symbol": contract_symbol,
+                "saved_count": 0,
+                "error": str(e)
+            })
+    
+    logger.info(f"Historical data processing complete: {processed_count} processed, {saved_count} bars saved, {failed_count} failed")
+    
+    return {
+        "processed": processed_count,
+        "saved": saved_count,
+        "failed": failed_count,
+        "missing_symbols": missing_symbols,
+        "results": results
+    }
 
 
 def _normalize_historical_bars(

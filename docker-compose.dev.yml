@@ -110,4 +110,21 @@ services:
     volumes:
       - .:/app
 
+  flower:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    command: ["celery", "-A", "ibx_celery.app", "flower", "--port=5555"]
+    ports: ["5555:5555"]
+    environment:
+      - SERVICE_NAME=flower
+      - APP_CELERY__BROKER_URL=amqp://guest:guest@host.docker.internal:5672//
+      - APP_CELERY__RESULT_BACKEND=rpc://
+      - APP_API__CONTRACTS_SERVICE_BASE=http://ib_api:9010
+    volumes:
+      - .:/app
+    depends_on:
+      - redis
+      - ib_api
+
 volumes: {}

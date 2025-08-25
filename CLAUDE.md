@@ -55,6 +55,7 @@ make run-chains     # Option chain API on :9004
 make run-frontend   # Frontend on :9000
 make run-orchestrator # Orchestrator API on :9005
 make run-ib         # IB API on :9010
+make run-flower     # Flower monitoring on :5555
 
 # Docker compose for all services
 make services-up    # Start all services
@@ -281,6 +282,156 @@ curl -X POST http://localhost:9005/orchestrator/historical/bars-by-symbols \
 ```
 
 All orchestrator endpoints return immediately with tracking IDs while processing happens asynchronously via Celery tasks.
+
+#### Job Monitoring with Flower
+
+Monitor async job status and failures using Flower web UI:
+
+```bash
+# Start Flower monitoring
+make run-flower
+
+# Or via docker-compose (includes full stack)
+docker-compose up flower
+```
+
+**Flower Web UI**: http://localhost:5555
+
+Features:
+- **Real-time task monitoring** - See running, failed, succeeded tasks
+- **Task details** - View arguments, results, tracebacks, execution time
+- **Worker monitoring** - Active workers, queues, rate limits
+- **Failure debugging** - Exact error messages and stack traces
+
+Browse to `/tasks` to see all job executions, including the historical data and contract search jobs from the orchestrator.
+
+## API Services Architecture
+
+### Service Separation - Write vs Read Operations
+
+The system uses **complementary APIs** with clear separation of concerns:
+
+```
+┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
+│   Frontend      │────│  Equity API      │────│  Repository     │
+│   Analytics     │    │  (Read Data)     │    │  (Parquet)      │
+└─────────────────┘    └──────────────────┘    └─────────────────┘
+                                                        ▲
+                                                        │
+                       ┌──────────────────┐    ┌───────┴─────────┐
+                       │  Orchestrator    │────│  IB API         │
+                       │  (Write Data)    │    │  (Live Data)    │
+                       └──────────────────┘    └─────────────────┘
+```
+
+### **Equity API** (Port 9002) - Data Reading Service
+**Purpose**: Fast retrieval of existing historical data from repository
+
+#### Endpoints:
+- **GET** `/health` - Service health check
+- **GET** `/equity/{symbol}/dates?bar_size=1 day` - Get available dates for symbol
+- **GET** `/equity/{symbol}/bars?start=2024-01-01&end=2024-12-31&bar_size=1 day` - Get historical bars
+
+#### Schemas:
+```python
+class EquityDateRange(BaseModel):
+    dates: List[date]
+
+class EquityBarsResponse(BaseModel):
+    symbol: str
+    bar_size: str  
+    start: date
+    end: date
+    rows: int
+    sample: List[dict]  # First 50 rows as sample
+```
+
+#### Usage Examples:
+```bash
+# Check available data dates for AAPL
+curl http://localhost:9002/equity/AAPL/dates?bar_size=1%20day
+
+# Get historical bars for date range  
+curl "http://localhost:9002/equity/AAPL/bars?start=2024-01-01&end=2024-01-31&bar_size=1%20day"
+```
+
+### **Orchestrator API** (Port 9005) - Data Ingestion Service
+**Purpose**: Asynchronous data collection and workflow orchestration
+
+#### Historical Data Endpoints:
+- **POST** `/orchestrator/historical/bars-by-symbols` - Fetch data by ticker symbols (auto-resolves contracts)
+- **POST** `/orchestrator/historical/bars` - Fetch data by explicit contract specifications
+- **POST** `/contracts/search` - Search and save contract descriptions  
+- **POST** `/contracts/details` - Fetch detailed contract information
+
+#### Schemas:
+```python
+class HistoricalDataBySymbolsRequest(BaseModel):
+    symbols: List[str]
+    end_date_time: str  # "20240823 23:59:59"
+    duration_str: str   # "1 D", "1 M", "1 Y", "2 W"
+    bar_size_setting: str  # "1 min", "5 mins", "1 hour", "1 day"
+    what_to_show: str = "TRADES"  # "TRADES", "MIDPOINT", "BID", "ASK"
+    use_rth: int = 1  # 1=regular hours, 0=all hours
+    repository_type: str = "equity"  # "equity" or "option"
+    timeout_seconds: float = 20.0
+
+class HistoricalDataRequest(BaseModel):
+    contracts: List[Dict[str, Any]]  # IB contract specifications
+    # ... same parameters as above
+
+class OrchestratorResult(BaseModel):
+    processed: int
+    saved: int  
+    skipped: int = 0
+    details: Optional[dict] = None
+    job_id: Optional[str] = None
+    monitor_url: Optional[str] = None
+```
+
+#### Usage Examples:
+```bash
+# Fetch historical data by symbols (recommended)
+curl -X POST http://localhost:9005/orchestrator/historical/bars-by-symbols \
+  -H "Content-Type: application/json" \
+  -d '{
+    "symbols": ["AAPL", "IBM"],
+    "end_date_time": "20240825 23:59:59",
+    "duration_str": "5 D", 
+    "bar_size_setting": "1 day",
+    "repository_type": "equity"
+  }'
+
+# Fetch by explicit contracts
+curl -X POST http://localhost:9005/orchestrator/historical/bars \
+  -H "Content-Type: application/json" \
+  -d '{
+    "contracts": [{
+      "symbol": "AAPL",
+      "secType": "STK",
+      "exchange": "SMART", 
+      "currency": "USD"
+    }],
+    "end_date_time": "20240825 23:59:59",
+    "duration_str": "1 D",
+    "bar_size_setting": "1 hour"
+  }'
+```
+
+### **Recommended Workflow**:
+
+1. **Data Collection**: Use `Orchestrator` to fetch new data from IB API
+   - Async processing via Celery tasks
+   - Rate limited (2 requests/sec for historical data)
+   - Monitor progress via Flower UI
+
+2. **Data Consumption**: Use `Equity API` for fast queries of existing data
+   - Synchronous responses for immediate results
+   - Optimized for frontend/analytics use cases
+
+### **No Functional Overlap**: 
+- **Orchestrator**: Write-heavy async operations (data ingestion)
+- **Equity API**: Read-heavy sync operations (data retrieval)
 
 ### Important Configuration Files
 - `app_settings/settings.py` - Central configuration using Pydantic

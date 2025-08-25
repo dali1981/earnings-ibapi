@@ -268,9 +268,24 @@ def fetch_historical_bars_by_symbols(payload: HistoricalDataBySymbolsRequest) ->
     
     logger.info(f"fetch_historical_bars_by_symbols called with symbols: {symbols}")
     
-    # For now, just resolve contracts as a first step
-    # TODO: Add full historical data fetching chain
-    result = resolve_contracts_for_symbols_task.apply_async(kwargs={"symbols": symbols})
+    # Create a custom chain that resolves contracts, then processes each one
+    from ops.tasks.historical_data import (
+        fetch_historical_bars_task,
+        save_historical_bars_task,
+        process_historical_data_for_resolved_contracts_task
+    )
+    
+    # Chain: resolve contracts -> process each resolved contract
+    result = process_historical_data_for_resolved_contracts_task.apply_async(kwargs={
+        "symbols": symbols,
+        "end_date_time": payload.end_date_time,
+        "duration_str": payload.duration_str,
+        "bar_size_setting": payload.bar_size_setting,
+        "what_to_show": payload.what_to_show,
+        "use_rth": payload.use_rth,
+        "repository_type": payload.repository_type,
+        "timeout_seconds": payload.timeout_seconds,
+    })
     
     return OrchestratorResult(
         processed=len(symbols),

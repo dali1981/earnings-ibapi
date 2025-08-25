@@ -36,6 +36,7 @@ help:
 	@echo "  run-frontend   Run frontend locally (uvicorn)"
 	@echo "  run-orchestrator Run orchestrator API locally (uvicorn)"
 	@echo "  run-ib         Run IBX service API locally (uvicorn)"
+	@echo "  run-flower     Run Flower monitoring for Celery (flower)"
 	@echo "  test-frontend  Run frontend unit/integration tests (pytest)"
 	@echo "  test-frontend-e2e  Run browser E2E tests (Playwright)"
 	@echo "  test-calendar  Run calendar service tests"
@@ -194,6 +195,9 @@ run-orchestrator:
 
 run-ib:
 	uvicorn services.ib_api.app:app --host 0.0.0.0 --port 9010 --reload
+
+run-flower:
+	celery -A ibx_celery.app flower --port=5555
 
 test-frontend:
 	pytest -q -m "frontend and (unit or integration)" -o addopts=
