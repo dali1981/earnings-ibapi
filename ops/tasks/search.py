@@ -22,16 +22,26 @@ def _normalize_matches(matches: List[dict]) -> pd.DataFrame:
         ])
     rows: List[Dict[str, Any]] = []
     for m in matches:
-        d = {str(k).lower(): v for k, v in (m or {}).items()}
-        rows.append(d)
+        if not m:
+            continue
+        # Extract contract details from nested structure
+        contract = m.get("contract", {})
+        if contract:
+            row = {
+                "symbol": contract.get("symbol"),
+                "conid": contract.get("conId"),
+                "sec_type": contract.get("secType"),
+                "currency": contract.get("currency"),
+                "primary_exchange": contract.get("primaryExchange"),
+                "derivative_sec_types": m.get("derivativeSecTypes", []),
+                "description": contract.get("description", ""),
+            }
+            rows.append(row)
     df = pd.DataFrame(rows)
     if df.empty:
         return df
-    df = df.rename(columns={
-        "sectype": "sec_type",
-        "primaryexchange": "primary_exchange",
-        "derivativesectypes": "derivative_sec_types",
-    })
+    # No need to rename columns since we set them correctly above
+    # Ensure all required columns exist
     for col in ["symbol", "conid", "sec_type", "currency", "primary_exchange", "derivative_sec_types"]:
         if col not in df.columns:
             df[col] = None
@@ -39,7 +49,7 @@ def _normalize_matches(matches: List[dict]) -> pd.DataFrame:
     return df
 
 
-@shared_task(name="orchestrator.fetch_matching_symbols", rate_limit="10/s", bind=True, max_retries=3, autoretry_for=(Exception,), retry_backoff=True)
+@shared_task(name="search.fetch_matching_symbols", rate_limit="10/s", bind=True, max_retries=3, autoretry_for=(Exception,), retry_backoff=True)
 def fetch_matching_symbols_task(
     self,
     *,
@@ -69,14 +79,15 @@ def fetch_matching_symbols_task(
     return df.to_dict(orient="records")
 
 
-@shared_task(name="orchestrator.save_contract_descriptions")
+@shared_task(name="search.save_contract_descriptions")
 def save_contract_descriptions_task(rows: List[Dict[str, Any]], base_path: Optional[str] = None) -> int:
     if not rows:
         return 0
     s = get_settings()
     base = Path(base_path) if base_path else (s.paths.data_root / "contract_descriptions")
     repo = ContractDescriptionsRepository(base)
-    df = _normalize_matches(rows)
+    # Create DataFrame directly from already-processed rows (don't normalize again)
+    df = pd.DataFrame(rows)
     # Ensure derivative_sec_types column exists and is list-like
     if "derivative_sec_types" not in df.columns:
         df["derivative_sec_types"] = [[] for _ in range(len(df))]

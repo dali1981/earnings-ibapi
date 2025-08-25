@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import os
 from enum import StrEnum
 from functools import lru_cache
 from pathlib import Path
 from typing import Dict, Optional
+import tomllib
 
 from pydantic import BaseModel, AnyHttpUrl, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -49,9 +51,35 @@ class IBSettings(BaseModel):
         return self.client_ids.get("contracts_backfill", self.client_id_default)
 
 
+class ServiceConfig(BaseModel):
+    """Configuration for a single service"""
+    host: str = Field(default="localhost")
+    port: int
+    protocol: str = Field(default="http")
+    
+    @property
+    def url(self) -> str:
+        """Construct the full URL from components"""
+        return f"{self.protocol}://{self.host}:{self.port}"
+
+class ServicesConfig(BaseModel):
+    """Configuration for all services"""
+    frontend: ServiceConfig = Field(default_factory=lambda: ServiceConfig(port=9000))
+    calendar: ServiceConfig = Field(default_factory=lambda: ServiceConfig(port=9001))
+    equity: ServiceConfig = Field(default_factory=lambda: ServiceConfig(port=9002))
+    options: ServiceConfig = Field(default_factory=lambda: ServiceConfig(port=9003))
+    chains: ServiceConfig = Field(default_factory=lambda: ServiceConfig(port=9004))
+    orchestrator: ServiceConfig = Field(default_factory=lambda: ServiceConfig(port=9005))
+    ib_api: ServiceConfig = Field(default_factory=lambda: ServiceConfig(port=9010))
+
 class APISettings(BaseModel):
-    # Logical service registry
-    contracts_service_base: AnyHttpUrl = Field("http://localhost:9010")
+    # Service configurations
+    services: ServicesConfig = Field(default_factory=ServicesConfig)
+    
+    @property
+    def contracts_service_base(self) -> str:
+        """Backward compatibility for contracts service"""
+        return self.services.ib_api.url
 
 
 class CeleryContractsLimits(BaseModel):
@@ -59,15 +87,21 @@ class CeleryContractsLimits(BaseModel):
     queue: str = "contracts"
 
 
+class CelerySearchLimits(BaseModel):
+    queue: str = "symbol-search"
+
+
+class CeleryHistoricalLimits(BaseModel):
+    fetch_rate: str = "2/s"  # IB API rate limit for historical data
+    queue: str = "historical"
+
+
 class CelerySettings(BaseModel):
     broker_url: Optional[str] = None
     result_backend: Optional[str] = None
     contracts: CeleryContractsLimits = CeleryContractsLimits()
-    # Queue for symbol search tasks
-    class CelerySearchLimits(BaseModel):
-        queue: str = "symbol-search"
-
     search: CelerySearchLimits = CelerySearchLimits()
+    historical: CeleryHistoricalLimits = CeleryHistoricalLimits()
 
 
 class EarningsSettings(BaseModel):
@@ -161,6 +195,8 @@ class Settings(BaseSettings):
         extra="ignore",
         env_file=".env",
         env_file_encoding="utf-8",
+        toml_file="config.toml",  # Load from TOML file
+        # Priority order: env vars > .env file > config.toml > defaults
     )
 
     env: AppEnv = AppEnv.dev

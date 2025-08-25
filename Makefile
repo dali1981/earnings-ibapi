@@ -34,6 +34,7 @@ help:
 	@echo "  run-options    Run option history API locally (uvicorn)"
 	@echo "  run-chains     Run option chain API locally (uvicorn)"
 	@echo "  run-frontend   Run frontend locally (uvicorn)"
+	@echo "  run-orchestrator Run orchestrator API locally (uvicorn)"
 	@echo "  run-ib         Run IBX service API locally (uvicorn)"
 	@echo "  test-frontend  Run frontend unit/integration tests (pytest)"
 	@echo "  test-frontend-e2e  Run browser E2E tests (Playwright)"
@@ -188,8 +189,11 @@ run-chains:
 run-frontend:
 	uvicorn services.frontend.main:app --host 0.0.0.0 --port 9000 --reload
 
+run-orchestrator:
+	uvicorn services.orchestrator_api.app:app --host 0.0.0.0 --port 9005 --reload
+
 run-ib:
-	uvicorn services.ib_api.main:app --host 0.0.0.0 --port 9010 --reload
+	uvicorn services.ib_api.app:app --host 0.0.0.0 --port 9010 --reload
 
 test-frontend:
 	pytest -q -m "frontend and (unit or integration)" -o addopts=

@@ -4,7 +4,13 @@ from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query
 
-from ..schemas.contracts import ContractDetailsBatch, OrchestratorResult, SymbolBatch
+from ..schemas.contracts import (
+    ContractDetailsBatch, 
+    OrchestratorResult, 
+    SymbolBatch,
+    HistoricalDataRequest,
+    HistoricalDataBySymbolsRequest,
+)
 from app_settings.settings import get_settings
 
 
@@ -78,15 +84,20 @@ def fetch_contract_details(payload: ContractDetailsBatch) -> OrchestratorResult:
     - Writes results to contracts repository
     - Uses Celery chain: check DB -> fetch from IB -> write to DB
     """
+    import logging
     from celery import chain
     from ops.tasks.contract_details import (
         check_existing_details_task,
         fetch_details_from_ib_task,
         save_details_to_repo_task,
     )
+    
+    logger = logging.getLogger(__name__)
+    logger.info(f"fetch_contract_details called with payload: {payload}")
 
     # Extract and normalize symbols
     symbols = sorted({s.strip().upper() for s in (payload.symbols or []) if s.strip()})
+    logger.info(f"Normalized symbols: {symbols}")
     
     # Handle conids if provided (convert to symbols first)
     if payload.conids and not symbols:
@@ -176,3 +187,112 @@ def setup_contracts_public(
             raise HTTPException(status_code=400, detail="Provide JSON body or ?symbols=")
         payload = SymbolBatch(symbols=[s.strip().upper() for s in symbols.split(",") if s.strip()])
     return setup_contracts(payload)
+
+
+@router.post("/historical/bars", response_model=OrchestratorResult)
+def fetch_historical_bars(payload: HistoricalDataRequest) -> OrchestratorResult:
+    """Asynchronously fetch historical bars for provided contracts.
+    
+    - Takes a list of IB contract specifications
+    - Fetches historical bars from IB API (rate limited at 2/sec)
+    - Writes results to equity_bars or option_bars repository
+    - Uses Celery tasks: fetch bars -> save to repo
+    """
+    import logging
+    from celery import chain, group
+    from ops.tasks.historical_data import (
+        fetch_historical_bars_task,
+        save_historical_bars_task,
+    )
+    
+    logger = logging.getLogger(__name__)
+    logger.info(f"fetch_historical_bars called with {len(payload.contracts)} contracts")
+    
+    if not payload.contracts:
+        raise HTTPException(status_code=400, detail="contracts must not be empty")
+    
+    # Create Celery chains for each contract
+    chains = []
+    for contract in payload.contracts:
+        # Chain: fetch historical bars -> save to repository
+        fetch_task = fetch_historical_bars_task.s(
+            contract=contract,
+            end_date_time=payload.end_date_time,
+            duration_str=payload.duration_str,
+            bar_size_setting=payload.bar_size_setting,
+            what_to_show=payload.what_to_show,
+            use_rth=payload.use_rth,
+            timeout_seconds=payload.timeout_seconds,
+        )
+        save_task = save_historical_bars_task.s(
+            repository_type=payload.repository_type,
+        )
+        chains.append(chain(fetch_task, save_task))
+    
+    # Execute all chains as a group
+    job = group(chains)
+    result = job.apply_async()
+    
+    return OrchestratorResult(
+        processed=len(payload.contracts),
+        saved=0,  # Will be updated by async tasks
+        skipped=0,
+        details={
+            "dispatched": len(chains),
+            "group_id": result.id,
+            "contracts": [c.get("symbol", "N/A") for c in payload.contracts],
+            "bar_size": payload.bar_size_setting,
+            "duration": payload.duration_str,
+        },
+    )
+
+
+@router.post("/historical/bars-by-symbols", response_model=OrchestratorResult)
+def fetch_historical_bars_by_symbols(payload: HistoricalDataBySymbolsRequest) -> OrchestratorResult:
+    """Asynchronously fetch historical bars for provided symbols.
+    
+    - Takes a list of ticker symbols
+    - Resolves contracts from repositories
+    - Fetches historical bars from IB API (rate limited at 2/sec)  
+    - Writes results to equity_bars or option_bars repository
+    - Uses Celery chain: resolve contracts -> fetch bars -> save to repo
+    """
+    import logging
+    from ops.tasks.historical_data import resolve_contracts_for_symbols_task
+    
+    logger = logging.getLogger(__name__)
+    
+    symbols = sorted({s.strip().upper() for s in payload.symbols if s.strip()})
+    if not symbols:
+        raise HTTPException(status_code=400, detail="symbols must not be empty")
+    
+    logger.info(f"fetch_historical_bars_by_symbols called with symbols: {symbols}")
+    
+    # For now, just resolve contracts as a first step
+    # TODO: Add full historical data fetching chain
+    result = resolve_contracts_for_symbols_task.apply_async(kwargs={"symbols": symbols})
+    
+    return OrchestratorResult(
+        processed=len(symbols),
+        saved=0,  # Will be updated by async tasks
+        skipped=0,
+        details={
+            "dispatched": len(symbols),
+            "chain_id": result.id,
+            "symbols": symbols,
+            "bar_size": payload.bar_size_setting,
+            "duration": payload.duration_str,
+        },
+    )
+
+
+@router_public.post("/historical/bars", response_model=OrchestratorResult)
+def fetch_historical_bars_public(payload: HistoricalDataRequest) -> OrchestratorResult:
+    """Public endpoint for historical bars by contracts."""
+    return fetch_historical_bars(payload)
+
+
+@router_public.post("/historical/bars-by-symbols", response_model=OrchestratorResult)
+def fetch_historical_bars_by_symbols_public(payload: HistoricalDataBySymbolsRequest) -> OrchestratorResult:
+    """Public endpoint for historical bars by symbols."""
+    return fetch_historical_bars_by_symbols(payload)

@@ -53,6 +53,7 @@ make run-equity     # Equity API on :9002
 make run-options    # Option history API on :9003
 make run-chains     # Option chain API on :9004
 make run-frontend   # Frontend on :9000
+make run-orchestrator # Orchestrator API on :9005
 make run-ib         # IB API on :9010
 
 # Docker compose for all services
@@ -117,6 +118,7 @@ services/             # FastAPI microservices
 ├── equity_api/       # Equity bar data
 ├── option_history_api/ # Option historical data
 ├── option_chain_api/ # Option chain snapshots
+├── orchestrator_api/ # High-level async workflows
 └── frontend/         # Web UI
 
 ops/
@@ -236,6 +238,49 @@ workflow = chain(
 )
 workflow.apply_async()
 ```
+
+#### Using Orchestrator API
+The orchestrator provides high-level async workflows for data operations:
+
+```bash
+# Contract setup (search + details)
+curl -X POST http://localhost:9005/orchestrator/contracts/search \
+  -H "Content-Type: application/json" \
+  -d '{"symbols": ["AAPL", "IBM"]}'
+
+curl -X POST http://localhost:9005/orchestrator/contracts/details \
+  -H "Content-Type: application/json" \
+  -d '{"symbols": ["AAPL", "IBM"]}'
+
+# Historical data fetching
+curl -X POST http://localhost:9005/orchestrator/historical/bars \
+  -H "Content-Type: application/json" \
+  -d '{
+    "contracts": [{
+      "symbol": "AAPL",
+      "secType": "STK", 
+      "exchange": "SMART",
+      "currency": "USD"
+    }],
+    "end_date_time": "20240825 23:59:59",
+    "duration_str": "1 D",
+    "bar_size_setting": "1 hour",
+    "repository_type": "equity"
+  }'
+
+# Historical data by symbols (auto-resolves contracts)
+curl -X POST http://localhost:9005/orchestrator/historical/bars-by-symbols \
+  -H "Content-Type: application/json" \
+  -d '{
+    "symbols": ["AAPL", "IBM"],
+    "end_date_time": "20240825 23:59:59", 
+    "duration_str": "5 D",
+    "bar_size_setting": "1 day",
+    "repository_type": "equity"
+  }'
+```
+
+All orchestrator endpoints return immediately with tracking IDs while processing happens asynchronously via Celery tasks.
 
 ### Important Configuration Files
 - `app_settings/settings.py` - Central configuration using Pydantic

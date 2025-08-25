@@ -62,7 +62,7 @@ class ContractRepository:
         write_dataset(
             df,
             self.base_path,
-            self.schema,
+            self._contracts_schema(),
             partition_cols=[
                 "sec_type",
                 "is_us_listing",

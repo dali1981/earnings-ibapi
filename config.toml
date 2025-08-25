@@ -1,0 +1,164 @@
+# Trading Project Configuration
+# This file centralizes all service configurations for easy management
+
+[environment]
+env = "dev"  # dev, test, prod
+
+# Service configurations with host and port
+# All services are clearly listed with their purpose and ports
+[api.services.frontend]
+host = "localhost"
+port = 9000
+protocol = "http"
+
+[api.services.calendar]
+host = "localhost"
+port = 9001
+protocol = "http"
+
+[api.services.equity]
+host = "localhost"
+port = 9002
+protocol = "http"
+
+[api.services.options]
+host = "localhost"
+port = 9003
+protocol = "http"
+
+[api.services.chains]
+host = "localhost"
+port = 9004
+protocol = "http"
+
+[api.services.orchestrator]
+host = "localhost"
+port = 9005  # Changed from 9010 to avoid conflict with ib_api
+protocol = "http"
+
+[api.services.ib_api]
+host = "localhost"
+port = 9010
+protocol = "http"
+
+# Interactive Brokers Settings
+[ib]
+host = "127.0.0.1"
+port = 4002  # TWS/IB Gateway port
+
+[ib.client_ids]
+default = 77
+streamer = 17
+contract_details_backfill = 8
+ib_source = 101
+contracts_backfill = 1
+fundamental_data = 200
+
+# Celery Configuration
+[celery]
+broker_url = "amqp://guest:guest@localhost:5672//"
+result_backend = "rpc://"
+
+[celery.contracts]
+fetch_rate = "10/m"
+queue = "contracts"
+
+[celery.search]
+queue = "symbol-search"
+
+[celery.historical]
+fetch_rate = "2/s"  # IB API rate limit for historical data
+queue = "historical"
+
+# Data Paths
+[paths]
+data_root = "./data"
+equity_bars = "./data/equity_bars"
+option_bars = "./data/option_bars"
+option_chains = "./data/option_chains"
+contracts = "./data/contracts"
+earnings = "./data/earnings"
+exports = "./data/exports"
+cache = "./data/cache"
+logs = "./data/logs"
+
+# Earnings Configuration
+[earnings]
+default_days_ahead = 3
+default_days_back = 360
+max_days_ahead = 60
+collection_hour = 6
+data_sources = ["nasdaq"]
+primary_source = "nasdaq"
+retention_days = 365
+cache_hours = 6
+
+[earnings.api_delays]
+nasdaq = 0.3
+fmp = 0.25
+finnhub = 1.0
+
+# Discovery Settings
+[discovery]
+min_market_cap = 1_000_000_000
+max_market_cap = 2_000_000_000_000
+min_avg_volume = 1_000_000
+min_price = 10.0
+max_price = 1000.0
+discovery_min_days = 1
+discovery_max_days = 60
+
+[discovery.data_collection]
+pre_earnings_days = 3
+post_earnings_days = 2
+lookback_days = 30
+iv_history_days = 90
+
+[discovery.timing]
+strategy_optimal_start = 7
+strategy_optimal_end = 14
+require_weekly_options = false
+require_liquid_options = false
+min_iv_rank = 20
+min_opportunity_score = 50.0
+excellent_threshold = 90.0
+good_threshold = 75.0
+
+[discovery.timing_weights]
+optimal = 100.0
+good = 80.0
+fair = 60.0
+poor = 40.0
+
+[discovery.strategy_multipliers.calendar_spread]
+"14_plus_days" = 1.0
+"7_to_14_days" = 0.8
+"under_7_days" = 0.5
+
+[discovery.strategy_multipliers.straddle]
+"under_5_days" = 1.0
+"5_to_10_days" = 0.9
+"over_10_days" = 0.7
+
+[discovery.strategy_multipliers.strangle]
+"under_7_days" = 1.0
+"7_to_14_days" = 0.8
+"over_14_days" = 0.6
+
+# Docker-specific overrides (when running in containers)
+[docker.services]
+frontend_url = "http://frontend:9000"
+calendar_url = "http://calendar:9001"
+equity_url = "http://equity:9002"
+options_url = "http://options:9003"
+chains_url = "http://chains:9004"
+orchestrator_url = "http://orchestrator:9005"
+ib_api_url = "http://ib_api:9010"
+
+[docker.celery]
+broker_url = "amqp://guest:guest@rabbitmq:5672//"
+result_backend = "rpc://"
+
+[docker.ib]
+host = "host.docker.internal"  # Access host machine from Docker
+port = 4002

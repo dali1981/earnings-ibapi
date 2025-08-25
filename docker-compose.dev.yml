@@ -59,6 +59,22 @@ services:
       - .:/app
       - ./data:/app/data
 
+  orchestrator:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    command: ["uvicorn", "services.orchestrator_api.app:app", "--host", "0.0.0.0", "--port", "9005", "--reload"]
+    ports: ["9005:9005"]
+    environment:
+      - SERVICE_NAME=orchestrator
+      - APP_API__SERVICES__IB_API__HOST=ib_api
+      - APP_API__SERVICES__IB_API__PORT=9010
+    volumes:
+      - .:/app
+      - ./data:/app/data
+    depends_on:
+      - ib_api
+
   ib_api:
     build:
       context: .

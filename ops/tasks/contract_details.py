@@ -25,6 +25,10 @@ def check_existing_details_task(
     Returns:
         Dict with 'existing_conids' and 'missing_symbols' lists
     """
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info(f"check_existing_details_task called with symbols: {symbols}")
+    
     try:
         from ibx_repos.contract_descriptions import ContractDescriptionsRepository
         from ibx_repos.contracts import ContractRepository
