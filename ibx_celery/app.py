@@ -5,7 +5,7 @@ from app_settings.settings import get_settings
 
 settings = get_settings()
 
-app = Celery("ibx", include=["ops.tasks.contracts", "ops.tasks.search"])
+app = Celery("ibx", include=["ops.tasks.contracts", "ops.tasks.search", "ops.tasks.contract_details"])
 app.conf.update(
     task_default_queue=settings.celery.contracts.queue,
     task_annotations={

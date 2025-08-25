@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from typing import List, Optional
+from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query
 
 from ..schemas.contracts import ContractDetailsBatch, OrchestratorResult, SymbolBatch
-from ..service.ib_runtime import open_runtime
+from app_settings.settings import get_settings
 
 
 router = APIRouter(prefix="/orchestrator", tags=["orchestrator"])
@@ -70,65 +70,68 @@ def search_contracts_public(
 
 @router.post("/contracts/details", response_model=OrchestratorResult)
 def fetch_contract_details(payload: ContractDetailsBatch) -> OrchestratorResult:
-    """Fetch contract details for provided `conids` or those discovered for `symbols`.
+    """Asynchronously fetch contract details for provided symbols.
 
-    - Reads from `contract_descriptions` snapshot to resolve `conids` if only `symbols` are given.
-    - Writes detailed contracts to `data/contracts` repository (vendor repo).
+    - Takes a list of ticker symbols
+    - Checks if tickers are in contract repository
+    - If not, sends contract details request to IB API
+    - Writes results to contracts repository
+    - Uses Celery chain: check DB -> fetch from IB -> write to DB
     """
-    from ibx_flows.contracts_backfill import _from_contract_details
-    try:
-        from ibx import ContractDetailsService  # type: ignore
-        from ibx import make_stock  # type: ignore
-    except Exception:  # pragma: no cover
-        from ibx.services import ContractDetailsService  # type: ignore
-        from ibx.contracts import make_stock  # type: ignore
-    from vendors.ibx_repos.contracts import ContractRepository
-    from vendors.ibx_repos.contract_descriptions import ContractDescriptionsRepository
-    from config import DATA_ROOT
-    import pandas as pd
+    from celery import chain
+    from ops.tasks.contract_details import (
+        check_existing_details_task,
+        fetch_details_from_ib_task,
+        save_details_to_repo_task,
+    )
 
+    # Extract and normalize symbols
     symbols = sorted({s.strip().upper() for s in (payload.symbols or []) if s.strip()})
-    conids: List[int] = sorted({int(c) for c in (payload.conids or []) if c is not None})
+    
+    # Handle conids if provided (convert to symbols first)
+    if payload.conids and not symbols:
+        # For backward compatibility, if only conids provided, we need to resolve them
+        from vendors.ibx_repos.contract_descriptions import ContractDescriptionsRepository
+        
+        settings = get_settings()
+        conids = sorted({int(c) for c in (payload.conids or []) if c is not None})
+        if conids:
+            desc_repo = ContractDescriptionsRepository(settings.paths.data_root / "contract_descriptions")
+            df = desc_repo.read(columns=["symbol", "conid"])
+            if not df.empty:
+                df_filtered = df[df["conid"].isin(conids)]
+                if not df_filtered.empty:
+                    symbols = sorted({s for s in df_filtered["symbol"].dropna().unique()})
+    
+    if not symbols:
+        raise HTTPException(status_code=400, detail="Provide symbols to fetch details")
 
-    # Resolve conids via descriptions if symbols provided
-    if symbols:
-        desc_repo = ContractDescriptionsRepository(DATA_ROOT / "contract_descriptions")
-        df = desc_repo.read(columns=["symbol", "conid"], symbol=symbols)
-        if not df.empty:
-            conids.extend([int(c) for c in df["conid"].dropna().tolist()])
-    conids = sorted(set(conids))
-    if not conids:
-        raise HTTPException(status_code=400, detail="Provide symbols and/or conids to fetch details")
-
-    repo = ContractRepository(DATA_ROOT / "contracts")
-    existing = repo.present_conids()
-    todo = [c for c in conids if c not in existing]
-
-    saved = 0
-    if not todo:
-        return OrchestratorResult(processed=len(conids), saved=0, skipped=len(conids))
-
-    with open_runtime() as rt:
-        svc = ContractDetailsService(rt)
-        rows: List[dict] = []
-        for conid in todo:
-            c = make_stock("?")
-            c.conId = int(conid)
-            try:
-                cds = svc.fetch(c, timeout=payload.timeout_seconds or 20.0)
-            except Exception:
-                cds = None
-            if not cds:
-                continue
-            row = _from_contract_details(cds[0])
-            if row and row.get("conid"):
-                rows.append(row)
-        if rows:
-            import pandas as pd
-            repo.save(pd.DataFrame(rows))
-            saved = len(rows)
-
-    return OrchestratorResult(processed=len(conids), saved=saved, skipped=len(conids) - saved)
+    # Create Celery chain for processing
+    # 1. Check which symbols already have details
+    # 2. Fetch missing details from IB API
+    # 3. Save fetched details to repository
+    task_chain = chain(
+        check_existing_details_task.s(symbols=symbols),
+        fetch_details_from_ib_task.s(
+            api_base=None,  # Will use settings default
+            timeout_seconds=payload.timeout_seconds or 20,
+        ),
+        save_details_to_repo_task.s(),
+    )
+    
+    # Execute the chain asynchronously
+    result = task_chain.apply_async()
+    
+    return OrchestratorResult(
+        processed=len(symbols),
+        saved=0,  # Will be updated by async task
+        skipped=0,  # Will be updated by async task
+        details={
+            "dispatched": len(symbols),
+            "chain_id": result.id,
+            "symbols": symbols,
+        },
+    )
 
 
 @router_public.post("/contracts/details", response_model=OrchestratorResult)
