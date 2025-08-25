@@ -20,56 +20,39 @@ def health():
 
 @router.post("/contracts/search", response_model=OrchestratorResult)
 def search_contracts(payload: SymbolBatch) -> OrchestratorResult:
-    """Search matching symbols via IB and snapshot contract descriptions.
+    """Asynchronously search matching symbols via IB API and save results.
 
-    - Writes to `data/contract_descriptions` (vendor repo), append-only by day.
-    - Filters by `sec_types`, `currency`, and `exchanges`.
+    - Dispatches a Celery chain per symbol: fetch -> save (save is idempotent).
+    - Rate limited to 10 requests/sec via Celery task settings.
+    - Returns an orchestrator result with dispatch details.
     """
-    from ibx_flows.symbol_search_ib import IBSymbolSearch
-    from vendors.ibx_repos.contract_descriptions import ContractDescriptionsRepository
-    from config import DATA_ROOT
-    import pandas as pd
+    from celery import chain, group
+    from ibx_celery.app import app as celery_app
+    from ops.tasks.search import fetch_matching_symbols_task, save_contract_descriptions_task
 
     symbols = sorted({s.strip().upper() for s in payload.symbols if s.strip()})
     if not symbols:
         raise HTTPException(status_code=400, detail="symbols must not be empty")
 
-    repo = ContractDescriptionsRepository(DATA_ROOT / "contract_descriptions")
-    rows: List[dict] = []
-    with open_runtime() as rt:
-        svc = IBSymbolSearch(rt)
-        for sym in symbols:
-            df = svc.search(sym)
-            if df is None or df.empty:
-                continue
-            # Normalize and filter
-            cols = {c.lower(): c for c in df.columns}
-            def get(col):
-                cl = col.lower(); return df[cols[cl]] if cl in cols else None
-            out = pd.DataFrame({
-                "symbol": get("symbol"),
-                "conid": pd.to_numeric(get("conid"), errors="coerce"),
-                "sec_type": (get("secType").astype(str) if get("secType") is not None else None),
-                "currency": (get("currency").astype(str) if get("currency") is not None else None),
-                "primary_exchange": (get("primaryExchange").astype(str) if get("primaryExchange") is not None else None),
-                "derivative_sec_types": get("derivativeSecTypes"),
-            })
-            if not out.empty:
-                if payload.sec_types:
-                    out = out[out["sec_type"].isin([s.upper() for s in payload.sec_types])]
-                if payload.currency:
-                    out = out[out["currency"] == payload.currency]
-                if payload.exchanges:
-                    out = out[out["primary_exchange"].isin([e.upper() for e in payload.exchanges])]
-                out = out.dropna(subset=["conid"]).drop_duplicates(subset=["conid"])
-                if not out.empty:
-                    rows.extend(out.to_dict(orient="records"))
+    chains = []
+    for sym in symbols:
+        sig_fetch = fetch_matching_symbols_task.s(
+            pattern=sym,
+            sec_types=payload.sec_types,
+            currency=payload.currency,
+            exchanges=payload.exchanges,
+        )
+        sig_save = save_contract_descriptions_task.s()
+        chains.append(chain(sig_fetch, sig_save))
 
-    if not rows:
-        return OrchestratorResult(processed=len(symbols), saved=0, skipped=0)
-
-    repo.save(pd.DataFrame(rows))
-    return OrchestratorResult(processed=len(symbols), saved=len(rows), skipped=0)
+    job = group(chains)
+    result = job.apply_async()
+    return OrchestratorResult(
+        processed=len(symbols),
+        saved=0,
+        skipped=0,
+        details={"dispatched": len(chains), "group_id": result.id},
+    )
 
 
 @router_public.post("/contracts/search", response_model=OrchestratorResult)
