@@ -11,6 +11,8 @@ app.conf.update(
     task_annotations={
         "contracts.backfill_fetch": {"rate_limit": settings.celery.contracts.fetch_rate},
     },
+    worker_hijack_root_logger=False,
+    worker_redirect_stdouts=False,
 )
 
 # Optional explicit routes if you split queues
