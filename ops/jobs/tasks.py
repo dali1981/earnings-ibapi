@@ -8,6 +8,7 @@ from ibx_flows.backfill import (
     BackfillConfig,
 )
 from ibx_flows.source_ib import IBSource
+from app_settings.settings import get_settings
 from pathlib import Path
 
 # Use new unified repository system
@@ -55,7 +56,8 @@ class BackfillEquityBarsTask(Task):
             bar_size=self.bar_size,
         )
         repo = EquityBarRepository(self.out)
-        src = IBSource()
+        s = get_settings()
+        src = IBSource(host=s.ib.host, port=s.ib.port, client_id=s.ib.client_id_contracts)
         backfill_equity_bars(src, repo, cfg)
 
 
@@ -100,7 +102,8 @@ class BackfillOptionBarsTask(Task):
             selection_mode=self.selection_mode,
         )
         repo = OptionBarRepository(self.out)
-        src = IBSource()
+        s = get_settings()
+        src = IBSource(host=s.ib.host, port=s.ib.port, client_id=s.ib.client_id_contracts)
         backfill_option_bars(
             src, repo, chain_repo=self._chain_repo, eq_repo=None, cfg=cfg
         )

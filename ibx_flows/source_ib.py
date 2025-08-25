@@ -23,7 +23,6 @@ except Exception:
     from ibx.services import ContractDetailsService, SecDefService, HistoricalService  # type: ignore
     from ibx.contracts import make_stock, make_option  # type: ignore
 
-from config import IB_CLIENT_IDS, IB_HOST, IB_PORT
 from ibx_time import ib_end_datetime_instrument, parse_ib_datetime_series
 
 
@@ -81,9 +80,9 @@ class _Pacer:
 
 @dataclass
 class IBSource:
-    host: str = IB_HOST
-    port: int = IB_PORT
-    client_id: int = IB_CLIENT_IDS["ib_source"]
+    host: str = "127.0.0.1"
+    port: int = 4002
+    client_id: int = 101
     max_hist_per_min: int = 40
 
     def __post_init__(self):

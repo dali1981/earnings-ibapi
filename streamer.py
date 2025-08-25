@@ -7,7 +7,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 import pandas as pd
 from ibapi.contract import Contract
 
-from config import DATA_ROOT, IB_CLIENT_IDS, IB_HOST, IB_PORT
+from app_settings.settings import get_settings
 from ib_client import IBClient
 from ibx_time import ib_end_datetime
 from common.repos.equities import EquityBarRepository
@@ -21,12 +21,12 @@ from common.utils import RateLimiter, make_option, make_stock
 class Config:
     symbol: str
     date: dt.date
-    host: str = IB_HOST
-    port: int = IB_PORT
-    client_id: int = IB_CLIENT_IDS["streamer"]
+    host: str = "127.0.0.1"
+    port: int = 4002
+    client_id: int = 17
     days_before: int = 30
     days_after: int = 5
-    out_dir: Path = DATA_ROOT
+    out_dir: Path = Path("data")
 
 
 class EarningsStreamer:

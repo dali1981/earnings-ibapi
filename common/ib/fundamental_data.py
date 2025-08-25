@@ -49,7 +49,6 @@ except ImportError:
     IB_AVAILABLE = False
     print("⚠️  IB API not available - install with: pip install ibapi")
 
-from config import IB_CLIENT_IDS, IB_HOST, IB_PORT
 from common.utils.logging_setup import get_logger
 
 logger = get_logger(__name__)
@@ -186,22 +185,22 @@ class IBFundamentalClient(EClient):
 class IBFundamentalDataFetcher:
     """Fetches fundamental data and calendar information from IB API."""
 
-    def __init__(self, host: str = None, port: int = None, client_id: int = None):
+    def __init__(self, host: str | None = None, port: int | None = None, client_id: int | None = None):
         """
         Initialize IB fundamental data fetcher.
 
         Args:
-            host: IB Gateway/TWS host (default from config)
-            port: IB Gateway/TWS port (default from config)
-            client_id: Client ID (default from config)
+            host: IB Gateway/TWS host (required by caller or defaults to 127.0.0.1)
+            port: IB Gateway/TWS port (required by caller or defaults to 4002)
+            client_id: Client ID (required by caller or defaults to 200)
         """
 
         if not IB_AVAILABLE:
             raise ImportError("IB API not available. Install with: pip install ibapi")
 
-        self.host = host or IB_HOST
-        self.port = port or IB_PORT
-        self.client_id = client_id or IB_CLIENT_IDS.get("fundamental_data", 200)
+        self.host = host or "127.0.0.1"
+        self.port = int(port or 4002)
+        self.client_id = int(client_id or 200)
 
         self.wrapper = IBFundamentalWrapper()
         self.client = IBFundamentalClient(self.wrapper)

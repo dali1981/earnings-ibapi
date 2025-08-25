@@ -22,7 +22,7 @@ import argparse
 import datetime as dt
 import logging
 
-from config import DATA_ROOT, IB_CLIENT_ID, IB_HOST, IB_PORT
+from app_settings.settings import get_settings
 
 # Logging is now configured globally in config.py
 log = logging.getLogger(__name__)
@@ -44,13 +44,14 @@ if __name__ == "__main__":
     log.info(f"Starting streamer for {ns.symbol} with earnings date {ns.earnings}")
 
     # Configuration is now sourced from the central config file
+    s = get_settings()
     cfg = Config(
         symbol=ns.symbol.upper(),
         date=dt.datetime.strptime(ns.earnings, "%Y-%m-%d").date(),
-        host=IB_HOST,
-        port=IB_PORT,
-        client_id=IB_CLIENT_ID,
-        out_dir=DATA_ROOT,
+        host=s.ib.host,
+        port=s.ib.port,
+        client_id=s.ib.client_id_default,
+        out_dir=s.paths.data_root,
         days_before=5,
         days_after=5,
     )

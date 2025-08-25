@@ -16,16 +16,16 @@ class AppEnv(StrEnum):
 
 
 class PathsSettings(BaseModel):
-    project_root: Path = Path(__file__).resolve().parents[2]
-    data_root: Path = Field(default_factory=lambda: Path("./data"))
-    equity_bars: Path = Field(default_factory=lambda: Path("./data/equity_bars"))
-    option_bars: Path = Field(default_factory=lambda: Path("./data/option_bars"))
+    project_root:  Path = Path(__file__).resolve().parents[2]
+    data_root:     Path = Field(default_factory=lambda: Path("./data"))
+    equity_bars:   Path = Field(default_factory=lambda: Path("./data/equity_bars"))
+    option_bars:   Path = Field(default_factory=lambda: Path("./data/option_bars"))
     option_chains: Path = Field(default_factory=lambda: Path("./data/option_chains"))
-    contracts: Path = Field(default_factory=lambda: Path("./data/contracts"))
-    earnings: Path = Field(default_factory=lambda: Path("./data/earnings"))
-    exports: Path = Field(default_factory=lambda: Path("./data/exports"))
-    cache: Path = Field(default_factory=lambda: Path("./data/cache"))
-    logs: Path = Field(default_factory=lambda: Path("./data/logs"))
+    contracts:     Path = Field(default_factory=lambda: Path("./data/contracts"))
+    earnings:      Path = Field(default_factory=lambda: Path("./data/earnings"))
+    exports:       Path = Field(default_factory=lambda: Path("./data/exports"))
+    cache:         Path = Field(default_factory=lambda: Path("./data/cache"))
+    logs:          Path = Field(default_factory=lambda: Path("./data/logs"))
 
 
 class IBSettings(BaseModel):
