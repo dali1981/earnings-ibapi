@@ -40,49 +40,57 @@ def setup_logging(
     """
 
     try:
-        # Import configuration
-        from config import LOGGING_CONFIG, LOGS_PATH
+        # Prefer centralized app settings with colored console formatter
+        from app_settings.settings import get_settings
 
-        # Create a copy of the config to modify
-        config = LOGGING_CONFIG.copy()
-
+        s = get_settings()
+        cfg = s.logging.build_config(s.paths.logs)
         # Update logging level
-        config["root"]["level"] = level.upper()
-
-        # Handle file logging
-        if enable_file_logging:
-            if log_filename:
-                # Use custom filename
-                custom_log_path = LOGS_PATH / log_filename
-                config["handlers"]["file"]["filename"] = str(custom_log_path)
-
-            # Ensure file handler is included
-            if "file" not in config["root"]["handlers"]:
-                config["root"]["handlers"].append("file")
+        cfg["root"]["level"] = level.upper()
+        # Handle file logging toggle/filename
+        if not enable_file_logging:
+            cfg["root"]["handlers"] = [h for h in cfg["root"]["handlers"] if h != "file"]
         else:
-            # Remove file handler
-            config["root"]["handlers"] = [
-                h for h in config["root"]["handlers"] if h != "file"
-            ]
-
-        # Apply the configuration
-        logging.config.dictConfig(config)
-
+            if log_filename:
+                cfg["handlers"]["file"]["filename"] = str(s.paths.logs / log_filename)
+            if "file" not in cfg["root"]["handlers"]:
+                cfg["root"]["handlers"].append("file")
+        logging.config.dictConfig(cfg)
         logger = logging.getLogger(__name__)
         logger.info(
-            f"📝 Centralized logging configured: level={level}, file_logging={enable_file_logging}"
+            f"📝 Logging configured (app_settings): level={level}, file_logging={enable_file_logging}"
         )
+    except Exception:
+        try:
+            # Legacy fallback: use config.py dict
+            from config import LOGGING_CONFIG, LOGS_PATH
 
-    except ImportError:
-        # Fallback if config is not available
-        logging.basicConfig(
-            level=getattr(logging, level.upper(), logging.INFO),
-            format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        )
-        logger = logging.getLogger(__name__)
-        logger.warning(
-            "⚠️ Using fallback logging configuration - config.py not available"
-        )
+            config = LOGGING_CONFIG.copy()
+            config["root"]["level"] = level.upper()
+            if enable_file_logging:
+                if log_filename:
+                    custom_log_path = LOGS_PATH / log_filename
+                    config["handlers"]["file"]["filename"] = str(custom_log_path)
+                if "file" not in config["root"]["handlers"]:
+                    config["root"]["handlers"].append("file")
+            else:
+                config["root"]["handlers"] = [
+                    h for h in config["root"]["handlers"] if h != "file"
+                ]
+            logging.config.dictConfig(config)
+            logger = logging.getLogger(__name__)
+            logger.info(
+                f"📝 Logging configured (legacy config.py): level={level}, file_logging={enable_file_logging}"
+            )
+        except Exception:
+            # Minimal fallback
+            logging.basicConfig(
+                level=getattr(logging, level.upper(), logging.INFO),
+                format="%(asctime)s [%(levelname)s] [%(name)s] %(message)s",
+                datefmt="%Y-%m-%d %H:%M:%S",
+            )
+            logger = logging.getLogger(__name__)
+            logger.warning("⚠️ Using basic logging configuration")
 
 
 def get_logger(name: str, level: Optional[str] = None) -> logging.Logger:

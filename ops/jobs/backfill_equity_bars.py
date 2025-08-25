@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from jobs.tasks import BackfillEquityBarsTask
+from ops.jobs.tasks import BackfillEquityBarsTask
 from pathlib import Path
 
 import argparse

@@ -118,19 +118,28 @@ class DiscoverySettings(BaseModel):
 
 class LoggingSettings(BaseModel):
     def build_config(self, logs_path: Path) -> dict:
+        # Bracketed, timestamped format; colored for console, plain for file
+        fmt = "%(asctime)s [%(levelname)s] [%(name)s] %(message)s"
+        datefmt = "%Y-%m-%d %H:%M:%S"
         return {
             "version": 1,
             "disable_existing_loggers": False,
             "formatters": {
-                "default": {
-                    "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+                "color": {
+                    "()": "app_settings.logging_formatters.ColorFormatter",
+                    "format": fmt,
+                    "datefmt": datefmt,
+                },
+                "plain": {
+                    "format": fmt,
+                    "datefmt": datefmt,
                 },
             },
             "handlers": {
-                "console": {"class": "logging.StreamHandler", "formatter": "default"},
+                "console": {"class": "logging.StreamHandler", "formatter": "color"},
                 "file": {
                     "class": "logging.handlers.RotatingFileHandler",
-                    "formatter": "default",
+                    "formatter": "plain",
                     "filename": str(logs_path / "app.log"),
                     "maxBytes": 5 * 1024 * 1024,
                     "backupCount": 5,
@@ -189,4 +198,3 @@ def get_settings() -> Settings:
     ]:
         Path(p).mkdir(parents=True, exist_ok=True)
     return s
-
