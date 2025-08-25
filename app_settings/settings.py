@@ -63,6 +63,11 @@ class CelerySettings(BaseModel):
     broker_url: Optional[str] = None
     result_backend: Optional[str] = None
     contracts: CeleryContractsLimits = CeleryContractsLimits()
+    # Queue for symbol search tasks
+    class CelerySearchLimits(BaseModel):
+        queue: str = "symbol-search"
+
+    search: CelerySearchLimits = CelerySearchLimits()
 
 
 class EarningsSettings(BaseModel):
