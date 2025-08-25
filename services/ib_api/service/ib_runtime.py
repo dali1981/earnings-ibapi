@@ -3,12 +3,10 @@ from __future__ import annotations
 import atexit
 from typing import Optional
 
-from ibx_config.settings import get_settings
+from ibx_settings.settings import get_settings
 
-try:
-    from ibx import IBRuntime  # type: ignore
-except Exception:  # pragma: no cover - fallback for vendored layout
-    from ibx.runtime import IBRuntime  # type: ignore
+
+from ibx import IBRuntime
 
 _rt_singleton: Optional[IBRuntime] = None
 
@@ -32,4 +30,3 @@ def _shutdown() -> None:
 
 
 atexit.register(_shutdown)
-

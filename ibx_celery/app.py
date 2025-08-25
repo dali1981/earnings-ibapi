@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from celery import Celery
-from ibx_config.settings import get_settings
+from ibx_settings.settings import get_settings
 
 settings = get_settings()
 
@@ -17,4 +17,3 @@ app.conf.update(
 app.conf.task_routes = {
     "contracts.*": {"queue": settings.limits.queue},
 }
-

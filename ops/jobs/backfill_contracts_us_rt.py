@@ -7,7 +7,7 @@ from typing import Iterable, List, Sequence
 
 from celery import group
 
-from ibx_config.settings import get_settings
+from ibx_settings.settings import get_settings
 from ibx_celery.app import app as celery_app  # ensure app is importable
 from ops.tasks.contracts import backfill_contracts_task
 

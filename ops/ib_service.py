@@ -8,7 +8,7 @@ try:
 except Exception:  # pragma: no cover - fallback for vendored layout
     from ibx.runtime import IBRuntime  # type: ignore
 
-from ibx_config.settings import get_settings
+from ibx_settings.settings import get_settings
 
 _rt_singleton: Optional[IBRuntime] = None
 
