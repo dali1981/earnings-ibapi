@@ -14,6 +14,11 @@ app.conf.update(
     worker_hijack_root_logger=False,
     worker_redirect_stdouts=False,
 )
+# Broker/backend from centralized settings
+if settings.celery.broker_url:
+    app.conf.broker_url = settings.celery.broker_url
+if settings.celery.result_backend:
+    app.conf.result_backend = settings.celery.result_backend
 
 # Optional explicit routes if you split queues
 app.conf.task_routes = {"contracts.*": {"queue": settings.celery.contracts.queue}}

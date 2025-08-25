@@ -184,6 +184,13 @@ def get_settings() -> Settings:
     provisional = Settings()
     _load_env_files(provisional.env)
     s = Settings()
+    # Environment-specific defaults
+    if s.env == AppEnv.dev:
+        # Use RabbitMQ locally unless explicitly overridden
+        if not s.celery.broker_url:
+            s.celery.broker_url = "amqp://guest:guest@localhost:5672//"
+        if not s.celery.result_backend:
+            s.celery.result_backend = "rpc://"
     # Ensure directories exist
     s.paths.data_root.mkdir(parents=True, exist_ok=True)
     for p in [

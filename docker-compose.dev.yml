@@ -85,8 +85,8 @@ services:
       dockerfile: Dockerfile.dev
     command: ["celery", "-A", "ibx_celery.app", "worker", "--loglevel=INFO"]
     environment:
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/1
+      - APP_CELERY__BROKER_URL=amqp://guest:guest@host.docker.internal:5672//
+      - APP_CELERY__RESULT_BACKEND=rpc://
       - APP_API__CONTRACTS_SERVICE_BASE=http://ib_api:9010
     depends_on:
       - redis
