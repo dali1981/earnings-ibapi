@@ -21,18 +21,24 @@ def test_frontend_injects_custom_bases(monkeypatch):
     assert "http://svc-calendar:1234" in html
     assert "http://svc-equity:2345" in html
     assert "http://svc-chains:3456" in html
-    # Verify the fetch templates are constructed from BASES
-    assert "`${BASES.calendar}/calendar/upcoming" in html
-    assert "`${BASES.equity}/equity/" in html
-    assert "`${BASES.chains}/chains/" in html
+    # Verify the page wires modules and actions (migrated away from inline fetch templates)
+    assert 'window.__BASES__' in html
+    assert 'data-action="calendar.get"' in html
+    assert 'data-action="calendar.fetch"' in html
+    assert 'data-action="equity.fetch"' in html
+    assert 'data-action="chains.latest"' in html
+    assert '/static/js/apiClient.js' in html
+    assert '/static/js/controllers.js' in html
+    assert '/static/js/bootstrap.js' in html
 
 
-def test_frontend_buttons_have_handlers():
+def test_frontend_buttons_have_actions():
     from services.frontend.main import app
 
     c = TestClient(app)
     html = c.get("/").text
-    # Check that the script registers event listeners for forms
-    assert "document.getElementById('calendarForm').addEventListener('submit'" in html
-    assert "document.getElementById('equityForm').addEventListener('submit'" in html
-    assert "document.getElementById('chainForm').addEventListener('submit'" in html
+    # Ensure forms/buttons declare actions which bootstrap binds to controllers
+    assert 'data-action="calendar.get"' in html
+    assert 'data-action="calendar.fetch"' in html
+    assert 'data-action="equity.fetch"' in html
+    assert 'data-action="chains.latest"' in html

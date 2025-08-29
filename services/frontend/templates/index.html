@@ -6,7 +6,7 @@
     <title>Trading Services</title>
     <link rel="stylesheet" href="/static/styles.css" />
   </head>
-  <body>
+  <body>getUpcoming
     <header>
       <h1>Trading Microservices</h1>
     </header>
@@ -14,12 +14,12 @@
       <section>
         <h2>Calendar Service</h2>
         <div id="calendarMeta" style="margin:.25rem 0; color:#8a90ad; font-size:.9rem;">Last collection: - | Source: -</div>
-        <form id="calendarGetForm">
+        <form id="calendarGetForm" data-action="calendar.get">
           <label>Days Ahead <input type="number" id="daysGet" value="7" min="0" max="180" /></label>
           <label>Symbols <input type="text" id="symbolsGet" placeholder="(optional) AAPL,MSFT" /></label>
           <button type="submit">Get (repo only)</button>
         </form>
-        <form id="calendarFetchForm" style="margin-top:.6rem">
+        <form id="calendarFetchForm" style="margin-top:.6rem" data-action="calendar.fetch">
           <label>Days Ahead <input type="number" id="daysFetch" value="7" min="0" max="180" /></label>
           <label>Source 
             <select id="sourceFetch">
@@ -41,16 +41,16 @@
           <label>Currency <input type="text" id="orcCurrency" value="USD" /></label>
           <label>Exchanges <input type="text" id="orcExchanges" value="NYSE,NASDAQ,AMEX,ARCA,BATS,IEX" /></label>
           <div style="margin-top:.3rem">
-            <button type="button" id="btnOrcSearch">Search Descriptions</button>
-            <button type="button" id="btnOrcDetails">Fetch Details</button>
-            <button type="button" id="btnOrcSetup">Setup (Search + Details)</button>
+            <button type="button" id="btnOrcSearch" data-action="orc.search">Search Descriptions</button>
+            <button type="button" id="btnOrcDetails" data-action="orc.details">Fetch Details</button>
+            <button type="button" id="btnOrcSetup" data-action="orc.setup">Setup (Search + Details)</button>
           </div>
         </form>
         <pre id="orchestratorOut" class="out"></pre>
       </section>
       <section>
         <h2>Equity History</h2>
-        <form id="equityForm">
+        <form id="equityForm" data-action="equity.fetch">
           <label>Symbol <input type="text" id="eqSymbol" placeholder="AAPL" /></label>
           <label>Start <input type="date" id="eqStart" /></label>
           <label>End <input type="date" id="eqEnd" /></label>
@@ -61,7 +61,7 @@
       </section>
       <section>
         <h2>Option Chain</h2>
-        <form id="chainForm">
+        <form id="chainForm" data-action="chains.latest">
           <label>Symbol <input type="text" id="chSymbol" placeholder="AAPL" /></label>
           <button type="submit">Latest Snapshot</button>
         </form>
@@ -78,93 +78,7 @@
       };
     </script>
     <script src="/static/js/apiClient.js" defer></script>
-    <script>
-      // Injected via template context with env overrides
-      const BASES = {
-        calendar: "{{ calendar_base }}",
-        equity: "{{ equity_base }}",
-        chains: "{{ chains_base }}",
-        orchestrator: "{{ orchestrator_base }}"
-      };
-
-      const svc = {
-        calendarGet: (days, symbols) => fetch(`${BASES.calendar}/calendar/get-upcoming?days=${days}` + (symbols?`&symbols=${encodeURIComponent(symbols)}`:'')),
-        calendarFetch: (days, source, symbols) => {
-          const qs = new URLSearchParams({ days: String(days), source });
-          if (symbols) qs.append('symbols', symbols);
-          return fetch(`${BASES.calendar}/calendar/fetch-upcoming?${qs.toString()}`, { method: 'POST' });
-        },
-        orcSearch: (payload) => fetch(`${BASES.orchestrator}/orchestrator/contracts/search`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload) }),
-        orcDetails: (payload) => fetch(`${BASES.orchestrator}/orchestrator/contracts/details`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload) }),
-        orcSetup: (payload) => fetch(`${BASES.orchestrator}/orchestrator/contracts/setup`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload) }),
-        equity: (sym, start, end, bar) => fetch(`${BASES.equity}/equity/${encodeURIComponent(sym)}/bars?start=${start}&end=${end}&bar_size=${encodeURIComponent(bar)}`),
-        chain: (sym) => fetch(`${BASES.chains}/chains/${encodeURIComponent(sym)}/latest`)
-      };
-      const setCalendarMeta = (res) => {
-        const src = res.headers.get('X-Calendar-Source') || '-';
-        const col = res.headers.get('X-Calendar-Collection-Date') || '-';
-        document.getElementById('calendarMeta').textContent = `Last collection: ${col} | Source: ${src}`;
-      }
-      document.getElementById('calendarGetForm').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const days = document.getElementById('daysGet').value;
-        const symbols = document.getElementById('symbolsGet').value;
-        const res = await svc.calendarGet(days, symbols);
-        setCalendarMeta(res);
-        const data = await res.json();
-        document.getElementById('calendarOut').textContent = JSON.stringify(data, null, 2);
-      });
-      document.getElementById('calendarFetchForm').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const days = document.getElementById('daysFetch').value;
-        const source = document.getElementById('sourceFetch').value;
-        const symbols = document.getElementById('symbolsFetch').value;
-        if (source === 'yahoo' && !symbols) {
-          alert('Yahoo requires symbols (comma-separated).');
-          return;
-        }
-        const res = await svc.calendarFetch(days, source, symbols);
-        setCalendarMeta(res);
-        const data = await res.json();
-        document.getElementById('calendarOut').textContent = JSON.stringify(data, null, 2);
-      });
-      document.getElementById('equityForm').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const s = document.getElementById('eqSymbol').value;
-        const st = document.getElementById('eqStart').value;
-        const en = document.getElementById('eqEnd').value;
-        const bar = document.getElementById('eqBar').value;
-        const res = await svc.equity(s, st, en, bar);
-        document.getElementById('equityOut').textContent = JSON.stringify(await res.json(), null, 2);
-      });
-      document.getElementById('chainForm').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const s = document.getElementById('chSymbol').value;
-        const res = await svc.chain(s);
-        document.getElementById('chainOut').textContent = JSON.stringify(await res.json(), null, 2);
-      });
-
-      function parseList(input) {
-        return (input || '').split(',').map(s => s.trim()).filter(Boolean);
-      }
-
-      async function runOrchestrator(kind) {
-        const symbols = parseList(document.getElementById('orcSymbols').value).map(s => s.toUpperCase());
-        const sec_types = parseList(document.getElementById('orcSecTypes').value).map(s => s.toUpperCase());
-        const currency = document.getElementById('orcCurrency').value.trim().toUpperCase() || 'USD';
-        const exchanges = parseList(document.getElementById('orcExchanges').value).map(s => s.toUpperCase());
-        const payload = { symbols, sec_types, currency, exchanges };
-        let res;
-        if (kind === 'search') res = await svc.orcSearch(payload);
-        else if (kind === 'details') res = await svc.orcDetails({ symbols });
-        else res = await svc.orcSetup(payload);
-        const data = await res.json();
-        document.getElementById('orchestratorOut').textContent = JSON.stringify(data, null, 2);
-      }
-
-      document.getElementById('btnOrcSearch').addEventListener('click', () => runOrchestrator('search'));
-      document.getElementById('btnOrcDetails').addEventListener('click', () => runOrchestrator('details'));
-      document.getElementById('btnOrcSetup').addEventListener('click', () => runOrchestrator('setup'));
-    </script>
+    <script src="/static/js/controllers.js" defer></script>
+    <script src="/static/js/bootstrap.js" defer></script>
   </body>
   </html>

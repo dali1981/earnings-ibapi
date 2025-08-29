@@ -25,10 +25,14 @@ def test_frontend_index_renders_defaults(monkeypatch):
     assert "http://localhost:9001" in html
     assert "http://localhost:9002" in html
     assert "http://localhost:9004" in html
-    # Check that key forms and buttons exist
-    assert 'id="calendarForm"' in html
+    # Check that key forms and modules exist (migrated to data-action wiring)
+    assert 'id="calendarGetForm"' in html
+    assert 'id="calendarFetchForm"' in html
     assert 'id="equityForm"' in html
     assert 'id="chainForm"' in html
+    assert '/static/js/apiClient.js' in html
+    assert '/static/js/controllers.js' in html
+    assert '/static/js/bootstrap.js' in html
 
 
 def test_static_css_served():
