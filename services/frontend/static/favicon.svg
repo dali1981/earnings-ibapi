@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- Background circle -->
+  <circle cx="16" cy="16" r="15" fill="#1e40af" stroke="#3b82f6" stroke-width="1"/>
+  
+  <!-- Chart bars representing trading/earnings data -->
+  <rect x="6" y="18" width="4" height="8" fill="#10b981" rx="0.5"/>
+  <rect x="11" y="14" width="4" height="12" fill="#10b981" rx="0.5"/>
+  <rect x="16" y="10" width="4" height="16" fill="#f59e0b" rx="0.5"/>
+  <rect x="21" y="12" width="4" height="14" fill="#ef4444" rx="0.5"/>
+  
+  <!-- Trend line -->
+  <path d="M 7 20 L 13 16 L 18 12 L 24 14" stroke="#fbbf24" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  
+  <!-- Dollar sign for financial theme -->
+  <text x="16" y="9" font-family="Arial, sans-serif" font-size="7" font-weight="bold" fill="white" text-anchor="middle">$</text>
+</svg>

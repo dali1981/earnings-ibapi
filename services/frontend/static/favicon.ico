@@ -1,0 +1,9 @@
+<!-- 
+This is a placeholder for favicon.ico
+To generate an actual .ico file, you can:
+1. Use the favicon.svg with an online converter like https://favicon.io/favicon-converter/
+2. Or use ImageMagick: convert favicon.svg -resize 16x16 -resize 32x32 -resize 48x48 favicon.ico
+3. Or use a Python script with Pillow library
+
+For now, browsers will use the SVG version which is referenced in the HTML.
+-->

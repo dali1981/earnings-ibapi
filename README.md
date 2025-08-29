@@ -65,6 +65,20 @@ This repo persists market/earnings data locally (Parquet) and notifies services 
   - `uvicorn services.option_chain_api.app:app --reload --port 9004`
   - `uvicorn services.frontend.main:app --reload --port 9000`
 
+## Frontend Service URL Resolution
+- Source of truth: `app_settings.Settings` (see `app_settings/settings.py`). The frontend reads service bases from `settings.api.services.*.url` and injects them into the page as `window.__BASES__`.
+- Preferred overrides via env (nested):
+  - `APP_API__SERVICES__CALENDAR__HOST=svc-calendar`, `APP_API__SERVICES__CALENDAR__PORT=9001`
+  - `APP_API__SERVICES__EQUITY__HOST=svc-equity`, `APP_API__SERVICES__EQUITY__PORT=9002`
+  - `APP_API__SERVICES__CHAINS__HOST=svc-chains`, `APP_API__SERVICES__CHAINS__PORT=9004`
+  - `APP_API__SERVICES__ORCHESTRATOR__HOST=svc-orchestrator`, `APP_API__SERVICES__ORCHESTRATOR__PORT=9005`
+- Legacy overrides (still supported):
+  - `FRONTEND_CALENDAR_BASE`, `FRONTEND_EQUITY_BASE`, `FRONTEND_CHAINS_BASE`, `FRONTEND_ORCHESTRATOR_BASE`
+- Client-side usage:
+  - `window.TradingAPI` provides a small API layer used by the frontend controllers; you can also call it from the console.
+    - Example: `TradingAPI.calendar.getUpcoming(7, 'AAPL,MSFT').then(({data}) => console.log(data))`
+  - UI elements bind to controller actions via `data-action` attributes, wired by `/static/js/bootstrap.js`.
+
 ## Notes
 - Experimental code lives under `labs/` (excluded from builds/formatters).
 - Vendored code in `ibx-*/` remains for now; consider switching to pip packages to reduce maintenance.
