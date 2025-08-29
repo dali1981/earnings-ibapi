@@ -4,11 +4,13 @@ Test script to verify the datetime formatting fix for IB API calls.
 This simulates the conditions that were causing the original error.
 """
 from datetime import date, datetime
-
-from ibx_time import (debug_datetime_format, ib_end_datetime,
-                      ib_end_datetime_instrument,
-                      safe_ib_end_datetime_instrument,
-                      validate_ib_datetime_format)
+from ibx_time import (
+    debug_datetime_format,
+    ib_end_datetime,
+    ib_end_datetime_instrument,
+    safe_ib_end_datetime_instrument,
+    validate_ib_datetime_format,
+)
 
 
 class MockContract:

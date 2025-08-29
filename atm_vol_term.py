@@ -21,17 +21,22 @@ You can also import and call `compute_atm_vol_term(...)` from your own code.
 """
 from __future__ import annotations
 
-import argparse
-import time
 from datetime import date
+from ibx import (
+    HistoricalService,
+    IBRuntime,
+    make_option,
+    make_stock,
+    SubscriptionService,
+)
+from common.repositories.option_chains import OptionChainSnapshotRepository as ChainRepository
+from ibx_time import ib_end_datetime_instrument, parse_ib_datetime_series
 from typing import Iterable, List, Optional, Tuple
 
+import argparse
 import pandas as pd
-from ibx import (HistoricalService, IBRuntime, SubscriptionService,
-                 make_option, make_stock)
-from ibx_repos import ChainRepository
+import time
 
-from ibx_time import ib_end_datetime_instrument, parse_ib_datetime_series
 
 # -------------------- small utils --------------------
 

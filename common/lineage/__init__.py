@@ -11,6 +11,7 @@ from .metadata import LineageMetadataRepository
 from .query import LineageQueryEngine
 from .visualizer import LineageVisualizer
 
+
 __all__ = [
     "LineageTracker",
     "DataOperation",

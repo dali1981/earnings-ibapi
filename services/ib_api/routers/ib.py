@@ -1,13 +1,11 @@
 from __future__ import annotations
 
-import asyncio
-from typing import Any, Dict, List, Optional
-
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException, status
-from pydantic import BaseModel, Field
-
-from services.ib_api.service.ib_runtime import get_runtime
 from app_settings.settings import get_settings
+from fastapi import APIRouter, HTTPException, status, WebSocket, WebSocketDisconnect
+from ibapi.contract import Contract
+from pydantic import BaseModel, Field
+from services.ib_api.service.ib_runtime import get_runtime
+from typing import Any, Dict, List, Optional
 from vendors.ibx.services import (
     ContractDetailsService,
     HistoricalService,
@@ -15,7 +13,8 @@ from vendors.ibx.services import (
     SecDefService,
     SubscriptionService,
 )
-from ibapi.contract import Contract
+
+import asyncio
 
 
 router = APIRouter()
@@ -83,7 +82,12 @@ class ContractDetailsRequest(BaseModel):
         ...,
         description="ibapi.contract.Contract fields or conId",
         examples=[
-            {"symbol": "AAPL", "secType": "STK", "exchange": "SMART", "currency": "USD"},
+            {
+                "symbol": "AAPL",
+                "secType": "STK",
+                "exchange": "SMART",
+                "currency": "USD",
+            },
             {"conId": 265598},
         ],
     )
@@ -103,7 +107,7 @@ def contract_details(req: ContractDetailsRequest) -> List[Dict[str, Any]]:
 class SecDefParamsRequest(BaseModel):
     symbol: str = Field(..., examples=["AAPL"])
     conid: int = Field(..., examples=[265598])
-    sec_type: str = Field("STK", examples=["STK"]) 
+    sec_type: str = Field("STK", examples=["STK"])
     exchange: str = Field("", examples=[""])
     timeout: float = Field(10.0, examples=[10.0])
 
@@ -125,12 +129,14 @@ def secdef_option_params(req: SecDefParamsRequest) -> List[Dict[str, Any]]:
 class HistoricalBarsRequest(BaseModel):
     contract: Dict[str, Any] = Field(
         ...,
-        examples=[{"symbol": "AAPL", "secType": "STK", "exchange": "SMART", "currency": "USD"}],
+        examples=[
+            {"symbol": "AAPL", "secType": "STK", "exchange": "SMART", "currency": "USD"}
+        ],
     )
     endDateTime: str = Field(..., examples=["20240823 23:59:59"])
-    durationStr: str = Field(..., examples=["1 D"]) 
-    barSizeSetting: str = Field(..., examples=["1 min"]) 
-    whatToShow: str = Field(..., examples=["TRADES"]) 
+    durationStr: str = Field(..., examples=["1 D"])
+    barSizeSetting: str = Field(..., examples=["1 min"])
+    whatToShow: str = Field(..., examples=["TRADES"])
     useRTH: int = Field(1, examples=[1])
     formatDate: int = Field(1, examples=[1])
     keepUpToDate: bool = Field(False, examples=[False])
@@ -170,22 +176,51 @@ def health() -> HealthResponse:
 
 @router.post("/historical/bars")
 def historical_bars(req: HistoricalBarsRequest) -> List[Dict[str, Any]]:
+    import logging
+    import traceback
+
+    logger = logging.getLogger(__name__)
+
     rt = get_runtime()
     _ensure_connected(rt)
     service = HistoricalService(rt)
     contract = _build_contract(req.contract)
-    rows = service.bars(
-        contract=contract,
-        endDateTime=req.endDateTime,
-        durationStr=req.durationStr,
-        barSizeSetting=req.barSizeSetting,
-        whatToShow=req.whatToShow,
-        useRTH=req.useRTH,
-        formatDate=req.formatDate,
-        keepUpToDate=req.keepUpToDate,
-        timeout=req.timeout,
+
+    logger.info(
+        f"📡 IB API: Historical bars request for {contract.symbol if hasattr(contract, 'symbol') else 'N/A'}"
     )
-    return rows
+
+    # Format endDateTime with proper timezone
+    from common.datetime.end_datetime import EndDateTime
+
+    formatted_end_time = EndDateTime(req.endDateTime).to_ib_format()
+
+    try:
+        rows = service.bars(
+            contract=contract,
+            endDateTime=formatted_end_time,
+            durationStr=req.durationStr,
+            barSizeSetting=req.barSizeSetting,
+            whatToShow=req.whatToShow,
+            useRTH=req.useRTH,
+            formatDate=req.formatDate,
+            keepUpToDate=req.keepUpToDate,
+            timeout=req.timeout,
+        )
+        logger.info(
+            f"📡 IB API: Successfully returned {len(rows)} bars for {contract.symbol if hasattr(contract, 'symbol') else 'N/A'}"
+        )
+        return rows
+    except Exception as e:
+        logger.error(f"📡 IB API: Error in historical bars request: {str(e)}")
+        logger.error(f"📡 IB API: Full traceback:\n{traceback.format_exc()}")
+        logger.error(
+            f"📡 IB API: Request details - contract: {req.contract}, endDateTime: {req.endDateTime}, duration: {req.durationStr}, barSize: {req.barSizeSetting}"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Historical bars request failed: {str(e)} | Full error: {repr(e)}",
+        )
 
 
 @router.websocket("/ws/market-data")

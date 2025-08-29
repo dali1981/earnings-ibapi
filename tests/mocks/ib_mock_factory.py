@@ -2,16 +2,16 @@
 Factory for creating IB API mocks with realistic data.
 """
 
-import random
-import threading
-import time
 from datetime import date, datetime, timedelta
+from ibapi.contract import Contract
+from ibapi.wrapper import EWrapper
 from typing import Any, Dict, List, Optional, Union
 from unittest.mock import MagicMock, Mock
 
 import pandas as pd
-from ibapi.contract import Contract
-from ibapi.wrapper import EWrapper
+import random
+import threading
+import time
 
 
 class MockDataGenerator:

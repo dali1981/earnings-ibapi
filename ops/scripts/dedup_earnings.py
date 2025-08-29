@@ -22,12 +22,13 @@ Usage:
 
 from __future__ import annotations
 
-import argparse
 from pathlib import Path
-import sys
 from typing import List, Tuple
 
+import argparse
 import pandas as pd
+import sys
+
 
 # Ensure project root on path so `config` is importable when run from subfolders
 sys.path.append(str(Path(__file__).parent.parent))
@@ -35,14 +36,20 @@ import config
 
 
 def parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="Deduplicate earnings repository partitions")
-    p.add_argument("--demo", action="store_true", help="Use demo base (data/exports/demo)")
+    p = argparse.ArgumentParser(
+        description="Deduplicate earnings repository partitions"
+    )
+    p.add_argument(
+        "--demo", action="store_true", help="Use demo base (data/exports/demo)"
+    )
     p.add_argument(
         "--date",
         type=str,
         help="Specific collection_date (YYYY-MM-DD) to process; default: all",
     )
-    p.add_argument("--dry-run", action="store_true", help="Report actions without writing")
+    p.add_argument(
+        "--dry-run", action="store_true", help="Report actions without writing"
+    )
     return p.parse_args()
 
 
@@ -102,7 +109,9 @@ def dedup_partition(src_dir: Path, dry_run: bool) -> Tuple[int, int, int]:
 def main() -> None:
     args = parse_args()
     base = (config.EXPORTS_PATH / "demo") if args.demo else config.DATA_ROOT
-    print(f"Scanning earnings under: {base / 'earnings'} {'[DRY-RUN]' if args.dry_run else ''}")
+    print(
+        f"Scanning earnings under: {base / 'earnings'} {'[DRY-RUN]' if args.dry_run else ''}"
+    )
 
     parts = list_partitions(base, args.date)
     if not parts:

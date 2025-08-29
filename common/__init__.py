@@ -9,4 +9,3 @@ This package provides import shortcuts so you can do:
 without changing existing module locations. It re-exports from the
 original packages to avoid disruptive moves.
 """
-

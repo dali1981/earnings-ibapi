@@ -21,22 +21,25 @@ Usage:
     python monitoring/dashboard.py --report --output reports/
 """
 
-import json
-import logging
-import sqlite3
-import time
 from collections import defaultdict, deque
 from dataclasses import asdict, dataclass
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+import json
+import logging
+import sqlite3
+import time
+
+
 # Optional web dashboard dependencies
 try:
-    import plotly.express as px
-    import plotly.graph_objs as go
     from flask import Flask, jsonify, render_template, request
     from plotly.utils import PlotlyJSONEncoder
+
+    import plotly.express as px
+    import plotly.graph_objs as go
 
     WEB_DASHBOARD_AVAILABLE = True
 except ImportError:
@@ -46,7 +49,9 @@ except ImportError:
 from earnings.fetcher import EarningsCalendarFetcher
 from earnings.scheduler import EarningsPriorityScheduler, SchedulePriority
 from jobs.orchestrator import DataPipelineOrchestrator
+
 import config
+
 
 logger = logging.getLogger(__name__)
 
@@ -577,7 +582,9 @@ class SystemMonitor:
 # Web Dashboard (optional)
 if WEB_DASHBOARD_AVAILABLE:
 
-    def create_web_dashboard(monitor: SystemMonitor, port: int = 8080, debug: bool = False):
+    def create_web_dashboard(
+        monitor: SystemMonitor, port: int = 8080, debug: bool = False
+    ):
         """Create Flask web dashboard for monitoring."""
 
         app = Flask(__name__)
@@ -623,9 +630,10 @@ if WEB_DASHBOARD_AVAILABLE:
               - hours: lookback window in hours (default 24)
               - aggregate: if truthy, return counts by topic/type
             """
-            from pathlib import Path
-            import json
             from datetime import datetime, timedelta
+            from pathlib import Path
+
+            import json
 
             topic = request.args.get("topic")
             etype = request.args.get("type")
@@ -639,7 +647,11 @@ if WEB_DASHBOARD_AVAILABLE:
             if not events_root.exists():
                 return jsonify({"events": results, "aggregate": {}})
 
-            files = [events_root / f"{topic}.jsonl"] if topic else sorted(events_root.glob("*.jsonl"))
+            files = (
+                [events_root / f"{topic}.jsonl"]
+                if topic
+                else sorted(events_root.glob("*.jsonl"))
+            )
 
             for fp in files:
                 if not fp.exists():
@@ -666,7 +678,8 @@ if WEB_DASHBOARD_AVAILABLE:
                     agg[key] = agg.get(key, 0) + 1
                 # Reformat keys for JSON
                 agg_json = [
-                    {"topic": k[0], "type": k[1], "count": v} for k, v in sorted(agg.items())
+                    {"topic": k[0], "type": k[1], "count": v}
+                    for k, v in sorted(agg.items())
                 ]
                 return jsonify({"aggregate": agg_json, "count": len(results)})
 
@@ -724,6 +737,7 @@ if WEB_DASHBOARD_AVAILABLE:
         def api_config():
             """Return selected config values and portfolio.yaml content."""
             from pathlib import Path as _P
+
             cfg = {
                 "PROJECT_ROOT": str(config.PROJECT_ROOT),
                 "DATA_ROOT": str(config.DATA_ROOT),
@@ -774,12 +788,18 @@ if WEB_DASHBOARD_AVAILABLE:
             def _serialize_job_result(r: Any) -> Dict[str, Any]:
                 try:
                     d = {
-                        "job_type": getattr(getattr(r, "job_type", None), "value", str(getattr(r, "job_type", None))),
+                        "job_type": getattr(
+                            getattr(r, "job_type", None),
+                            "value",
+                            str(getattr(r, "job_type", None)),
+                        ),
                         "symbol": getattr(r, "symbol", None),
                         "success": getattr(r, "success", None),
                         "error_message": getattr(r, "error_message", None),
                         "data_records": getattr(r, "data_records", None),
-                        "execution_time_seconds": getattr(r, "execution_time_seconds", None),
+                        "execution_time_seconds": getattr(
+                            r, "execution_time_seconds", None
+                        ),
                     }
                     return d
                 except Exception:
@@ -801,11 +821,13 @@ if WEB_DASHBOARD_AVAILABLE:
                         return jsonify({"error": "Missing symbol"}), 400
                     try:
                         res = monitor.orchestrator.setup_new_symbol(symbol, lookback)
-                        result.update({
-                            "symbol": symbol,
-                            "lookback_days": lookback,
-                            "result": [_serialize_job_result(r) for r in res],
-                        })
+                        result.update(
+                            {
+                                "symbol": symbol,
+                                "lookback_days": lookback,
+                                "result": [_serialize_job_result(r) for r in res],
+                            }
+                        )
                         return jsonify(result)
                     except Exception as e:
                         return jsonify({"error": str(e)}), 500
@@ -854,7 +876,9 @@ def main():
         "--output", type=Path, help="Output directory for static report"
     )
     parser.add_argument("--days", type=int, default=7, help="Report period in days")
-    parser.add_argument("--debug", action="store_true", help="Enable Flask debug and auto-reload")
+    parser.add_argument(
+        "--debug", action="store_true", help="Enable Flask debug and auto-reload"
+    )
 
     args = parser.parse_args()
 

@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-import json
-import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, Optional
 
 import config
+import json
+import time
 
 
 @dataclass
@@ -18,14 +18,21 @@ class Event:
 
     def to_json(self) -> str:
         return json.dumps(
-            {"type": self.type, "topic": self.topic, "payload": self.payload, "ts": self.ts},
+            {
+                "type": self.type,
+                "topic": self.topic,
+                "payload": self.payload,
+                "ts": self.ts,
+            },
             separators=(",", ":"),
             ensure_ascii=False,
         )
 
 
 class EventBus:
-    def publish(self, event_type: str, topic: str, payload: Optional[Dict[str, Any]] = None) -> None:
+    def publish(
+        self, event_type: str, topic: str, payload: Optional[Dict[str, Any]] = None
+    ) -> None:
         raise NotImplementedError
 
     def notify_data_available(self, dataset: str, **metadata: Any) -> None:
@@ -40,7 +47,9 @@ class FileEventBus(EventBus):
         self.events_dir.mkdir(parents=True, exist_ok=True)
         self.ready_dir.mkdir(parents=True, exist_ok=True)
 
-    def publish(self, event_type: str, topic: str, payload: Optional[Dict[str, Any]] = None) -> None:
+    def publish(
+        self, event_type: str, topic: str, payload: Optional[Dict[str, Any]] = None
+    ) -> None:
         # Enrich payload with correlation_id when available
         enriched: Dict[str, Any] = dict(payload or {})
 
@@ -54,7 +63,9 @@ class FileEventBus(EventBus):
             corr = enriched.get("job_id")
         if not corr:
             try:
-                from common.reliability.logging import get_current_context  # type: ignore
+                from common.reliability.logging import (
+                    get_current_context,  # type: ignore
+                )
 
                 ctx = get_current_context()
                 if ctx and getattr(ctx, "correlation_id", None):

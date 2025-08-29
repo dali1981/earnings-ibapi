@@ -1,10 +1,11 @@
 # config.py
-import logging.config
-import os
-from pathlib import Path
-
 # --- IB Connection ---
 from app_settings.settings import get_settings  # centralized settings
+from pathlib import Path
+
+import logging.config
+import os
+
 
 _S = get_settings()
 IB_HOST = _S.ib.host

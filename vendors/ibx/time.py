@@ -15,12 +15,13 @@ Notes
 
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional, Union
 
 import pandas as pd
+import re
+
 
 __all__ = [
     "parse_ib_datetime_series",

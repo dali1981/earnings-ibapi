@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-import os
 from celery import Celery
+
+import os
 
 
 def _make_app() -> Celery:
@@ -23,4 +24,3 @@ def _make_app() -> Celery:
 
 
 app = _make_app()
-

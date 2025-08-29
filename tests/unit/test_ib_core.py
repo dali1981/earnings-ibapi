@@ -2,17 +2,23 @@
 Unit tests for IB API core components.
 """
 
-import threading
-import time
+from api.ib_core import (
+    ContractDetailsService,
+    FutureRegistry,
+    HistoricalService,
+    IBFuture,
+    IBRuntime,
+    IBWrapperBridge,
+    make_stock,
+    RequestIdSequencer,
+    SecDefService,
+)
+from ibapi.contract import Contract
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
-from ibapi.contract import Contract
-
-from api.ib_core import (ContractDetailsService, FutureRegistry,
-                         HistoricalService, IBFuture, IBRuntime,
-                         IBWrapperBridge, RequestIdSequencer, SecDefService,
-                         make_stock)
+import threading
+import time
 
 
 @pytest.mark.unit

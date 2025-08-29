@@ -62,6 +62,7 @@ class EquityBarRepository(BaseRepository):
                 pa.field("wap", pa.float64(), nullable=True),
                 pa.field("bar_count", pa.int64(), nullable=True),
                 pa.field("data_type", pa.string(), nullable=True),
+                pa.field("created_at", pa.timestamp("ns")),
             ]
         )
 

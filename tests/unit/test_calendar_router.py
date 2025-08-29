@@ -1,6 +1,7 @@
-import pytest
-from types import SimpleNamespace
 from fastapi.testclient import TestClient
+from types import SimpleNamespace
+
+import pytest
 
 
 pytestmark = [pytest.mark.unit, pytest.mark.calendar]
@@ -24,8 +25,8 @@ def _mk_event(symbol: str = "AAPL"):
 
 def test_calendar_upcoming_route(monkeypatch):
     # Monkeypatch EarningsService used by the router to avoid network
-    from services.calendar_api.routers import calendar as cal_module
     from services.calendar_api.app import app
+    from services.calendar_api.routers import calendar as cal_module
 
     class FakeSvc:
         async def get_upcoming(self, *, days_ahead: int, symbols=None):
@@ -34,7 +35,9 @@ def test_calendar_upcoming_route(monkeypatch):
             return [_mk_event("AAPL"), _mk_event("MSFT")]
 
     # Service renamed to EarningsFetcherService
-    monkeypatch.setattr(cal_module, "EarningsFetcherService", lambda: FakeSvc(), raising=True)
+    monkeypatch.setattr(
+        cal_module, "EarningsFetcherService", lambda: FakeSvc(), raising=True
+    )
 
     c = TestClient(app)
     r = c.get("/calendar/upcoming", params={"days": 14, "symbols": "AAPL,MSFT"})

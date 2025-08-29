@@ -1,14 +1,14 @@
 # ib_vol_live.py
 # pip install ibapi
-import logging
-import time
 from dataclasses import dataclass
 from enum import IntEnum
-from typing import Dict, List
-
 from ibapi.client import EClient
 from ibapi.contract import Contract
 from ibapi.wrapper import EWrapper
+from typing import Dict, List
+
+import logging
+import time
 
 
 # -------- Enums (minimal subset you actually use) --------
@@ -222,6 +222,7 @@ if __name__ == "__main__":
 # if _is_valid_size(size):
 #     log(...)
 import warnings
+
 
 warnings.warn(
     "option_ticks.py is deprecated. Prefer repositories/option_bars and streaming flow.",

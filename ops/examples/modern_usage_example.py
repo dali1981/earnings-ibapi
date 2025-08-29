@@ -16,19 +16,26 @@ Run with:
     python examples/modern_usage_example.py
 """
 
-import logging
+# Repository imports - new unified system
+from common.repositories import (
+    EquityBarRepository,
+    OptionBarRepository,
+    OptionChainSnapshotRepository,
+)
+from config import DATA_ROOT
 from datetime import date, datetime, timedelta
+
+# Core system components
+from jobs.orchestrator import (
+    DataPipelineOrchestrator,
+    DataValidation,
+    PrerequisiteError,
+)
 from pathlib import Path
 
+import logging
 import pandas as pd
 
-from config import DATA_ROOT
-# Core system components
-from jobs.orchestrator import (DataPipelineOrchestrator, DataValidation,
-                               PrerequisiteError)
-# Repository imports - new unified system
-from common.repositories import (EquityBarRepository, OptionBarRepository,
-                          OptionChainSnapshotRepository)
 
 # Lineage tracking (optional)
 try:
@@ -41,6 +48,7 @@ except ImportError:
 
 # Setup logging
 from common.utils.logging_setup import setup_logging
+
 
 setup_logging()
 logger = logging.getLogger(__name__)

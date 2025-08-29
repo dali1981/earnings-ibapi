@@ -21,28 +21,31 @@ Usage:
     calendar = fetcher.get_earnings_calendar(["AAPL", "GOOGL"])
 """
 
-import sys
 from pathlib import Path
+
+import sys
+
 
 sys.path.append(str(Path(__file__).parent.parent))
 
-import json
-import time
 from dataclasses import asdict, dataclass
 from datetime import date, datetime, timedelta
 from enum import Enum
 from typing import Any, Dict, List, Optional, Union
 
+import json
 import pandas as pd
+import time
+
 
 # Import IB API components
 try:
-    import threading
-
     from ibapi.client import EClient
     from ibapi.common import TickerId
     from ibapi.contract import Contract
     from ibapi.wrapper import EWrapper
+
+    import threading
 
     IB_AVAILABLE = True
 except ImportError:
@@ -50,6 +53,7 @@ except ImportError:
     print("⚠️  IB API not available - install with: pip install ibapi")
 
 from common.utils.logging_setup import get_logger
+
 
 logger = get_logger(__name__)
 
@@ -185,7 +189,12 @@ class IBFundamentalClient(EClient):
 class IBFundamentalDataFetcher:
     """Fetches fundamental data and calendar information from IB API."""
 
-    def __init__(self, host: str | None = None, port: int | None = None, client_id: int | None = None):
+    def __init__(
+        self,
+        host: str | None = None,
+        port: int | None = None,
+        client_id: int | None = None,
+    ):
         """
         Initialize IB fundamental data fetcher.
 

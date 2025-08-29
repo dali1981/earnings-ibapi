@@ -1,14 +1,14 @@
 # ib_core.py
-import logging
-import threading
+from api.subscriptions import SubscriptionRegistry
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple
-
 from ibapi.client import EClient
 from ibapi.contract import Contract
 from ibapi.wrapper import EWrapper
+from typing import Any, Dict, List, Optional, Tuple
 
-from api.subscriptions import SubscriptionRegistry
+import logging
+import threading
+
 
 log = logging.getLogger("ib.core")
 

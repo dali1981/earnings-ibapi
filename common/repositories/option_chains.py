@@ -51,32 +51,19 @@ class OptionChainSnapshotRepository(BaseRepository):
         return pa.schema(
             [
                 pa.field("underlying", pa.string()),
-                pa.field("snapshot_date", pa.date32()),
-                pa.field("expiry", pa.date32()),
-                pa.field("strike", pa.float64()),
-                pa.field("right", pa.string()),
-                pa.field("bid", pa.float64(), nullable=True),
-                pa.field("ask", pa.float64(), nullable=True),
-                pa.field("last", pa.float64(), nullable=True),
-                pa.field("volume", pa.float64(), nullable=True),
-                pa.field("open_interest", pa.float64(), nullable=True),
-                pa.field("implied_volatility", pa.float64(), nullable=True),
-                pa.field("delta", pa.float64(), nullable=True),
-                pa.field("gamma", pa.float64(), nullable=True),
-                pa.field("theta", pa.float64(), nullable=True),
-                pa.field("vega", pa.float64(), nullable=True),
-                pa.field("contract_id", pa.int64(), nullable=True),
-                pa.field("local_symbol", pa.string(), nullable=True),
-                pa.field("trading_class", pa.string(), nullable=True),
-                pa.field("exchange", pa.string(), nullable=True),
-                pa.field("currency", pa.string(), nullable=True),
-                pa.field("multiplier", pa.int64(), nullable=True),
+                pa.field("underlying_conid", pa.int64()),
+                pa.field("exchange", pa.string()),
+                pa.field("trading_class", pa.string()),
+                pa.field("multiplier", pa.string()),
+                pa.field("expirations", pa.list_(pa.string())),
+                pa.field("strikes", pa.list_(pa.float64())),
+                pa.field("as_of", pa.date32()),
             ]
         )
 
     def _get_partition_columns(self, **kwargs) -> List[str]:
         """Get partition columns for option chain snapshots."""
-        return ["underlying", "snapshot_date"]
+        return ["as_of"]
 
     def _normalize_data(
         self,

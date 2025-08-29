@@ -1,12 +1,11 @@
-import threading
-from typing import Optional
-
-from ibapi.client import EClient
-
 from .futures import FutureRegistry
 from .ids import RequestIdSequencer
 from .subscriptions import SubscriptionRegistry
 from .wrapper import IBWrapperBridge
+from ibapi.client import EClient
+from typing import Optional
+
+import threading
 
 
 class IBRuntime:

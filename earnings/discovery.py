@@ -31,12 +31,12 @@ import sys
 
 
 sys.path.append(str(Path(__file__).parent.parent))
+from common.repositories.earnings import EarningsCalendarRepository
+from common.utils.logging_setup import get_logger
 from config import DISCOVERY_CONFIG, EARNINGS_CONFIG, EARNINGS_PATH, EXPORTS_PATH
 
 # Import our earnings fetcher and repository
 from earnings.fetcher import EarningsCalendarFetcher, EarningsEvent
-from common.repositories.earnings import EarningsCalendarRepository
-from common.utils.logging_setup import get_logger
 
 import argparse
 

@@ -1,5 +1,6 @@
 import warnings
 
+
 warnings.warn(
     "contracts_snapshot_one.py is deprecated. Use jobs/contracts_snapshot.py --patterns instead.",
     DeprecationWarning,
@@ -11,7 +12,8 @@ from ibx_flows.contracts_backfill import (
     ContractDescriptionsSnapshotJob,
     ContractsConfig,
 )
-from ibx_repos import ContractDescriptionsRepository
+from common.repositories.contract_descriptions import ContractDescriptionsRepository
+
 
 if __name__ == "__main__":
     cfg = ContractsConfig(patterns=["DEC", "CMCL", "NIU"])

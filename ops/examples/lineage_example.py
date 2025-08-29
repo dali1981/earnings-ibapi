@@ -5,20 +5,25 @@ This example demonstrates how to set up and use the lineage tracking system
 with the trading data repositories.
 """
 
-import tempfile
-from datetime import date, datetime
-from pathlib import Path
-
-import pandas as pd
-
 # Import lineage components
-from common.lineage import (LineageMetadataRepository, LineageQueryEngine,
-                     LineageTracker, LineageVisualizer, set_global_tracker)
+from common.lineage import (
+    LineageMetadataRepository,
+    LineageQueryEngine,
+    LineageTracker,
+    LineageVisualizer,
+    set_global_tracker,
+)
 from common.lineage.core import OperationType
+
 # Import repositories
 from common.repositories.equity_bars import EquityBarRepository
 from common.repositories.option_bars import OptionBarRepository
 from common.repositories.option_chains import OptionChainSnapshotRepository
+from datetime import date, datetime
+from pathlib import Path
+
+import pandas as pd
+import tempfile
 
 
 def setup_lineage_system(base_path: str) -> tuple:

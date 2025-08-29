@@ -1,13 +1,15 @@
-import sys
 from datetime import date, timedelta
 from pathlib import Path
 
 import pandas as pd
 import pytest
+import sys
 
 
 @pytest.mark.unit
-def test_show_upcoming_earnings_reads_local_db_and_prints(tmp_path, monkeypatch, capsys):
+def test_show_upcoming_earnings_reads_local_db_and_prints(
+    tmp_path, monkeypatch, capsys
+):
     # Arrange repository structure under a temp base
     base = tmp_path
     earnings_dir = base / "earnings"
@@ -33,7 +35,9 @@ def test_show_upcoming_earnings_reads_local_db_and_prints(tmp_path, monkeypatch,
         }
     ]
     df = pd.DataFrame(rows)
-    (part / "earnings.parquet").write_bytes(b"")  # ensure file exists even if empty write fails
+    (part / "earnings.parquet").write_bytes(
+        b""
+    )  # ensure file exists even if empty write fails
     df.to_parquet(part / "earnings.parquet")
 
     # Monkeypatch config to point DATA_ROOT to tmp base
@@ -45,7 +49,9 @@ def test_show_upcoming_earnings_reads_local_db_and_prints(tmp_path, monkeypatch,
     sys.path.append(str(Path(__file__).parents[2]))  # repo root
     from scripts import show_upcoming_earnings as cli
 
-    monkeypatch.setattr(sys, "argv", ["show_upcoming_earnings.py", "--days", "1"], raising=True)
+    monkeypatch.setattr(
+        sys, "argv", ["show_upcoming_earnings.py", "--days", "1"], raising=True
+    )
 
     # Monkeypatch repository method to avoid ParquetDataset filter quirks in tests
     from common.repositories.earnings import EarningsCalendarRepository
@@ -55,7 +61,12 @@ def test_show_upcoming_earnings_reads_local_db_and_prints(tmp_path, monkeypatch,
         dfp["earnings_date"] = pd.to_datetime(dfp["earnings_date"]).dt.date
         return dfp
 
-    monkeypatch.setattr(EarningsCalendarRepository, "get_earnings_by_date_range", _load_range, raising=True)
+    monkeypatch.setattr(
+        EarningsCalendarRepository,
+        "get_earnings_by_date_range",
+        _load_range,
+        raising=True,
+    )
 
     # Act
     cli.main()

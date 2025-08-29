@@ -9,21 +9,37 @@ This module shows how to use the reliability system components:
 - Structured logging with context
 """
 
-import asyncio
-import logging
-import time
+# Import reliability system components
+from common.reliability import (  # Exceptions; Retry and circuit breaker; Decorators; Logging; Configuration
+    BaseTradingException,
+    circuit_breaker,
+    configure_trading_logging,
+    connection_operation,
+    DataValidationException,
+    get_trading_logger,
+    historical_data_request,
+    ib_api_call,
+    ib_api_retry,
+    IBConnectionException,
+    JitterType,
+    log_context,
+    market_data_request,
+    market_data_retry,
+    MarketDataTimeoutException,
+    performance_log,
+    RateLimitException,
+    resilient_operation,
+    retry,
+    RetryStrategy,
+    setup_reliability_system,
+    StructuredFormatter,
+)
 from datetime import date, datetime
 from typing import Any, Dict, List
 
-# Import reliability system components
-from common.reliability import (  # Exceptions; Retry and circuit breaker; Decorators; Logging; Configuration
-    BaseTradingException, DataValidationException, IBConnectionException,
-    JitterType, MarketDataTimeoutException, RateLimitException, RetryStrategy,
-    StructuredFormatter, circuit_breaker, configure_trading_logging,
-    connection_operation, get_trading_logger, historical_data_request,
-    ib_api_call, ib_api_retry, log_context, market_data_request,
-    market_data_retry, performance_log, resilient_operation, retry,
-    setup_reliability_system)
+import asyncio
+import logging
+import time
 
 
 # Example 1: Basic Exception Handling and Logging

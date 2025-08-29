@@ -1,19 +1,18 @@
 from __future__ import annotations
 
-import datetime
-import pathlib
+from ._util import _write_empty_dataset
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
 from typing import List, Optional, Set, Union
 
+import datetime
 import pandas as pd
+import pathlib
 import pyarrow as pa
 import pyarrow.dataset as ds
 import pyarrow.parquet as pq
 
-from ._util import _write_empty_dataset
-
 
 def _dataset_hive(path: str, schema: pa.Schema | None = None):
     return ds.dataset(path, format="parquet", partitioning="hive", schema=schema)
@@ -45,11 +44,11 @@ def _build_filter(**kwargs):
     return expr
 
 
-import datetime
-import pathlib
 from datetime import date
 
+import datetime
 import pandas as pd
+import pathlib
 import pyarrow.dataset as ds
 
 
@@ -83,10 +82,10 @@ def _build_filter(**kwargs):
     return expr
 
 
-import pathlib
 from datetime import date
 
 import pandas as pd
+import pathlib
 
 
 def _build_filter(**kwargs):
@@ -141,9 +140,8 @@ def _ensure_schema_columns(df: pd.DataFrame, required: list) -> pd.DataFrame:
     return df
 
 
-import re
-
 import pandas as pd
+import re
 
 
 def _parse_ib_datetime_series(s):

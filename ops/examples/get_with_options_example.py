@@ -12,14 +12,17 @@ Usage:
 from __future__ import annotations
 
 from pathlib import Path
+
 import sys
+
 
 # Ensure project root on path
 sys.path.append(str(Path(__file__).parent.parent))
 
+from common.repositories.contract_descriptions import ContractDescriptionsRepository
+
 import config
 import pandas as pd
-from common.repositories.contract_descriptions import ContractDescriptionsRepository
 
 
 def main() -> None:
@@ -51,4 +54,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

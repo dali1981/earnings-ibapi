@@ -49,7 +49,9 @@ def setup_logging(
         cfg["root"]["level"] = level.upper()
         # Handle file logging toggle/filename
         if not enable_file_logging:
-            cfg["root"]["handlers"] = [h for h in cfg["root"]["handlers"] if h != "file"]
+            cfg["root"]["handlers"] = [
+                h for h in cfg["root"]["handlers"] if h != "file"
+            ]
         else:
             if log_filename:
                 cfg["handlers"]["file"]["filename"] = str(s.paths.logs / log_filename)

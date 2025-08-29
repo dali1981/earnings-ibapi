@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-import atexit
-import time
+from app_settings.settings import get_settings
+from ibx import IBRuntime
 from typing import Optional
 
-from app_settings.settings import get_settings
+import atexit
+import time
 
-
-from ibx import IBRuntime
 
 _rt_singleton: Optional[IBRuntime] = None
 _last_attempt_ts: float = 0.0
@@ -24,7 +23,9 @@ def get_runtime() -> IBRuntime:
     global _rt_singleton, _last_attempt_ts
     s = get_settings()
     if _rt_singleton is None:
-        _rt_singleton = IBRuntime(host=s.ib.host, port=s.ib.port, client_id=s.ib.client_id_contracts)
+        _rt_singleton = IBRuntime(
+            host=s.ib.host, port=s.ib.port, client_id=s.ib.client_id_contracts
+        )
 
     try:
         if not _rt_singleton.client.isConnected():

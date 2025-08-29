@@ -3,8 +3,6 @@ from __future__ import annotations
 from .select_strikes import select_contracts, StrikeSelectionConfig
 from .source_interface import MarketDataSource
 from .windows import missing_windows
-from dataclasses import dataclass
-from datetime import date
 
 # Use new unified repository system
 from common.repositories import (
@@ -15,6 +13,8 @@ from common.repositories import (
 from common.utils.demo_mode import dataset_topic as topic_for
 from common.utils.demo_mode import demo_base
 from common.utils.events.bus import FileEventBus
+from dataclasses import dataclass
+from datetime import date
 
 import pandas as pd
 

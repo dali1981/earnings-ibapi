@@ -4,12 +4,13 @@ Data lineage visualization components.
 
 from __future__ import annotations
 
-import json
+from .core import DataOperation, LineageNode, LineageTracker, OperationType
+from .query import LineageQueryEngine
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Set, Tuple
 
-from .core import DataOperation, LineageNode, LineageTracker, OperationType
-from .query import LineageQueryEngine
+import json
+
 
 try:
     from common.reliability import get_trading_logger

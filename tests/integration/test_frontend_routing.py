@@ -1,5 +1,6 @@
-import pytest
 from fastapi.testclient import TestClient
+
+import pytest
 
 
 pytestmark = pytest.mark.integration
@@ -25,8 +26,10 @@ def test_frontend_injects_custom_bases(monkeypatch):
     assert "`${BASES.equity}/equity/" in html
     assert "`${BASES.chains}/chains/" in html
 
+
 def test_frontend_buttons_have_handlers():
     from services.frontend.main import app
+
     c = TestClient(app)
     html = c.get("/").text
     # Check that the script registers event listeners for forms

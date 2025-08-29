@@ -1,10 +1,9 @@
 # tests/test_app.py
 from datetime import date
+from ibx_flows.windows import missing_windows
 
 import pandas as pd
 import pytest
-
-from ibx_flows.windows import missing_windows
 
 
 def test_missing_windows():

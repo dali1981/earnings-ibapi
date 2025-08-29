@@ -25,13 +25,14 @@ Notes
 
 from __future__ import annotations
 
-import math
 from dataclasses import dataclass
-from typing import Iterable, List, Optional, Tuple
-
-import pandas as pd
 from ibx import HistoricalService, make_option
 from ibx.time import ib_end_datetime_instrument
+from typing import Iterable, List, Optional, Tuple
+
+import math
+import pandas as pd
+
 
 # ---------------- Black–Scholes helpers ----------------
 

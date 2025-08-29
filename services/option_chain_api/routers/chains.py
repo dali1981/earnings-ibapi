@@ -1,11 +1,10 @@
 from __future__ import annotations
 
+from common.repositories import OptionChainSnapshotRepository
+from fastapi import APIRouter, HTTPException
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException
-
 import config
-from common.repositories import OptionChainSnapshotRepository
 
 
 router = APIRouter()
@@ -26,4 +25,3 @@ def latest_snapshot_date(symbol: str):
         return {"symbol": symbol.upper(), "as_of": d.isoformat()}
     except Exception as e:
         raise HTTPException(status_code=404, detail=str(e))
-

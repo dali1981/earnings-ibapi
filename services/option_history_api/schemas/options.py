@@ -10,4 +10,3 @@ class OptionBarsSummary(BaseModel):
     start: date
     end: date
     rows: int
-

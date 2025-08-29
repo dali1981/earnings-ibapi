@@ -1,5 +1,6 @@
-import threading
 from typing import Any, Dict, List, Optional, Tuple
+
+import threading
 
 
 class IBFuture:

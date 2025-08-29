@@ -1,20 +1,57 @@
 from __future__ import annotations
 
-from datetime import date, timedelta
-from typing import List, Optional
-
-from fastapi import APIRouter, Query, HTTPException, Response
-
+import json
 from ..schemas.calendar import EarningsEventModel, NewEarningsEvent
-from ..service.earnings_fetcher_service import EarningsFetcherService
 from ..service.calendar_service import CalendarService
-from earnings import EarningsSource
-from common.repositories.earnings import EarningsCalendarRepository
+from ..service.earnings_fetcher_service import EarningsFetcherService
 from common.reliability.logging import get_trading_logger
+from common.repositories.earnings import EarningsCalendarRepository
+from datetime import date, timedelta
+from earnings import EarningsSource
+from fastapi import APIRouter, HTTPException, Query, Response
+from typing import List, Optional
 
 
 router = APIRouter()
 logger = get_trading_logger(__name__)
+
+
+def safe_convert_to_model(events: list, event_type=EarningsEventModel) -> List[EarningsEventModel]:
+    """
+    Safely convert earnings events to Pydantic models with JSON serialization validation.
+    
+    Logs detailed error information for any events that fail to serialize.
+    """
+    result = []
+    for i, event in enumerate(events):
+        try:
+            # Convert to model
+            model = event_type.from_entity(event)
+            
+            # Validate JSON serialization
+            json.dumps(model.dict())
+            
+            result.append(model)
+        except (ValueError, TypeError) as ex:
+            # Log the problematic event details
+            logger.error(f"Failed to serialize event {i}/{len(events)}: {ex}")
+            logger.error(f"Event: symbol={getattr(event, 'symbol', 'N/A')}, "
+                        f"date={getattr(event, 'earnings_date', 'N/A')}, "
+                        f"eps_est={getattr(event, 'eps_estimate', 'N/A')}, "
+                        f"eps_act={getattr(event, 'eps_actual', 'N/A')}, "
+                        f"rev_est={getattr(event, 'revenue_estimate', 'N/A')}, "
+                        f"rev_act={getattr(event, 'revenue_actual', 'N/A')}")
+            
+            # Try to log the full event dict if available
+            try:
+                logger.debug(f"Full event data: {event.__dict__}")
+            except:
+                pass
+                
+    if len(result) < len(events):
+        logger.warning(f"Serialized {len(result)}/{len(events)} events successfully")
+        
+    return result
 
 
 @router.get("/health")
@@ -32,14 +69,16 @@ async def upcoming(
 
     Use `/calendar/fetch-upcoming` to fetch from external sources and persist.
     """
-    syms: Optional[List[str]] = [s.strip().upper() for s in symbols.split(",")] if symbols else None
+    syms: Optional[List[str]] = (
+        [s.strip().upper() for s in symbols.split(",")] if symbols else None
+    )
     cal = CalendarService()
     events = cal.get_upcoming_events(days_ahead=days, symbols=syms)
     response.headers["X-Calendar-Source"] = "repo"
     latest = cal.get_latest_collection_date_str()
     if latest:
         response.headers["X-Calendar-Collection-Date"] = latest
-    return [EarningsEventModel.from_entity(e) for e in events]
+    return safe_convert_to_model(events)
 
 
 @router.get("/calendar/get-upcoming", response_model=List[EarningsEventModel])
@@ -54,23 +93,31 @@ def get_upcoming(
     - If `symbols` omitted, returns all upcoming within the window from local repo.
     - Adds headers for transparency: source and latest collection date.
     """
-    syms: Optional[List[str]] = [s.strip().upper() for s in symbols.split(",")] if symbols else None
+    syms: Optional[List[str]] = (
+        [s.strip().upper() for s in symbols.split(",")] if symbols else None
+    )
     cal = CalendarService()
     events = cal.get_upcoming_events(days_ahead=days, symbols=syms)
     response.headers["X-Calendar-Source"] = "repo"
     latest = cal.get_latest_collection_date_str()
     if latest:
         response.headers["X-Calendar-Collection-Date"] = latest
-    return [EarningsEventModel.from_entity(e) for e in events]
+    return safe_convert_to_model(events)
 
 
 @router.post("/calendar/fetch-upcoming", response_model=List[EarningsEventModel])
 async def fetch_upcoming(
     response: Response,
     days: int = Query(14, ge=0, le=180),
-    source: str = Query("nasdaq", description="nasdaq (default), yahoo, or all (case-insensitive)"),
-    symbols: Optional[str] = Query(None, description="Comma-separated symbols (required for yahoo)"),
-    symbol: Optional[str] = Query(None, description="Single symbol (alias for symbols)"),
+    source: str = Query(
+        "nasdaq", description="nasdaq (default), yahoo, or all (case-insensitive)"
+    ),
+    symbols: Optional[str] = Query(
+        None, description="Comma-separated symbols (required for yahoo)"
+    ),
+    symbol: Optional[str] = Query(
+        None, description="Single symbol (alias for symbols)"
+    ),
 ):
     """Fetch upcoming earnings from external source(s) and persist.
 
@@ -90,7 +137,9 @@ async def fetch_upcoming(
     # Case-insensitive source handling
     src = (source or "nasdaq").strip().lower()
     if src not in {"nasdaq", "yahoo", "all"}:
-        raise HTTPException(status_code=400, detail="Invalid source. Use nasdaq, yahoo, or all.")
+        raise HTTPException(
+            status_code=400, detail="Invalid source. Use nasdaq, yahoo, or all."
+        )
 
     sources: List[EarningsSource]
     if src == "yahoo":
@@ -113,7 +162,7 @@ async def fetch_upcoming(
         logger.error(f"Failed to persist fetched earnings: {e}")
         # Still return fetched results even if persistence fails
         response.headers["X-Calendar-Source"] = "fetched"
-    return [EarningsEventModel.from_entity(e) for e in fetched]
+    return safe_convert_to_model(fetched)
 
 
 @router.post("/calendar/fetch-upcoming/yahoo", response_model=List[EarningsEventModel])
@@ -125,10 +174,14 @@ async def fetch_upcoming_yahoo(
     """Yahoo-only fetch for upcoming earnings (requires symbols)."""
     syms: List[str] = [s.strip().upper() for s in symbols.split(",") if s.strip()]
     if not syms:
-        raise HTTPException(status_code=400, detail="symbols must contain at least one ticker")
+        raise HTTPException(
+            status_code=400, detail="symbols must contain at least one ticker"
+        )
 
     fetcher = EarningsFetcherService()
-    fetched = await fetcher.get_upcoming(days_ahead=days, symbols=syms, sources=[EarningsSource.YAHOO])
+    fetched = await fetcher.get_upcoming(
+        days_ahead=days, symbols=syms, sources=[EarningsSource.YAHOO]
+    )
 
     cal = CalendarService()
     try:
@@ -138,7 +191,7 @@ async def fetch_upcoming_yahoo(
     except Exception as e:
         logger.error(f"Failed to persist fetched earnings: {e}")
         response.headers["X-Calendar-Source"] = "fetched"
-    return [EarningsEventModel.from_entity(e) for e in fetched]
+    return safe_convert_to_model(fetched)
 
 
 @router.post("/calendar/events")
@@ -161,11 +214,15 @@ def add_events(events: list[NewEarningsEvent]):
         try:
             # Check presence for that exact symbol/date/source
             repo = EarningsCalendarRepository()  # direct read for existence
-            df = repo.get_earnings_by_date_range(e.earnings_date, e.earnings_date, symbols=[e.symbol], sources=[e.source])
+            df = repo.get_earnings_by_date_range(
+                e.earnings_date, e.earnings_date, symbols=[e.symbol], sources=[e.source]
+            )
             exists = not df.empty
             if exists:
                 duplicates += 1
-                logger.info(f"Duplicate earnings event received for {e.symbol} on {e.earnings_date} (source={e.source})")
+                logger.info(
+                    f"Duplicate earnings event received for {e.symbol} on {e.earnings_date} (source={e.source})"
+                )
                 continue
             to_write.append(
                 EarningsEvent(
@@ -199,8 +256,17 @@ def add_events(events: list[NewEarningsEvent]):
 def is_present(symbol: str, earnings_date: date, source: str | None = None):
     repo = EarningsCalendarRepository()
     try:
-        df = repo.get_earnings_by_date_range(earnings_date, earnings_date, symbols=[symbol], sources=[source] if source else None)
-        return {"symbol": symbol, "earnings_date": earnings_date, "present": (not df.empty)}
+        df = repo.get_earnings_by_date_range(
+            earnings_date,
+            earnings_date,
+            symbols=[symbol],
+            sources=[source] if source else None,
+        )
+        return {
+            "symbol": symbol,
+            "earnings_date": earnings_date,
+            "present": (not df.empty),
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -210,7 +276,11 @@ def symbol_earnings(symbol: str, days_back: int = Query(365, ge=1, le=3650)):
     repo = EarningsCalendarRepository()
     try:
         df = repo.get_historical_symbol_earnings(symbol, days_back=days_back)
-        return {"symbol": symbol, "rows": int(len(df)), "events": df.head(100).to_dict(orient="records") if not df.empty else []}
+        return {
+            "symbol": symbol,
+            "rows": int(len(df)),
+            "events": df.head(100).to_dict(orient="records") if not df.empty else [],
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

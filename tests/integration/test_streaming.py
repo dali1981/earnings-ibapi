@@ -2,18 +2,17 @@
 Integration tests for streaming components.
 """
 
-import threading
-import time
 from datetime import date, datetime, timedelta
-from unittest.mock import MagicMock, Mock, patch
-
-import pandas as pd
-import pytest
-
 from request_sequencer import RequestSequencer
 from response_sequencer import ResponseSequencer
 from sink import EquityBarSink, OptionBarSink, Sink
 from streamer import Config, EarningsStreamer
+from unittest.mock import MagicMock, Mock, patch
+
+import pandas as pd
+import pytest
+import threading
+import time
 
 
 @pytest.mark.integration

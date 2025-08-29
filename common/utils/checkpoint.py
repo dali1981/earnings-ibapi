@@ -1,8 +1,12 @@
 """Deprecated shim. Use `utils.events.checkpoint` instead."""
 
+from common.utils.events.checkpoint import (  # noqa: F401
+    load_checkpoint,
+    save_checkpoint,
+)
+
 import warnings
 
-from common.utils.events.checkpoint import load_checkpoint, save_checkpoint  # noqa: F401
 
 warnings.warn(
     "utils.checkpoint is deprecated; use utils.events.checkpoint",

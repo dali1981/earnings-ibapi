@@ -1,12 +1,13 @@
+from datetime import date, timedelta
+
 import pandas as pd
 import pytest
-from datetime import date, timedelta
 
 
 @pytest.mark.unit
 def test_backfill_equity_bars_writes_and_notifies(tmp_path, monkeypatch):
     from common.repositories.equity_bars import EquityBarRepository
-    from ibx_flows.backfill import BackfillConfig, backfill_equity_bars
+    from ibx_flows.backfill import backfill_equity_bars, BackfillConfig
 
     # Fake source implementing get_equity_bars
     class FakeSource:

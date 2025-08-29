@@ -1,20 +1,19 @@
-import datetime as dt
-import time
-from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple
-
-import pandas as pd
-from ibapi.contract import Contract
-
 from app_settings.settings import get_settings
-from ib_client import IBClient
-from ibx_time import ib_end_datetime
 from common.repos.equities import EquityBarRepository
+from common.utils import make_option, make_stock, RateLimiter
+from dataclasses import dataclass, field
+from ib_client import IBClient
+from ibapi.contract import Contract
+from ibx_time import ib_end_datetime
+from pathlib import Path
 from request_sequencer import RequestSequencer
 from response_sequencer import ResponseSequencer
 from sink import EquityBarSink, Sink
-from common.utils import RateLimiter, make_option, make_stock
+from typing import Any, Callable, Dict, List, Optional, Tuple
+
+import datetime as dt
+import pandas as pd
+import time
 
 
 @dataclass
@@ -63,9 +62,8 @@ class EarningsStreamer:
         p.mkdir(parents=True, exist_ok=True)
         return p
 
-    import logging
-
     import ibapi.utils
+    import logging
 
     logging.basicConfig(
         level=logging.INFO,

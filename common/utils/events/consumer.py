@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-import json
+from .checkpoint import load_checkpoint, save_checkpoint
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Optional
 
 import config
-from .checkpoint import load_checkpoint, save_checkpoint
+import json
 
 
 @dataclass
@@ -17,18 +17,34 @@ class ConsumerCheckpoint:
 
     @classmethod
     def from_dict(cls, d: Dict) -> "ConsumerCheckpoint":
-        return cls(filename=d.get("filename", ""), offset=int(d.get("offset", 0)), last_ts=float(d.get("last_ts", 0.0)))
+        return cls(
+            filename=d.get("filename", ""),
+            offset=int(d.get("offset", 0)),
+            last_ts=float(d.get("last_ts", 0.0)),
+        )
 
     def to_dict(self) -> Dict:
-        return {"filename": self.filename, "offset": self.offset, "last_ts": self.last_ts}
+        return {
+            "filename": self.filename,
+            "offset": self.offset,
+            "last_ts": self.last_ts,
+        }
 
 
 class JSONLConsumer:
-    def __init__(self, topic: str, *, cache_root: Optional[Path] = None, state_root: Optional[Path] = None):
+    def __init__(
+        self,
+        topic: str,
+        *,
+        cache_root: Optional[Path] = None,
+        state_root: Optional[Path] = None,
+    ):
         self.topic = topic
         self.cache_root = Path(cache_root) if cache_root else (config.CACHE_PATH)
         self.events_path = Path(self.cache_root) / "events" / f"{topic}.jsonl"
-        self.state_root = Path(state_root) if state_root else (config.CACHE_PATH / "state")
+        self.state_root = (
+            Path(state_root) if state_root else (config.CACHE_PATH / "state")
+        )
 
     def _cp_path(self, service: str) -> Path:
         return self.state_root / service / f"{self.topic}.json"
@@ -74,4 +90,3 @@ class JSONLConsumer:
         new_cp = ConsumerCheckpoint(filename=str(path), offset=offset, last_ts=last_ts)
         self._save_cp(service, new_cp)
         return events
-

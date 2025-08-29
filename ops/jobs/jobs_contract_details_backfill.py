@@ -37,6 +37,7 @@ def make_contract_by_conid(conid: int):
 
 import warnings
 
+
 warnings.warn(
     "jobs_contract_details_backfill.py is deprecated. Use ibx_flows/contracts_backfill or jobs/contracts_snapshot.py.",
     DeprecationWarning,

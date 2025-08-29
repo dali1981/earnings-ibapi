@@ -4,20 +4,22 @@ Core data lineage tracking components.
 
 from __future__ import annotations
 
-import time
-import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional, Set, Union
 
 import pandas as pd
+import time
+import uuid
+
 
 try:
     from common.reliability import get_trading_logger, log_context
 except ImportError:
-    import logging
     from contextlib import contextmanager
+
+    import logging
 
     def get_trading_logger(name: str):
         return logging.getLogger(name)

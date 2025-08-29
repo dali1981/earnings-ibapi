@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-import argparse
+from common.repositories.equity_bars import EquityBarRepository
 
+import argparse
 import pandas as pd
-from ibx_repos import EquityBarRepository
 
 
 def main():

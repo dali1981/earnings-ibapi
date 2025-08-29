@@ -16,10 +16,9 @@ Features:
 from dataclasses import asdict, dataclass
 from datetime import date, datetime, timedelta
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
 import json
-import logging
 import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
@@ -30,12 +29,14 @@ sys.path.append(str(Path(__file__).resolve().parents[2]))
 
 # Import configuration first
 from config import EARNINGS_CONFIG, EARNINGS_PATH
+
+
 # Avoid runtime import cycle: only import for type checking
 if TYPE_CHECKING:
     from earnings.fetcher import EarningsEvent
-from common.lineage.decorators import track_lineage
+
 from common.repositories.base import BaseRepository
-from common.utils.logging_setup import get_logger
+from common.instrumentation import get_trading_logger as get_logger
 
 
 logger = get_logger(__name__)
@@ -83,7 +84,7 @@ class EarningsCalendarRepository(BaseRepository):
         # Use configured retention policy
         self.retention_days = EARNINGS_CONFIG.get("retention_days", 365)
 
-        logger.info(f"📊 Initialized earnings repository with CONFIGURED settings:")
+        logger.info("📊 Initialized earnings repository with CONFIGURED settings:")
         logger.info(f"   Data path: {self.data_path}")
         logger.info(f"   Retention: {self.retention_days} days")
         logger.info(f"   Partitioning: {self.partition_cols}")
@@ -187,7 +188,9 @@ class EarningsCalendarRepository(BaseRepository):
                     logger.warning(f"Could not read existing parquet: {f}")
             combined = pd.concat(frames, ignore_index=True)
             before = len(combined)
-            combined = combined.drop_duplicates(subset=["symbol", "earnings_date", "source"])  # idempotent key
+            combined = combined.drop_duplicates(
+                subset=["symbol", "earnings_date", "source"]
+            )  # idempotent key
             after = len(combined)
 
             # Overwrite partition atomically: remove old files then write one consolidated file
@@ -288,14 +291,20 @@ class EarningsCalendarRepository(BaseRepository):
 
             # Convert date strings back to dates
             df["earnings_date"] = pd.to_datetime(df["earnings_date"]).dt.date
-            df["collection_date"] = pd.to_datetime(df.get("collection_date", None)).dt.date
+            df["collection_date"] = pd.to_datetime(
+                df.get("collection_date", None)
+            ).dt.date
 
             # Date filtering
-            df = df[(df["earnings_date"] >= start_date) & (df["earnings_date"] <= end_date)]
+            df = df[
+                (df["earnings_date"] >= start_date) & (df["earnings_date"] <= end_date)
+            ]
 
             # Deduplicate across combined frames to avoid repeats from multiple collection days
             if {"symbol", "earnings_date", "source"}.issubset(df.columns):
-                df = df.drop_duplicates(subset=["symbol", "earnings_date", "source"], keep="last")
+                df = df.drop_duplicates(
+                    subset=["symbol", "earnings_date", "source"], keep="last"
+                )
 
             # Additional filtering
             if symbols:
@@ -506,7 +515,10 @@ class EarningsCalendarRepository(BaseRepository):
         return pd.DataFrame(data)
 
     def _calculate_storage_metadata(
-        self, earnings: List["EarningsEvent"], collection_date: date, start_time: datetime
+        self,
+        earnings: List["EarningsEvent"],
+        collection_date: date,
+        start_time: datetime,
     ) -> EarningsStorageMetadata:
         """Calculate metadata for storage batch."""
 
@@ -610,7 +622,7 @@ def main():
 
     # Test storage stats
     stats = repo.get_storage_stats()
-    print(f"\n📊 Current storage stats:")
+    print("\n📊 Current storage stats:")
     print(f"   Collections: {stats['total_collections']}")
     print(f"   Total events: {stats['total_events']}")
     print(f"   Storage size: {stats['total_size_mb']} MB")

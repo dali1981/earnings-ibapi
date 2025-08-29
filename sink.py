@@ -1,13 +1,12 @@
-import logging
 from collections import defaultdict
+from common.repos.equities import EquityBarRepository
+from common.utils import append_parquet
+from option_repositories import BarRepository, ChainRepository
 from pathlib import Path
 from typing import Any, Dict, List
 
+import logging
 import pandas as pd
-
-from option_repositories import BarRepository, ChainRepository
-from common.repos.equities import EquityBarRepository
-from common.utils import append_parquet
 
 
 class Sink:

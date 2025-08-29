@@ -12,15 +12,16 @@ Drop-in replacement for your existing ibx/greeks_repo_first.py.
 
 from __future__ import annotations
 
-import math
-import time
-import warnings
 from dataclasses import dataclass
+from ibx import HistoricalService, make_option, SubscriptionService
+from ibx.time import ib_end_datetime_instrument, parse_ib_datetime_series
 from typing import Iterable, List, Optional, Sequence, Tuple
 
+import math
 import pandas as pd
-from ibx import HistoricalService, SubscriptionService, make_option
-from ibx.time import ib_end_datetime_instrument, parse_ib_datetime_series
+import time
+import warnings
+
 
 # ---------------- Black–Scholes helpers ----------------
 

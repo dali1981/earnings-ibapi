@@ -1,6 +1,6 @@
-import json
 from pathlib import Path
 
+import json
 import pytest
 
 
@@ -15,14 +15,21 @@ def test_jsonl_consumer_checkpoint_and_read(tmp_path):
 
     # Write two events
     def write_evt(payload, ts):
-        rec = {"type": "data.available", "topic": "equity_bars", "payload": payload, "ts": ts}
+        rec = {
+            "type": "data.available",
+            "topic": "equity_bars",
+            "payload": payload,
+            "ts": ts,
+        }
         with topic_file.open("a", encoding="utf-8") as f:
             f.write(json.dumps(rec) + "\n")
 
     write_evt({"symbol": "AAA"}, 1.0)
     write_evt({"symbol": "BBB"}, 2.0)
 
-    cons = JSONLConsumer("equity_bars", cache_root=tmp_path / "cache", state_root=state_root)
+    cons = JSONLConsumer(
+        "equity_bars", cache_root=tmp_path / "cache", state_root=state_root
+    )
 
     # First read returns both
     out1 = cons.read(service="svc")

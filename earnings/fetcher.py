@@ -18,11 +18,11 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+import asyncio
+import httpx
 import json
 import os
 import pandas as pd
-import asyncio
-import httpx
 import sys
 import time
 
@@ -137,16 +137,34 @@ class EarningsCalendarFetcher:
 
         self._async_client: Optional[httpx.AsyncClient] = None
 
-    async def _async_get_json(self, url: str, params: Dict[str, Any], timeout: float = 30.0, headers: Optional[Dict[str, str]] = None) -> Any:
+    async def _async_get_json(
+        self,
+        url: str,
+        params: Dict[str, Any],
+        timeout: float = 30.0,
+        headers: Optional[Dict[str, str]] = None,
+    ) -> Any:
         if self._async_client is None:
-            self._async_client = httpx.AsyncClient(headers=self._default_headers, timeout=timeout)
+            self._async_client = httpx.AsyncClient(
+                headers=self._default_headers, timeout=timeout
+            )
         h = {**self._default_headers, **(headers or {})}
-        resp = await self._async_client.get(url, params=params, headers=h, timeout=timeout)
+        resp = await self._async_client.get(
+            url, params=params, headers=h, timeout=timeout
+        )
         resp.raise_for_status()
         return resp.json()
 
-    def _get_json(self, url: str, params: Dict[str, Any], timeout: float = 30.0, headers: Optional[Dict[str, str]] = None) -> Any:
-        return asyncio.run(self._async_get_json(url, params, timeout=timeout, headers=headers))
+    def _get_json(
+        self,
+        url: str,
+        params: Dict[str, Any],
+        timeout: float = 30.0,
+        headers: Optional[Dict[str, str]] = None,
+    ) -> Any:
+        return asyncio.run(
+            self._async_get_json(url, params, timeout=timeout, headers=headers)
+        )
 
     def get_earnings_range(
         self,

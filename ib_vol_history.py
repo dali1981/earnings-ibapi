@@ -2,18 +2,18 @@
 # Pulls:
 #  A) Underlying 30d Historical Vol (HISTORICAL_VOLATILITY) and 30d Option IV (OPTION_IMPLIED_VOLATILITY)
 #  B) Option price bars (MIDPOINT), then computes per-bar contract IV via Black–Scholes
-import logging
-import math
-import time
 from dataclasses import dataclass
-from idlelib.run import install_recursionlimit_wrappers
-from typing import Dict, List, Tuple
-
 from ibapi.client import EClient
 from ibapi.common import BarData
 from ibapi.contract import Contract
 from ibapi.utils import iswrapper
 from ibapi.wrapper import EWrapper
+from idlelib.run import install_recursionlimit_wrappers
+from typing import Dict, List, Tuple
+
+import logging
+import math
+import time
 
 
 # ---------- Black–Scholes helpers ----------

@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-from typing import List, Optional
-
-from earnings.async_fetcher import AsyncEarningsCalendarFetcher
-from earnings import EarningsEvent, EarningsSource  # Use Pydantic-based models/enums
 from anyio import to_thread
+from earnings import EarningsEvent, EarningsSource  # Use Pydantic-based models/enums
+from earnings.async_fetcher import AsyncEarningsCalendarFetcher
+from typing import List, Optional
 
 
 class EarningsFetcherService:

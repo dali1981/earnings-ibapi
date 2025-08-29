@@ -3,8 +3,10 @@
 Debug Market Coverage - Check what APIs actually return
 """
 
-import sys
 from pathlib import Path
+
+import sys
+
 
 sys.path.append(str(Path(__file__).parent.parent))
 

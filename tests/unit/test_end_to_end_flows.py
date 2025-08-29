@@ -1,16 +1,17 @@
+from datetime import date, datetime, timedelta
+
 import pandas as pd
 import pytest
-from datetime import date, datetime, timedelta
 
 
 @pytest.mark.unit
 def test_flow_chain_then_option_bars_with_source_spot(tmp_path, monkeypatch):
-    from common.repositories.option_chains import OptionChainSnapshotRepository
     from common.repositories.option_bars import OptionBarRepository
+    from common.repositories.option_chains import OptionChainSnapshotRepository
     from ibx_flows.backfill import (
-        BackfillConfig,
-        backfill_option_chain_daily,
         backfill_option_bars,
+        backfill_option_chain_daily,
+        BackfillConfig,
     )
 
     # Fake IB source with chain snapshot, equity spot, and option bars
@@ -108,9 +109,9 @@ def test_flow_chain_then_option_bars_with_source_spot(tmp_path, monkeypatch):
 def test_option_bars_requires_spot_unless_source_provides_it(tmp_path, monkeypatch):
     from common.repositories.option_bars import OptionBarRepository
     from ibx_flows.backfill import (
-        BackfillConfig,
         backfill_equity_bars,
         backfill_option_bars,
+        BackfillConfig,
     )
 
     # Source without equity spot -> raises
@@ -186,8 +187,12 @@ def test_option_bars_requires_spot_unless_source_provides_it(tmp_path, monkeypat
 
     # Missing spot raises
     with pytest.raises(RuntimeError):
-        backfill_option_bars(NoEqSource(), opt_repo, chain_repo=None, eq_repo=None, cfg=cfg)
+        backfill_option_bars(
+            NoEqSource(), opt_repo, chain_repo=None, eq_repo=None, cfg=cfg
+        )
 
     # If source provides spot, it succeeds without prior equity repo
-    backfill_option_bars(EqOnlySource(), opt_repo, chain_repo=None, eq_repo=None, cfg=cfg)
+    backfill_option_bars(
+        EqOnlySource(), opt_repo, chain_repo=None, eq_repo=None, cfg=cfg
+    )
     assert list((base / "option_bars").rglob("*.parquet"))

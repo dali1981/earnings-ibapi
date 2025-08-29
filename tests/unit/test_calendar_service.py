@@ -1,6 +1,6 @@
-import asyncio
 from types import SimpleNamespace
 
+import asyncio
 import pytest
 
 
@@ -23,12 +23,19 @@ def _mk_event(symbol: str = "AAPL"):
 
 def test_earnings_service_calls_fetcher(monkeypatch):
     from services.calendar_api.service.earnings_service import EarningsService
+
     import earnings.fetcher as fetch_mod
 
     calls = {}
 
-    async def fake_async_get_upcoming_earnings(self, *, symbols=None, days_ahead=14, sources=None):
-        calls["args"] = {"symbols": symbols, "days_ahead": days_ahead, "sources": sources}
+    async def fake_async_get_upcoming_earnings(
+        self, *, symbols=None, days_ahead=14, sources=None
+    ):
+        calls["args"] = {
+            "symbols": symbols,
+            "days_ahead": days_ahead,
+            "sources": sources,
+        }
         return [_mk_event("AAPL"), _mk_event("MSFT")]
 
     monkeypatch.setattr(

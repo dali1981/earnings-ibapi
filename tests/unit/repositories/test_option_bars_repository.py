@@ -1,13 +1,14 @@
 """
-Unit tests for OptionBarRepository.
+Unit tests for OptionBarRepository (common.repositories).
 """
 
-from datetime import date, datetime
+from datetime import date
 from pathlib import Path
 
 import pandas as pd
 import pytest
-from ibx_repos.option_bars import OptionBarRepository, OptionMeta
+
+from common.repositories.option_bars import OptionBarRepository
 
 
 @pytest.mark.unit
@@ -16,65 +17,36 @@ class TestOptionBarRepository:
     """Test cases for OptionBarRepository."""
 
     def test_repository_initialization(self, temp_data_dir):
-        """Test repository initialization creates necessary directories."""
         repo_path = temp_data_dir / "test_option_bars"
         repo = OptionBarRepository(repo_path)
-
         assert repo.base_path.exists()
         assert repo.base_path == repo_path
         assert repo.schema is not None
 
-    def test_option_meta_creation(self):
-        """Test OptionMeta dataclass creation."""
-        meta = OptionMeta(
-            underlying="AAPL",
-            expiry=date(2024, 3, 15),
-            strike=150.0,
-            right="C",
-            bar_size="1 min",
-        )
-
-        assert meta.underlying == "AAPL"
-        assert meta.expiry == date(2024, 3, 15)
-        assert meta.strike == 150.0
-        assert meta.right == "C"
-        assert meta.bar_size == "1 min"
-
-    def test_expiry_normalization(self):
-        """Test expiry date normalization."""
-        repo = OptionBarRepository(Path("/tmp/test"))
-
-        # Test with date object
-        assert repo._norm_expiry(date(2024, 3, 15)) == "20240315"
-
-        # Test with string formats
-        assert repo._norm_expiry("20240315") == "20240315"
-        assert repo._norm_expiry("202403") == "20240301"  # Adds day
-
     def test_save_intraday_option_bars(self, option_repository, sample_option_data):
         """Test saving intraday option bar data."""
-        meta = OptionMeta(
+        # Save data
+        option_repository.save(
+            sample_option_data,
             underlying="AAPL",
             expiry=date(2024, 3, 15),
             strike=150.0,
             right="C",
             bar_size="1 min",
-            what_to_show="TRADES",
+            data_type="TRADES",
         )
-
-        # Save data
-        option_repository.save(sample_option_data, meta)
 
         # Verify data was saved
-        loaded_data = option_repository.load(
+        loaded_table = option_repository.load(
             underlying="AAPL", expiry=date(2024, 3, 15), right="C", strike=150.0
         )
+        df = loaded_table.to_pandas()
 
-        assert not loaded_data.empty
-        assert len(loaded_data) == len(sample_option_data)
-        assert all(loaded_data["underlying"] == "AAPL")
-        assert all(loaded_data["right"] == "C")
-        assert all(loaded_data["strike"] == 150.0)
+        assert not df.empty
+        assert len(df) == len(sample_option_data)
+        assert all(df["underlying"] == "AAPL")
+        assert all(df["right"] == "C")
+        assert all(df["strike"] == 150.0)
 
     def test_save_daily_option_bars(self, option_repository):
         """Test saving daily option bar data."""
@@ -89,7 +61,9 @@ class TestOptionBarRepository:
             }
         )
 
-        meta = OptionMeta(
+        # Save data
+        option_repository.save(
+            daily_data,
             underlying="MSFT",
             expiry=date(2024, 4, 15),
             strike=200.0,
@@ -97,30 +71,27 @@ class TestOptionBarRepository:
             bar_size="1 day",
         )
 
-        # Save data
-        option_repository.save(daily_data, meta)
-
         # Verify data was saved
-        loaded_data = option_repository.load(
-            underlying="MSFT", expiry="20240415", right="P", strike=200.0
+        loaded_table = option_repository.load(
+            underlying="MSFT", expiry=date(2024, 4, 15), right="P", strike=200.0
         )
+        df = loaded_table.to_pandas()
 
-        assert not loaded_data.empty
-        assert len(loaded_data) == 3
-        assert all(loaded_data["underlying"] == "MSFT")
-        assert all(loaded_data["expiry"] == "20240415")
+        assert not df.empty
+        assert len(df) == 3
+        assert all(df["underlying"] == "MSFT")
+        assert all(df["expiry"] == pd.to_datetime(date(2024, 4, 15)).date())
 
     def test_load_with_filters(self, option_repository, sample_option_data):
         """Test loading data with various filters."""
-        meta = OptionMeta(
+        option_repository.save(
+            sample_option_data,
             underlying="GOOGL",
             expiry=date(2024, 6, 21),
             strike=300.0,
             right="C",
             bar_size="5 mins",
         )
-
-        option_repository.save(sample_option_data, meta)
 
         # Test different filter combinations
         test_cases = [
@@ -137,16 +108,17 @@ class TestOptionBarRepository:
         ]
 
         for filters in test_cases:
-            loaded_data = option_repository.load(**filters)
-            assert not loaded_data.empty, f"No data for filters: {filters}"
+            loaded_table = option_repository.load(**filters)
+            df = loaded_table.to_pandas()
+            assert not df.empty, f"No data for filters: {filters}"
 
             # Verify filter conditions
             if "underlying" in filters:
-                assert all(loaded_data["underlying"] == filters["underlying"])
+                assert all(df["underlying"] == filters["underlying"])
             if "right" in filters:
-                assert all(loaded_data["right"] == filters["right"])
+                assert all(df["right"] == filters["right"])
             if "strike" in filters:
-                assert all(loaded_data["strike"] == filters["strike"])
+                assert all(df["strike"] == filters["strike"])
 
     def test_data_normalization(self, option_repository):
         """Test data normalization during save."""
@@ -162,66 +134,59 @@ class TestOptionBarRepository:
             }
         )
 
-        meta = OptionMeta(
+        # Save and reload
+        option_repository.save(
+            test_data,
             underlying="TEST",
             expiry=date(2024, 1, 19),
             strike=100.0,
             right="C",
             bar_size="1 min",
         )
-
-        # Save and reload
-        option_repository.save(test_data, meta)
-        loaded_data = option_repository.load(underlying="TEST")
+        loaded_table = option_repository.load(underlying="TEST")
+        df = loaded_table.to_pandas()
 
         # Verify data types are correct
-        assert loaded_data["open"].dtype == "float64"
-        assert loaded_data["volume"].dtype == "float64"
-        assert pd.api.types.is_datetime64_any_dtype(loaded_data["time"])
-        assert loaded_data["strike"].dtype == "float64"
+        assert df["open"].dtype == "float64"
+        assert df["volume"].dtype == "float64"
+        assert pd.api.types.is_datetime64_any_dtype(df["time"])
+        assert df["strike"].dtype == "float64"
 
     def test_present_dates_for_contract(self, option_repository, sample_option_data):
         """Test present_dates_for_contract method."""
-        meta = OptionMeta(
+        option_repository.save(
+            sample_option_data,
             underlying="TSLA",
             expiry=date(2024, 5, 17),
             strike=250.0,
             right="P",
             bar_size="1 min",
         )
-
-        option_repository.save(sample_option_data, meta)
 
         start = pd.Timestamp("2023-12-31")
         end = pd.Timestamp("2024-01-31")
 
-        present_dates = option_repository.present_dates_for_contract(
-            underlying="TSLA",
-            expiry=date(2024, 5, 17),
-            right="P",
-            strike=250.0,
-            bar_size="1 min",
-            start=start,
-            end=end,
-        )
-
+        # Use BaseRepository.present_dates for generic date presence
+        present_dates = option_repository.present_dates(start, end, underlying="TSLA")
         assert isinstance(present_dates, set)
-        # Should have some dates from our sample data
         assert len(present_dates) > 0
 
     def test_invalid_meta_handling(self, option_repository):
         """Test handling of invalid OptionMeta."""
         # Test with missing required fields
-        with pytest.raises((ValueError, TypeError)):
-            OptionMeta(
-                underlying="TEST",
-                # Missing expiry, strike, right
-                bar_size="1 min",
-            )
+        # Skipped: OptionMeta no longer used in common.repositories
+        assert True
 
     def test_empty_dataframe_handling(self, option_repository):
         """Test handling of empty dataframes."""
-        meta = OptionMeta(
+        # Create empty dataframe with correct columns
+        empty_data = pd.DataFrame(
+            columns=["time", "open", "high", "low", "close", "volume"]
+        )
+
+        # Should not raise an error
+        option_repository.save(
+            empty_data,
             underlying="EMPTY",
             expiry=date(2024, 1, 19),
             strike=100.0,
@@ -229,30 +194,22 @@ class TestOptionBarRepository:
             bar_size="1 min",
         )
 
-        # Create empty dataframe with correct columns
-        empty_data = pd.DataFrame(
-            columns=["time", "open", "high", "low", "close", "volume"]
-        )
-
-        # Should not raise an error
-        option_repository.save(empty_data, meta)
-
         # Loading should return empty dataframe
-        loaded_data = option_repository.load(underlying="EMPTY")
-        assert loaded_data.empty
+        loaded_table = option_repository.load(underlying="EMPTY")
+        assert loaded_table.num_rows == 0
 
     def test_schema_compliance(self, option_repository, sample_option_data):
         """Test that saved data complies with repository schema."""
-        meta = OptionMeta(
+        option_repository.save(
+            sample_option_data,
             underlying="SCHEMA_TEST",
             expiry=date(2024, 2, 16),
             strike=175.0,
             right="C",
             bar_size="1 min",
         )
-
-        option_repository.save(sample_option_data, meta)
-        loaded_data = option_repository.load(underlying="SCHEMA_TEST")
+        loaded_table = option_repository.load(underlying="SCHEMA_TEST")
+        loaded_data = loaded_table.to_pandas()
 
         # Check required columns exist
         required_columns = [

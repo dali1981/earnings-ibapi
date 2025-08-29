@@ -3,10 +3,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from math import erf, exp, isfinite, log, pi, sqrt
+from numpy.typing import ArrayLike
 from typing import Literal, Optional, Tuple
 
 import numpy as np
-from numpy.typing import ArrayLike
+
 
 Right = Literal["C", "P"]
 

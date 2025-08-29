@@ -2,14 +2,13 @@
 """
 Test script for the new repository system.
 """
-import tempfile
+# Test the new repositories
+from common.repositories import EquityBarRepository
 from datetime import date, datetime
 from pathlib import Path
 
 import pandas as pd
-
-# Test the new repositories
-from common.repositories import EquityBarRepository
+import tempfile
 
 
 def test_equity_bars_repository():

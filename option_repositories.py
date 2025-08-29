@@ -232,6 +232,7 @@ class BarRepository:
 #     )
 import warnings
 
+
 warnings.warn(
     "option_repositories.py is deprecated. Prefer repositories/ package classes.",
     DeprecationWarning,

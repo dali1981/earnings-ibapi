@@ -3,33 +3,30 @@
 Earnings calendar source abstractions and implementations.
 """
 
-import asyncio
-import random
 from abc import ABC, abstractmethod
-from datetime import date, timedelta
-from typing import List, Optional
-import httpx
-
 from common.utils import get_logger
+from datetime import date, timedelta
 from earnings.models import EarningsEvent, EarningsSource
-from typing import Dict, Type, Iterable
+from typing import Dict, Iterable, List, Optional, Type
+
+import asyncio
+import httpx
+import random
+
 
 logger = get_logger(__name__)
 
 
 class EarningsCalendarSource(ABC):
     """Abstract base class for earnings calendar data sources."""
-    
+
     @abstractmethod
     async def fetch_earnings_range(
-        self,
-        start_date: date,
-        end_date: date,
-        symbols: Optional[List[str]] = None
+        self, start_date: date, end_date: date, symbols: Optional[List[str]] = None
     ) -> List[EarningsEvent]:
         """Fetch earnings events for a date range."""
         pass
-    
+
     @property
     @abstractmethod
     def source_name(self) -> EarningsSource:
@@ -39,7 +36,7 @@ class EarningsCalendarSource(ABC):
 
 class NasdaqEarningsSource(EarningsCalendarSource):
     """NASDAQ earnings calendar source implementation."""
-    
+
     def __init__(self):
         self.base_url = "https://api.nasdaq.com/api/calendar/earnings"
         self.headers = {
@@ -47,24 +44,18 @@ class NasdaqEarningsSource(EarningsCalendarSource):
             "Accept": "application/json, text/plain, */*",
             "Referer": "https://www.nasdaq.com/",
         }
-    
+
     @property
     def source_name(self) -> EarningsSource:
         return EarningsSource.NASDAQ
-    
+
     async def fetch_earnings_range(
-        self,
-        start_date: date,
-        end_date: date,
-        symbols: Optional[List[str]] = None
+        self, start_date: date, end_date: date, symbols: Optional[List[str]] = None
     ) -> List[EarningsEvent]:
         """Fetch earnings for date range from NASDAQ API."""
         all_events = []
-        
-        async with httpx.AsyncClient(
-            headers=self.headers,
-            timeout=30.0
-        ) as client:
+
+        async with httpx.AsyncClient(headers=self.headers, timeout=30.0) as client:
             current = start_date
             while current <= end_date:
                 if current.weekday() < 5:  # Skip weekends
@@ -72,20 +63,16 @@ class NasdaqEarningsSource(EarningsCalendarSource):
                     all_events.extend(events)
                     await asyncio.sleep(0.5 + random.random() * 0.5)
                 current += timedelta(days=1)
-        
+
         return all_events
-    
+
     async def _fetch_day(
-        self,
-        client: httpx.AsyncClient,
-        day: date,
-        symbols: Optional[List[str]]
+        self, client: httpx.AsyncClient, day: date, symbols: Optional[List[str]]
     ) -> List[EarningsEvent]:
         """Fetch earnings for single day."""
         try:
             response = await client.get(
-                self.base_url,
-                params={"date": day.strftime("%Y-%m-%d")}
+                self.base_url, params={"date": day.strftime("%Y-%m-%d")}
             )
             response.raise_for_status()
             data = response.json()
@@ -93,38 +80,35 @@ class NasdaqEarningsSource(EarningsCalendarSource):
         except Exception as e:
             logger.error(f"Failed to fetch NASDAQ data for {day}: {e}")
             return []
-    
+
     def _parse_response(
-        self,
-        data: dict,
-        day: date,
-        symbols: Optional[List[str]]
+        self, data: dict, day: date, symbols: Optional[List[str]]
     ) -> List[EarningsEvent]:
         """Parse NASDAQ response to EarningsEvent list."""
         try:
             from earnings.models import NasdaqEarningsRow
-            
+
             rows = data.get("data", {}).get("rows", [])
             if not rows:
                 return []
-            
+
             symbol_set = {s.upper() for s in symbols} if symbols else None
             events = []
-            
+
             for row_data in rows:
                 try:
                     symbol = row_data.get("symbol", "").upper()
                     if symbol_set and symbol not in symbol_set:
                         continue
-                    
+
                     row = NasdaqEarningsRow(**row_data)
                     event = row.to_earnings_event(day)
                     events.append(event)
                 except Exception:
                     continue
-            
+
             return events
-            
+
         except Exception as e:
             logger.error(f"Parse failed for {day}: {e}")
             return []
@@ -132,7 +116,7 @@ class NasdaqEarningsSource(EarningsCalendarSource):
 
 class YahooEarningsSource(EarningsCalendarSource):
     """Yahoo Finance earnings calendar source implementation."""
-    
+
     def __init__(self):
         self.base_url = "https://query1.finance.yahoo.com/v1/finance/search"
         self.calendar_url = "https://query1.finance.yahoo.com/v8/finance/chart"
@@ -145,16 +129,13 @@ class YahooEarningsSource(EarningsCalendarSource):
             "Pragma": "no-cache",
             "Cache-Control": "no-cache",
         }
-    
+
     @property
     def source_name(self) -> EarningsSource:
         return EarningsSource.YAHOO
-    
+
     async def fetch_earnings_range(
-        self,
-        start_date: date,
-        end_date: date,
-        symbols: Optional[List[str]] = None
+        self, start_date: date, end_date: date, symbols: Optional[List[str]] = None
     ) -> List[EarningsEvent]:
         """Fetch earnings for date range from Yahoo Finance.
 
@@ -166,7 +147,9 @@ class YahooEarningsSource(EarningsCalendarSource):
             if symbols:
                 for symbol in symbols:
                     try:
-                        events = await self._fetch_symbol_earnings(client, symbol, start_date, end_date)
+                        events = await self._fetch_symbol_earnings(
+                            client, symbol, start_date, end_date
+                        )
                         all_events.extend(events)
                         await asyncio.sleep(0.2 + random.random() * 0.3)
                     except Exception as e:
@@ -248,12 +231,18 @@ class YahooEarningsSource(EarningsCalendarSource):
                     company = row.get("companyshortname") or row.get("shortName") or sym
                     # Datetime can be epoch seconds in 'startdatetime' or date string in 'startdate'
                     edate: Optional[date] = None
-                    ts = row.get("startdatetime") or row.get("startDate") or row.get("startdate")
+                    ts = (
+                        row.get("startdatetime")
+                        or row.get("startDate")
+                        or row.get("startdate")
+                    )
                     if isinstance(ts, (int, float)):
                         from datetime import datetime
+
                         edate = datetime.fromtimestamp(int(ts)).date()
                     elif isinstance(ts, str) and len(ts) >= 10:
                         from datetime import datetime
+
                         try:
                             edate = datetime.strptime(ts[:10], "%Y-%m-%d").date()
                         except Exception:
@@ -292,6 +281,7 @@ class YahooEarningsSource(EarningsCalendarSource):
             earnings_date = earnings.get("earningsDate", [{}])[0]
             if earnings_date and "raw" in earnings_date:
                 from datetime import datetime
+
                 earnings_timestamp = earnings_date["raw"]
                 earnings_dt = datetime.fromtimestamp(earnings_timestamp).date()
                 if start_date <= earnings_dt <= end_date:

@@ -10,14 +10,14 @@ Usage:
     python jobs/run_data_validation.py --config symbols.txt --full-report
 """
 
-from datetime import date, datetime, timedelta
-from jobs.orchestrator import DataValidation, PrerequisiteError
-from pathlib import Path
 from common.repositories import (
     EquityBarRepository,
     OptionBarRepository,
     OptionChainSnapshotRepository,
 )
+from datetime import date, datetime, timedelta
+from jobs.orchestrator import DataValidation, PrerequisiteError
+from pathlib import Path
 from typing import Any, Dict, List
 
 import argparse

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-import argparse
+from common.repositories.option_bars import OptionBarRepository
 
+import argparse
 import pandas as pd
-from ibx_repos import OptionBarRepository
 
 
 def main():

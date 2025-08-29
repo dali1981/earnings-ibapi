@@ -3,18 +3,19 @@ Structured logging integration for financial trading applications.
 Provides enhanced logging with context, correlation IDs, and performance metrics.
 """
 
-import json
-import logging
-import threading
-import time
-import uuid
+from .exceptions import BaseTradingException, ErrorCategory, ErrorSeverity
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from functools import wraps
 from typing import Any, Callable, Dict, Optional, Union
 
-from .exceptions import BaseTradingException, ErrorCategory, ErrorSeverity
+import json
+import logging
+import threading
+import time
+import uuid
+
 
 # Thread-local storage for correlation context
 _context_storage = threading.local()

@@ -28,14 +28,16 @@ import sys
 # Ensure project root on path
 sys.path.append(str(Path(__file__).parent.parent))
 
-from ibx_flows.backfill import backfill_option_bars, BackfillConfig
-from ibx_flows.source_ib import IBSource
 from common.repositories.option_bars import OptionBarRepository
 from common.utils.events.consumer import JSONLConsumer
 from common.utils.events.processed_index import ProcessedIndex
+from ibx_flows.backfill import backfill_option_bars, BackfillConfig
+from ibx_flows.source_ib import IBSource
 
 import config
 import pandas as pd
+
+
 try:
     from common.reliability.logging import log_context
 except Exception:

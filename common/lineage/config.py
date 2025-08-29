@@ -4,12 +4,12 @@ Configuration for data lineage tracking system.
 
 from __future__ import annotations
 
-import os
+from .core import OperationType
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from .core import OperationType
+import os
 
 
 @dataclass

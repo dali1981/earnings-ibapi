@@ -1,7 +1,8 @@
+from typing import Callable, List
+
 import logging
 import threading
 import time
-from typing import Callable, List
 
 
 class RequestSequencer:

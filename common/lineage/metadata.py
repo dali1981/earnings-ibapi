@@ -4,20 +4,20 @@ Metadata storage for data lineage information.
 
 from __future__ import annotations
 
-import json
+from .core import DataOperation, LineageNode, OperationType
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
+import json
 import pandas as pd
 import pyarrow as pa
 import pyarrow.dataset as ds
 import pyarrow.parquet as pq
 
-from .core import DataOperation, LineageNode, OperationType
 
 try:
-    from common.reliability import StorageException, get_trading_logger
+    from common.reliability import get_trading_logger, StorageException
 except ImportError:
     import logging
 

@@ -1,8 +1,8 @@
+from option_ticks import LiveVolTap
+
 import logging
 import threading
 import time
-
-from option_ticks import LiveVolTap
 
 
 def run_for(app, seconds, host="127.0.0.1", port=7497, client_id=42):

@@ -10,32 +10,44 @@ Usage examples:
 
 from __future__ import annotations
 
-import argparse
-import sys
 from datetime import date, timedelta
 from pathlib import Path
+
+import argparse
+import sys
+
 
 # Ensure project root on path
 sys.path.append(str(Path(__file__).parent.parent))
 
-import pandas as pd
+from common.repositories.earnings import EarningsCalendarRepository
 
 import config
-from common.repositories.earnings import EarningsCalendarRepository
+import pandas as pd
 
 
 def parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="Display upcoming earnings from the local DB")
-    p.add_argument("--days", type=int, default=30, help="Days ahead to display (default: 30)")
-    p.add_argument("--symbols", type=str, help="Comma-separated list of symbols to filter")
+    p = argparse.ArgumentParser(
+        description="Display upcoming earnings from the local DB"
+    )
+    p.add_argument(
+        "--days", type=int, default=30, help="Days ahead to display (default: 30)"
+    )
+    p.add_argument(
+        "--symbols", type=str, help="Comma-separated list of symbols to filter"
+    )
     p.add_argument("--source", type=str, help="Filter by source (e.g., nasdaq)")
-    p.add_argument("--limit", type=int, default=100, help="Max rows to show (default: 100)")
-    p.add_argument("--demo", action="store_true", help="Read from demo base (data/exports/demo)")
+    p.add_argument(
+        "--limit", type=int, default=100, help="Max rows to show (default: 100)"
+    )
+    p.add_argument(
+        "--demo", action="store_true", help="Read from demo base (data/exports/demo)"
+    )
     return p.parse_args()
 
 
 def trim(text: str, width: int) -> str:
-    s = (text or "")
+    s = text or ""
     return s if len(s) <= width else s[: width - 1] + "…"
 
 
@@ -51,7 +63,9 @@ def main() -> None:
     if args.symbols:
         symbols = [s.strip().upper() for s in args.symbols.split(",") if s.strip()]
 
-    df = repo.get_earnings_by_date_range(start_date=today, end_date=end, symbols=symbols)
+    df = repo.get_earnings_by_date_range(
+        start_date=today, end_date=end, symbols=symbols
+    )
 
     if args.source:
         df = df[df["source"].str.lower() == args.source.lower()]
@@ -66,7 +80,9 @@ def main() -> None:
     df = df.sort_values(["earnings_date", "symbol"]).head(args.limit)
 
     # Pretty print
-    print(f"📅 Upcoming earnings (next {args.days} days){' [demo]' if args.demo else ''}")
+    print(
+        f"📅 Upcoming earnings (next {args.days} days){' [demo]' if args.demo else ''}"
+    )
     print("=" * 60)
     header = f"{'Date':<12} {'Symbol':<8} {'Time':<5} {'Source':<8} Company"
     print(header)
@@ -82,4 +98,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

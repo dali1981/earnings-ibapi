@@ -4,6 +4,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Literal
 
+
 IB_HIST_FMT = "%Y%m%d %H:%M:%S"
 IB_DATE_FMT = "%Y%m%d"
 

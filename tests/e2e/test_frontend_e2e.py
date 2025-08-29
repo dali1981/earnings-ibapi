@@ -1,11 +1,13 @@
 import os
+import pytest
 import socket
 import threading
 import time
 
-import pytest
 
-playwright = pytest.importorskip("playwright.sync_api", reason="Playwright not installed; skip E2E")
+playwright = pytest.importorskip(
+    "playwright.sync_api", reason="Playwright not installed; skip E2E"
+)
 
 
 pytestmark = [pytest.mark.frontend_e2e]
@@ -48,18 +50,31 @@ def test_frontend_buttons_route_requests():
             CORSMiddleware,
             allow_origins=["*"],
             allow_credentials=True,
-            allow_methods=["*"]
-            ,
-            allow_headers=["*"]
+            allow_methods=["*"],
+            allow_headers=["*"],
         )
 
     @cal.get("/calendar/upcoming")
     def cal_upcoming(days: int, symbols: str | None = None):
-        return [{"symbol": "AAPL", "company_name": "Apple", "earnings_date": "2025-01-01", "source": "mock"}]
+        return [
+            {
+                "symbol": "AAPL",
+                "company_name": "Apple",
+                "earnings_date": "2025-01-01",
+                "source": "mock",
+            }
+        ]
 
     @eq.get("/equity/{symbol}/bars")
     def eq_bars(symbol: str, start: str, end: str, bar_size: str = "1 day"):
-        return {"symbol": symbol, "bar_size": bar_size, "start": start, "end": end, "rows": 0, "sample": []}
+        return {
+            "symbol": symbol,
+            "bar_size": bar_size,
+            "start": start,
+            "end": end,
+            "rows": 0,
+            "sample": [],
+        }
 
     @ch.get("/chains/{symbol}/latest")
     def ch_latest(symbol: str):
@@ -95,18 +110,24 @@ def test_frontend_buttons_route_requests():
         page.fill("#days", "7")
         page.fill("#symbols", "AAPL")
         page.click("#calendarForm button[type=submit]")
-        page.wait_for_function("document.querySelector('#calendarOut').textContent.includes('AAPL')")
+        page.wait_for_function(
+            "document.querySelector('#calendarOut').textContent.includes('AAPL')"
+        )
 
         # Equity: set fields and submit
         page.fill("#eqSymbol", "AAPL")
         page.fill("#eqStart", "2024-01-01")
         page.fill("#eqEnd", "2024-01-31")
         page.click("#equityForm button[type=submit]")
-        page.wait_for_function("document.querySelector('#equityOut').textContent.length > 0")
+        page.wait_for_function(
+            "document.querySelector('#equityOut').textContent.length > 0"
+        )
 
         # Chains: submit
         page.fill("#chSymbol", "AAPL")
         page.click("#chainForm button[type=submit]")
-        page.wait_for_function("document.querySelector('#chainOut').textContent.includes('as_of')")
+        page.wait_for_function(
+            "document.querySelector('#chainOut').textContent.includes('as_of')"
+        )
 
         browser.close()

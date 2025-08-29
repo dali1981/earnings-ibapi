@@ -9,6 +9,7 @@ from .equity_bars import EquityBarRepository
 from .option_bars import OptionBarRepository, OptionMeta
 from .service import FetchSpec, IBXDataService
 
+
 __all__ = [
     "ContractDescriptionsRepository",
     "EquityBarRepository",

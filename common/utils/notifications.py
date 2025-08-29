@@ -11,14 +11,14 @@ keep the system local-first. They can be added later behind env/config flags.
 
 from __future__ import annotations
 
-import json
-import logging
-import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Protocol
 
 import config
+import json
+import logging
+import time
 
 
 Severity = str  # one of: "critical", "error", "warning", "info", "success"
@@ -77,7 +77,12 @@ class FileNotifier:
         category: str = "general",
         context: Optional[Dict[str, Any]] = None,
     ) -> None:
-        note = Notification(message=message, severity=severity, category=category, context=dict(context or {}))
+        note = Notification(
+            message=message,
+            severity=severity,
+            category=category,
+            context=dict(context or {}),
+        )
         with self.path.open("a", encoding="utf-8") as f:
             f.write(note.to_json() + "\n")
 
@@ -125,7 +130,9 @@ class MultiNotifier:
             try:
                 n.notify(message, severity=severity, category=category, context=context)
             except Exception:  # pragma: no cover - best-effort fan-out
-                logging.getLogger("notifications").exception("Notifier failed: %s", type(n).__name__)
+                logging.getLogger("notifications").exception(
+                    "Notifier failed: %s", type(n).__name__
+                )
 
 
 def get_default_notifier(*, include_logger: bool = True) -> Notifier:
@@ -148,4 +155,3 @@ __all__ = [
     "MultiNotifier",
     "get_default_notifier",
 ]
-

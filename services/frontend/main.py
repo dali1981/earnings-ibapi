@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from pathlib import Path
-
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from pathlib import Path
+
 import os
 
 
@@ -29,9 +29,13 @@ def index(request: Request):
         "index.html",
         {
             "request": request,
-            "calendar_base": os.getenv("FRONTEND_CALENDAR_BASE", "http://localhost:9001"),
+            "calendar_base": os.getenv(
+                "FRONTEND_CALENDAR_BASE", "http://localhost:9001"
+            ),
             "equity_base": os.getenv("FRONTEND_EQUITY_BASE", "http://localhost:9002"),
             "chains_base": os.getenv("FRONTEND_CHAINS_BASE", "http://localhost:9004"),
-            "orchestrator_base": os.getenv("FRONTEND_ORCHESTRATOR_BASE", "http://localhost:9005"),
+            "orchestrator_base": os.getenv(
+                "FRONTEND_ORCHESTRATOR_BASE", "http://localhost:9005"
+            ),
         },
     )

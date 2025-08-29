@@ -18,22 +18,28 @@ Tested with TWS 10.24 / *ibapi* 10.24, Python 3.11.
 
 from __future__ import annotations
 
+from app_settings.settings import get_settings
+from common.utils.logging_setup import setup_logging, disable_noisy_loggers
+
 import argparse
 import datetime as dt
 import logging
 
-from app_settings.settings import get_settings
 
 # Logging is now configured globally in config.py
 log = logging.getLogger(__name__)
 
 from streamer import Config, EarningsStreamer
 
+
 # ───────────────────────────────────────────────────────────────────────────────
 # CLI entry point
 # ───────────────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
+    # Configure logging explicitly for CLI entry
+    setup_logging()
+    disable_noisy_loggers()
     cli = argparse.ArgumentParser("earnings_ibapi_streamer")
     cli.add_argument(
         "--symbol", required=True, help="Stock symbol to stream earnings for"

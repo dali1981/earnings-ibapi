@@ -1,5 +1,13 @@
 from __future__ import annotations
 
+from app_settings.settings import get_settings
+
+# Use new unified repository system
+from common.repositories import (
+    EquityBarRepository,
+    OptionBarRepository,
+    OptionChainSnapshotRepository,
+)
 from dataclasses import dataclass
 from datetime import date
 from ibx_flows.backfill import (
@@ -8,15 +16,7 @@ from ibx_flows.backfill import (
     BackfillConfig,
 )
 from ibx_flows.source_ib import IBSource
-from app_settings.settings import get_settings
 from pathlib import Path
-
-# Use new unified repository system
-from common.repositories import (
-    EquityBarRepository,
-    OptionBarRepository,
-    OptionChainSnapshotRepository,
-)
 from typing import Optional
 
 
@@ -57,7 +57,9 @@ class BackfillEquityBarsTask(Task):
         )
         repo = EquityBarRepository(self.out)
         s = get_settings()
-        src = IBSource(host=s.ib.host, port=s.ib.port, client_id=s.ib.client_id_contracts)
+        src = IBSource(
+            host=s.ib.host, port=s.ib.port, client_id=s.ib.client_id_contracts
+        )
         backfill_equity_bars(src, repo, cfg)
 
 
@@ -103,7 +105,9 @@ class BackfillOptionBarsTask(Task):
         )
         repo = OptionBarRepository(self.out)
         s = get_settings()
-        src = IBSource(host=s.ib.host, port=s.ib.port, client_id=s.ib.client_id_contracts)
+        src = IBSource(
+            host=s.ib.host, port=s.ib.port, client_id=s.ib.client_id_contracts
+        )
         backfill_option_bars(
             src, repo, chain_repo=self._chain_repo, eq_repo=None, cfg=cfg
         )

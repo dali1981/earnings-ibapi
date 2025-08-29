@@ -1,6 +1,6 @@
-import json
 from pathlib import Path
 
+import json
 import pytest
 
 
@@ -17,7 +17,12 @@ def test_file_notifier_appends_jsonl(tmp_path, monkeypatch):
     from common.utils.notifications import FileNotifier
 
     n = FileNotifier()
-    n.notify("Backfill completed", severity="success", category="jobs", context={"job": "equity_bars", "rows": 123})
+    n.notify(
+        "Backfill completed",
+        severity="success",
+        category="jobs",
+        context={"job": "equity_bars", "rows": 123},
+    )
 
     out = cache / "notifications.jsonl"
     assert out.exists(), "notifications jsonl should be created"
@@ -43,7 +48,11 @@ def test_multi_notifier_fanout(monkeypatch, caplog, tmp_path):
     m = MultiNotifier([file_n, log_n])
 
     with caplog.at_level("INFO"):
-        m.notify("Data available", category="events", context={"topic": "equity_bars", "symbol": "AAPL"})
+        m.notify(
+            "Data available",
+            category="events",
+            context={"topic": "equity_bars", "symbol": "AAPL"},
+        )
 
     # File notification present
     out = cache / "notifications.jsonl"
@@ -54,4 +63,3 @@ def test_multi_notifier_fanout(monkeypatch, caplog, tmp_path):
 
     # Logger emitted an info-level record containing the message
     assert any("Data available" in rec.message for rec in caplog.records)
-

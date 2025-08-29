@@ -1,9 +1,7 @@
-from typing import Any, Dict, List
-
-from ibapi.contract import Contract
-
 from .futures import IBFuture
 from .runtime import IBRuntime
+from ibapi.contract import Contract
+from typing import Any, Dict, List
 
 
 class MatchingSymbolService:

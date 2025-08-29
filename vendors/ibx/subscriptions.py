@@ -1,6 +1,7 @@
+from typing import Any, Callable, Dict, Optional
+
 import queue
 import threading
-from typing import Any, Callable, Dict, Optional
 
 
 class Subscription:

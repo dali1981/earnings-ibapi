@@ -2,15 +2,15 @@
 """
 Test runner script with custom configurations and reporting.
 """
-import argparse
-import json
-import os
-import subprocess
-import sys
 from datetime import datetime
 from pathlib import Path
 
+import argparse
+import json
+import os
 import pytest
+import subprocess
+import sys
 
 
 class TestRunner:

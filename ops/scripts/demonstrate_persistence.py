@@ -19,10 +19,10 @@ import sys
 # Add project root to path
 sys.path.append(str(Path(__file__).parent.parent))
 
+from common.repositories.earnings import EarningsCalendarRepository
 from config import EARNINGS_PATH
 from earnings.fetcher import EarningsCalendarFetcher, EarningsSource
 from jobs.daily_earnings_collection import DailyEarningsCollector
-from common.repositories.earnings import EarningsCalendarRepository
 
 
 def demonstrate_persistence(demo: bool = False):

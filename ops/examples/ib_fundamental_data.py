@@ -19,21 +19,27 @@ Prerequisites:
     - Valid IB account with market data subscriptions
 """
 
-import sys
 from pathlib import Path
+
+import sys
+
 
 sys.path.append(str(Path(__file__).parent.parent))
 
-import time
+from common.ib.fundamental_data import (
+    CalendarEvent,
+    CompanyFundamentals,
+    EarningsEstimate,
+    IBFundamentalDataFetcher,
+)
+from common.utils.logging_setup import get_logger, setup_logging
+from config import EXPORTS_PATH
 from datetime import date, timedelta
 from typing import Any, Dict, List, Optional
 
 import pandas as pd
+import time
 
-from config import EXPORTS_PATH
-from common.ib.fundamental_data import (CalendarEvent, CompanyFundamentals,
-                                 EarningsEstimate, IBFundamentalDataFetcher)
-from common.utils.logging_setup import get_logger, setup_logging
 
 logger = get_logger(__name__)
 

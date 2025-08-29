@@ -1,13 +1,13 @@
 from __future__ import annotations
 
+from app_settings.settings import get_settings
+from celery import shared_task
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence
 
 import httpx
 import pandas as pd
-from celery import shared_task
-from pathlib import Path
 
-from app_settings.settings import get_settings
 
 try:
     from vendors.ibx_repos.contract_descriptions import ContractDescriptionsRepository
@@ -17,9 +17,16 @@ except Exception:  # pragma: no cover
 
 def _normalize_matches(matches: List[dict]) -> pd.DataFrame:
     if not matches:
-        return pd.DataFrame(columns=[
-            "symbol", "conid", "sec_type", "currency", "primary_exchange", "derivative_sec_types"
-        ])
+        return pd.DataFrame(
+            columns=[
+                "symbol",
+                "conid",
+                "sec_type",
+                "currency",
+                "primary_exchange",
+                "derivative_sec_types",
+            ]
+        )
     rows: List[Dict[str, Any]] = []
     for m in matches:
         if not m:
@@ -42,14 +49,28 @@ def _normalize_matches(matches: List[dict]) -> pd.DataFrame:
         return df
     # No need to rename columns since we set them correctly above
     # Ensure all required columns exist
-    for col in ["symbol", "conid", "sec_type", "currency", "primary_exchange", "derivative_sec_types"]:
+    for col in [
+        "symbol",
+        "conid",
+        "sec_type",
+        "currency",
+        "primary_exchange",
+        "derivative_sec_types",
+    ]:
         if col not in df.columns:
             df[col] = None
     df["conid"] = pd.to_numeric(df["conid"], errors="coerce")
     return df
 
 
-@shared_task(name="search.fetch_matching_symbols", rate_limit="10/s", bind=True, max_retries=3, autoretry_for=(Exception,), retry_backoff=True)
+@shared_task(
+    name="search.fetch_matching_symbols",
+    rate_limit="10/s",
+    bind=True,
+    max_retries=3,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+)
 def fetch_matching_symbols_task(
     self,
     *,
@@ -80,11 +101,15 @@ def fetch_matching_symbols_task(
 
 
 @shared_task(name="search.save_contract_descriptions")
-def save_contract_descriptions_task(rows: List[Dict[str, Any]], base_path: Optional[str] = None) -> int:
+def save_contract_descriptions_task(
+    rows: List[Dict[str, Any]], base_path: Optional[str] = None
+) -> int:
     if not rows:
         return 0
     s = get_settings()
-    base = Path(base_path) if base_path else (s.paths.data_root / "contract_descriptions")
+    base = (
+        Path(base_path) if base_path else (s.paths.data_root / "contract_descriptions")
+    )
     repo = ContractDescriptionsRepository(base)
     # Create DataFrame directly from already-processed rows (don't normalize again)
     df = pd.DataFrame(rows)
@@ -93,4 +118,3 @@ def save_contract_descriptions_task(rows: List[Dict[str, Any]], base_path: Optio
         df["derivative_sec_types"] = [[] for _ in range(len(df))]
     repo.save(df)
     return len(df)
-

@@ -14,26 +14,37 @@ Key Concepts Demonstrated:
 6. Data lineage tracking and analysis
 """
 
-import logging
-import time
-from datetime import date, datetime, timedelta
-from pathlib import Path
-
-import pandas as pd
+# Core repository imports
+from common.repositories import (
+    EquityBarRepository,
+    OptionBarRepository,
+    OptionChainSnapshotRepository,
+)
 
 # Configuration
 from config import DATA_ROOT, EXPORTS_PATH
+from datetime import date, datetime, timedelta
+
 # Job orchestration
-from jobs.orchestrator import (DataPipelineOrchestrator, DataValidation,
-                               PrerequisiteError)
-# Core repository imports
-from common.repositories import (EquityBarRepository, OptionBarRepository,
-                          OptionChainSnapshotRepository)
+from jobs.orchestrator import (
+    DataPipelineOrchestrator,
+    DataValidation,
+    PrerequisiteError,
+)
+from pathlib import Path
+
+import logging
+import pandas as pd
+import time
+
 
 # Lineage tracking
 try:
-    from common.lineage import (LineageMetadataRepository, LineageTracker,
-                         set_global_tracker)
+    from common.lineage import (
+        LineageMetadataRepository,
+        LineageTracker,
+        set_global_tracker,
+    )
     from common.lineage.query import LineageQueryEngine
     from common.lineage.visualizer import LineageVisualizer
 

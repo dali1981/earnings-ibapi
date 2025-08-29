@@ -1,15 +1,16 @@
 from __future__ import annotations
 
-# --- NEW: subscriptions ---
-import logging
-import queue
-import threading
-from typing import TYPE_CHECKING, Callable, Dict, Optional
-
 from ibapi.client import EClient
 from ibapi.contract import Contract
 from ibapi.ticktype import TickTypeEnum
 from ibapi.wrapper import EWrapper
+from typing import Callable, Dict, Optional, TYPE_CHECKING
+
+# --- NEW: subscriptions ---
+import logging
+import queue
+import threading
+
 
 if TYPE_CHECKING:  # avoid runtime circular imports
     from api.ib_core import FutureRegistry, IBRuntime, RequestIdSequencer

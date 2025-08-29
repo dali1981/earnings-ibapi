@@ -3,18 +3,23 @@ Exponential backoff retry mechanism for financial trading operations.
 Provides configurable retry logic with jitter, maximum attempts, and custom stop conditions.
 """
 
-import asyncio
-import logging
-import random
-import time
+from .exceptions import (
+    BaseTradingException,
+    CircuitBreakerException,
+    ErrorSeverity,
+    get_error_severity,
+    is_recoverable_error,
+    RateLimitException,
+)
 from dataclasses import dataclass, field
 from enum import Enum
 from functools import wraps
 from typing import Any, Callable, Optional, Tuple, Type, Union
 
-from .exceptions import (BaseTradingException, CircuitBreakerException,
-                         ErrorSeverity, RateLimitException, get_error_severity,
-                         is_recoverable_error)
+import asyncio
+import logging
+import random
+import time
 
 
 class RetryStrategy(Enum):

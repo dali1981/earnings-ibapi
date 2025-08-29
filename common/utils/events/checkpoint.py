@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-import json
-import os
 from pathlib import Path
 from typing import Any, Dict
+
+import json
+import os
 
 
 def _atomic_write(path: Path, content: str) -> None:
@@ -24,4 +25,3 @@ def load_checkpoint(path: Path) -> Dict[str, Any]:
 
 def save_checkpoint(path: Path, data: Dict[str, Any]) -> None:
     _atomic_write(path, json.dumps(data, ensure_ascii=False, separators=(",", ":")))
-

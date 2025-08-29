@@ -19,26 +19,35 @@ Run example:
 from __future__ import annotations
 
 import pathlib
+
 # --- project-root import shim (so this runs from examples/ without installing) ---
 import sys
+
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 # -------------------------------------------------------------------------------
 
-import argparse
-import math
-import time
 from datetime import date
-from typing import Dict, Iterable, List, Optional, Tuple
-
-import pandas as pd
-from ibx import (HistoricalService, IBRuntime, SubscriptionService,
-                 make_option, make_stock)
+from ibx import (
+    HistoricalService,
+    IBRuntime,
+    make_option,
+    make_stock,
+    SubscriptionService,
+)
 from ibx.greeks_repo_first import option_greeks_repo_first
 from ibx.time import ib_end_datetime_instrument
-from ibx_repos import ChainRepository, OptionBarRepository
+from common.repositories.option_chains import OptionChainSnapshotRepository as ChainRepository
+from common.repositories.option_bars import OptionBarRepository
+from typing import Dict, Iterable, List, Optional, Tuple
+
+import argparse
+import math
+import pandas as pd
+import time
+
 
 # -------------------- small utils --------------------
 

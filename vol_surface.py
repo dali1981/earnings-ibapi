@@ -7,18 +7,17 @@ Usage:
         --expirations 20250117,20250221 --strikes 100,110,120
 """
 
-import argparse
-import datetime as dt
-from typing import List
-
-from ibapi.contract import Contract
-
+from common.utils import make_option, RateLimiter
 from ib_client import IBClient
+from ibapi.contract import Contract
 from ibx_time import ib_end_datetime
 from request_sequencer import RequestSequencer
 from sink import Sink
 from streamer import Config
-from common.utils import RateLimiter, make_option
+from typing import List
+
+import argparse
+import datetime as dt
 
 
 def parse_args() -> argparse.Namespace:

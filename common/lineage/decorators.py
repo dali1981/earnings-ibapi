@@ -4,11 +4,12 @@ Decorators for automatic lineage tracking.
 
 from __future__ import annotations
 
-import functools
-import inspect
+from .core import DataSource, LineageTracker, OperationType
 from typing import Any, Callable, Dict, List, Optional, Type, Union
 
-from .core import DataSource, LineageTracker, OperationType
+import functools
+import inspect
+
 
 try:
     from common.reliability import get_trading_logger

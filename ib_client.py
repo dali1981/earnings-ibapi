@@ -1,20 +1,20 @@
 # ————————————————————————————————————————————————————————————————
 # Streaming EWrapper/EClient implementation
 # ————————————————————————————————————————————————————————————————
-import logging
-import threading
 from collections import defaultdict
-from pathlib import Path
-from typing import Any, Dict, List
-
+from common.utils import append_parquet, RateLimiter
 from ibapi.client import EClient
 from ibapi.utils import iswrapper
 from ibapi.wrapper import EWrapper
-
+from pathlib import Path
 from request_sequencer import RequestSequencer
 from response_sequencer import ResponseSequencer
 from sink import Sink
-from common.utils import RateLimiter, append_parquet
+from typing import Any, Dict, List
+
+import logging
+import threading
+
 
 log = logging.getLogger(__name__)
 

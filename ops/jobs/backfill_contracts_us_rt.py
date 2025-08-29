@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
-import argparse
+from app_settings.settings import get_settings
+from celery import group
+from ibx_celery.app import app as celery_app  # ensure app is importable
+from ops.tasks.contracts import backfill_contracts_task
 from pathlib import Path
 from typing import Iterable, List, Sequence
 
-from celery import group
-
-from app_settings.settings import get_settings
-from ibx_celery.app import app as celery_app  # ensure app is importable
-from ops.tasks.contracts import backfill_contracts_task
+import argparse
 
 
 def _chunk(seq: Sequence[str], size: int) -> Iterable[List[str]]:
@@ -18,7 +17,9 @@ def _chunk(seq: Sequence[str], size: int) -> Iterable[List[str]]:
 
 
 def main() -> None:
-    p = argparse.ArgumentParser(description="Launch Celery backfill jobs for US contracts")
+    p = argparse.ArgumentParser(
+        description="Launch Celery backfill jobs for US contracts"
+    )
     settings = get_settings()
     p.add_argument("--root", type=Path, default=settings.repo.contracts_path)
     p.add_argument(
@@ -35,9 +36,21 @@ def main() -> None:
         help="Optional symbol search patterns; if omitted, worker will expand defaults",
     )
     p.add_argument("--chunk-size", type=int, default=200, help="Patterns per task")
-    p.add_argument("--use-service", action="store_true", help="Reuse long-lived IB runtime per worker")
-    p.add_argument("--via-api", action="store_true", help="Use FastAPI service instead of direct IB")
-    p.add_argument("--api-base", default=os.environ.get("IB_API_BASE", "http://localhost:9010"), help="Base URL for IB API service")
+    p.add_argument(
+        "--use-service",
+        action="store_true",
+        help="Reuse long-lived IB runtime per worker",
+    )
+    p.add_argument(
+        "--via-api",
+        action="store_true",
+        help="Use FastAPI service instead of direct IB",
+    )
+    p.add_argument(
+        "--api-base",
+        default=os.environ.get("IB_API_BASE", "http://localhost:9010"),
+        help="Base URL for IB API service",
+    )
     p.add_argument("--host", default=settings.ib.host)
     p.add_argument("--port", type=int, default=settings.ib.port)
     p.add_argument(

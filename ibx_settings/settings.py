@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-from functools import lru_cache
 from enum import StrEnum
+from functools import lru_cache
 from pathlib import Path
-from typing import Optional
-
-from pydantic import BaseModel, AnyHttpUrl, Field
+from pydantic import AnyHttpUrl, BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from typing import Optional
 
 
 class AppEnv(StrEnum):
@@ -85,4 +84,3 @@ def get_settings() -> Settings:
         # Example: tighten limits, different service base, etc. (keep as-is unless specified)
         pass
     return s
-

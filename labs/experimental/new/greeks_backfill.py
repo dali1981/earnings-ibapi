@@ -6,13 +6,12 @@ Option identity is passed by flags (underlying/expiry/right/strike).
 """
 from __future__ import annotations
 
-import argparse
 from datetime import datetime, timezone
-
-import pandas as pd
+from ibx_flows.greeks_historical import AsOfInputs, compute_table, OptionMeta
 from ibx_repos.greeks import CalculatedGreeksRepo
 
-from ibx_flows.greeks_historical import AsOfInputs, OptionMeta, compute_table
+import argparse
+import pandas as pd
 
 
 def parse_args():

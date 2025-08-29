@@ -1,14 +1,14 @@
 from __future__ import annotations
 
-import os
 from enum import StrEnum
 from functools import lru_cache
 from pathlib import Path
-from typing import Dict, Optional
-import tomllib
-
-from pydantic import BaseModel, AnyHttpUrl, Field
+from pydantic import AnyHttpUrl, BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from typing import Dict, Optional
+
+import os
+import tomllib
 
 
 class AppEnv(StrEnum):
@@ -18,16 +18,16 @@ class AppEnv(StrEnum):
 
 
 class PathsSettings(BaseModel):
-    project_root:  Path = Path(__file__).resolve().parents[2]
-    data_root:     Path = Field(default_factory=lambda: Path("./data"))
-    equity_bars:   Path = Field(default_factory=lambda: Path("./data/equity_bars"))
-    option_bars:   Path = Field(default_factory=lambda: Path("./data/option_bars"))
+    project_root: Path = Path(__file__).resolve().parents[2]
+    data_root: Path = Field(default_factory=lambda: Path("./data"))
+    equity_bars: Path = Field(default_factory=lambda: Path("./data/equity_bars"))
+    option_bars: Path = Field(default_factory=lambda: Path("./data/option_bars"))
     option_chains: Path = Field(default_factory=lambda: Path("./data/option_chains"))
-    contracts:     Path = Field(default_factory=lambda: Path("./data/contracts"))
-    earnings:      Path = Field(default_factory=lambda: Path("./data/earnings"))
-    exports:       Path = Field(default_factory=lambda: Path("./data/exports"))
-    cache:         Path = Field(default_factory=lambda: Path("./data/cache"))
-    logs:          Path = Field(default_factory=lambda: Path("./data/logs"))
+    contracts: Path = Field(default_factory=lambda: Path("./data/contracts"))
+    earnings: Path = Field(default_factory=lambda: Path("./data/earnings"))
+    exports: Path = Field(default_factory=lambda: Path("./data/exports"))
+    cache: Path = Field(default_factory=lambda: Path("./data/cache"))
+    logs: Path = Field(default_factory=lambda: Path("./data/logs"))
 
 
 class IBSettings(BaseModel):
@@ -53,29 +53,35 @@ class IBSettings(BaseModel):
 
 class ServiceConfig(BaseModel):
     """Configuration for a single service"""
+
     host: str = Field(default="localhost")
     port: int
     protocol: str = Field(default="http")
-    
+
     @property
     def url(self) -> str:
         """Construct the full URL from components"""
         return f"{self.protocol}://{self.host}:{self.port}"
 
+
 class ServicesConfig(BaseModel):
     """Configuration for all services"""
+
     frontend: ServiceConfig = Field(default_factory=lambda: ServiceConfig(port=9000))
     calendar: ServiceConfig = Field(default_factory=lambda: ServiceConfig(port=9001))
     equity: ServiceConfig = Field(default_factory=lambda: ServiceConfig(port=9002))
     options: ServiceConfig = Field(default_factory=lambda: ServiceConfig(port=9003))
     chains: ServiceConfig = Field(default_factory=lambda: ServiceConfig(port=9004))
-    orchestrator: ServiceConfig = Field(default_factory=lambda: ServiceConfig(port=9005))
+    orchestrator: ServiceConfig = Field(
+        default_factory=lambda: ServiceConfig(port=9005)
+    )
     ib_api: ServiceConfig = Field(default_factory=lambda: ServiceConfig(port=9010))
+
 
 class APISettings(BaseModel):
     # Service configurations
     services: ServicesConfig = Field(default_factory=ServicesConfig)
-    
+
     @property
     def contracts_service_base(self) -> str:
         """Backward compatibility for contracts service"""
@@ -97,8 +103,8 @@ class CeleryHistoricalLimits(BaseModel):
 
 
 class CelerySettings(BaseModel):
-    broker_url: Optional[str] = None
-    result_backend: Optional[str] = None
+    broker_url: Optional[str] = "amqp://localhost:5672/"
+    result_backend: Optional[str] = "rpc://"
     contracts: CeleryContractsLimits = CeleryContractsLimits()
     search: CelerySearchLimits = CelerySearchLimits()
     historical: CeleryHistoricalLimits = CeleryHistoricalLimits()
@@ -229,7 +235,7 @@ def get_settings() -> Settings:
     if s.env == AppEnv.dev:
         # Use RabbitMQ locally unless explicitly overridden
         if not s.celery.broker_url:
-            s.celery.broker_url = "amqp://guest:guest@localhost:5672//"
+            s.celery.broker_url = "amqp://guest:guest@127.0.0.1:5672//"
         if not s.celery.result_backend:
             s.celery.result_backend = "rpc://"
     # Ensure directories exist

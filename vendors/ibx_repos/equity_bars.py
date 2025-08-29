@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from ._util import _write_empty_dataset
 from datetime import date, datetime
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Set, Union
@@ -8,8 +9,6 @@ import pandas as pd
 import pyarrow as pa
 import pyarrow.dataset as ds
 import pyarrow.parquet as pq
-
-from ._util import _write_empty_dataset
 
 
 def _dataset_hive(path: str, schema: pa.Schema | None = None):
@@ -99,9 +98,8 @@ def _ensure_schema_columns(df: pd.DataFrame, required: list) -> pd.DataFrame:
     return df
 
 
-import re
-
 import pandas as pd
+import re
 
 
 def _parse_ib_datetime_series(s):

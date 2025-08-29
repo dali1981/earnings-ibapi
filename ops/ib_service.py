@@ -1,7 +1,9 @@
 from __future__ import annotations
 
-import atexit
 from typing import Optional
+
+import atexit
+
 
 try:
     from ibx import IBRuntime  # type: ignore
@@ -9,6 +11,7 @@ except Exception:  # pragma: no cover - fallback for vendored layout
     from ibx.runtime import IBRuntime  # type: ignore
 
 from app_settings.settings import get_settings
+
 
 _rt_singleton: Optional[IBRuntime] = None
 

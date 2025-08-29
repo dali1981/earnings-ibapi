@@ -3,17 +3,19 @@
 from __future__ import annotations
 
 from pathlib import Path
+
 import socket
 import sys
+
 
 # Ensure project root on sys.path for config and local imports
 sys.path.append(str(Path(__file__).parent.parent))
 
-from config import IB_CLIENT_ID, IB_HOST, IB_PORT, DATA_ROOT, EXPORTS_PATH
+from common.repositories.option_chains import OptionChainSnapshotRepository
+from config import DATA_ROOT, EXPORTS_PATH, IB_CLIENT_ID, IB_HOST, IB_PORT
 from datetime import datetime, timedelta
 from ibx_flows.backfill import backfill_option_chain_daily, BackfillConfig
 from ibx_flows.source_ib import IBSource
-from common.repositories.option_chains import OptionChainSnapshotRepository
 
 import argparse
 import logging
@@ -52,20 +54,36 @@ class FakeSource:
 if __name__ == "__main__":
     p = argparse.ArgumentParser(description="Backfill option chain snapshots")
     p.add_argument("--symbol", type=str, required=True, help="underlying symbol")
-    p.add_argument("--start", type=str, required=True, help="YYYY-MM-DD (deprecated; snapshots are current-only)")
-    p.add_argument("--end", type=str, required=True, help="YYYY-MM-DD (deprecated; snapshots are current-only)")
-    p.add_argument("--offline", action="store_true", help="Run without IB (fake source)")
+    p.add_argument(
+        "--start",
+        type=str,
+        required=True,
+        help="YYYY-MM-DD (deprecated; snapshots are current-only)",
+    )
+    p.add_argument(
+        "--end",
+        type=str,
+        required=True,
+        help="YYYY-MM-DD (deprecated; snapshots are current-only)",
+    )
+    p.add_argument(
+        "--offline", action="store_true", help="Run without IB (fake source)"
+    )
     p.add_argument("--host", default=IB_HOST)
     p.add_argument("--port", type=int, default=IB_PORT)
     args = p.parse_args()
 
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s"
+    )
     log.info(
         f"Starting option chain backfill for {args.symbol} from {args.start} to {args.end}"
     )
 
     # Deprecated behavior: IB does not provide historical chains; treat as a labeled snapshot (start=end)
-    log.warning("backfill_option_chains is deprecated. Use jobs/snapshot_option_chains.py --date instead.")
+    log.warning(
+        "backfill_option_chains is deprecated. Use jobs/snapshot_option_chains.py --date instead."
+    )
     snap_date = datetime.fromisoformat(args.end).date()
     cfg = BackfillConfig(underlying=args.symbol, start=snap_date, end=snap_date)
 

@@ -12,6 +12,7 @@ new code.
 
 import warnings as _warnings
 
+
 _warnings.warn(
     "The 'earnings_trading' package is deprecated. Use 'earnings.discovery' "
     "for pure discovery and 'trading.strategy_analyzer' for optional trading "

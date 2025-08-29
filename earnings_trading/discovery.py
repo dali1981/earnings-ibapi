@@ -9,17 +9,19 @@ for trading-related dataclasses/enums and scoring helpers.
 
 from __future__ import annotations
 
+from config import DISCOVERY_CONFIG, EXPORTS_PATH
 from dataclasses import dataclass
 from datetime import date
-from pathlib import Path
-from typing import Dict, List, Optional
-
-from config import DISCOVERY_CONFIG, EXPORTS_PATH
 from earnings.discovery import EarningsDiscoveryEngine as PureDiscoveryEngine
 from earnings.fetcher import EarningsEvent
-from trading.strategy_analyzer import (OptionsStrategy,
-                                       OptionsStrategyAnalyzer,
-                                       TradingOpportunity)
+from pathlib import Path
+from trading.strategy_analyzer import (
+    OptionsStrategy,
+    OptionsStrategyAnalyzer,
+    TradingOpportunity,
+)
+from typing import Dict, List, Optional
+
 
 # Backwards-compatible aliases
 EarningsCandidate = TradingOpportunity

@@ -8,77 +8,103 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from datetime import date, datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Union
+from typing import Any, Dict, List, Optional, Set, Union, Tuple, Iterable
 
-import logging
 import pandas as pd
 import pyarrow as pa
 import pyarrow.dataset as ds
 import pyarrow.parquet as pq
 import re
 
+from functools import reduce
+import operator
+from datetime import date, datetime
 
-# Import reliability components with fallback for development
-try:
-    from common.reliability import (
-        DataValidationException,
-        get_trading_logger,
-        log_context,
-        performance_log,
-        StorageException,
-    )
-except ImportError:
-    # Fallback implementations for development/testing
-    from contextlib import contextmanager
+from jedi.inference.value.iterable import Sequence
 
-    import logging
+Filter = Tuple[str, str, Any]
 
-    def get_trading_logger(name: str):
-        return logging.getLogger(name)
+def _ensure_list(x: Any) -> list:
+    if x is None:
+        return []
+    if isinstance(x, (str, bytes)):
+        return [x]
+    try:
+        return list(x)
+    except TypeError:
+        return [x]
 
-    @contextmanager
-    def log_context(**kwargs):
-        yield
+def _build_arrow_expression(filters: Sequence[Filter]) -> Optional[ds.Expression]:
+    if not filters:
+        return None
 
-    class DataValidationException(ValueError):
-        def __init__(self, message: str, field: str = None, **kwargs):
-            super().__init__(message)
-            self.field = field
-            self.context = kwargs
+    F = ds.field
+    exprs = []
 
-    class StorageException(Exception):
-        def __init__(self, message: str, storage_type: str = None, **kwargs):
-            super().__init__(message)
-            self.storage_type = storage_type
-            self.context = kwargs
+    for field, op, value in filters:
+        op = op.lower().strip()
 
-    def performance_log(operation: str):
-        def decorator(func):
-            return func
+        if op == "==":
+            e = (F(field) == value)
+        elif op == "!=":
+            e = (F(field) != value)
+        elif op == ">=":
+            e = (F(field) >= value)
+        elif op == ">":
+            e = (F(field) > value)
+        elif op == "<=":
+            e = (F(field) <= value)
+        elif op == "<":
+            e = (F(field) < value)
+        elif op == "in":
+            vals = _ensure_list(value)
+            e = F(field).isin(vals)  # empty list => always False (fine)
+        elif op == "not in":
+            vals = _ensure_list(value)
+            if not vals:
+                continue  # empty NOT IN => no-op (always True)
+            e = ~F(field).isin(vals)
+        elif op == "between":
+            lo, hi = value
+            parts = []
+            if lo is not None:
+                parts.append(F(field) >= lo)
+            if hi is not None:
+                parts.append(F(field) <= hi)
+            if not parts:
+                continue
+            e = reduce(lambda a, b: a & b, parts)
+        else:
+            raise ValueError(f"Unsupported op: {op}")
 
-        return decorator
+        exprs.append(e)
+
+    if not exprs:
+        return None
+    return reduce(lambda a, b: a & b, exprs)
 
 
-# Import lineage tracking components
-try:
-    from common.lineage.core import OperationType
-    from common.lineage.decorators import track_repository_operation
+# Lightweight instrumentation shim (no-op in tests when LIGHTWEIGHT_REPOS=1)
+from common.instrumentation import (
+    DataValidationException,
+    StorageException,
+    get_trading_logger,
+    log_context,
+    performance_log,
+)
 
-    LINEAGE_AVAILABLE = True
-except ImportError:
-    # Fallback when lineage not available
-    def track_repository_operation(operation_type):
-        def decorator(func):
-            return func
 
-        return decorator
+from common.instrumentation import OperationType, track_repository_operation
 
-    class OperationType:
-        READ = "read"
-        WRITE = "write"
+LINEAGE_AVAILABLE = True
 
-    LINEAGE_AVAILABLE = False
 
+def _as_list(x):
+    if x is None:
+        return None
+    if isinstance(x, (list, tuple, set)):
+        return [str(v) for v in x]
+    return [str(x)]
 
 class BaseRepository(ABC):
     """
@@ -113,6 +139,14 @@ class BaseRepository(ABC):
         # Create empty dataset if it doesn't exist
         if not any(self.dataset_path.rglob("*.parquet")):
             self._write_empty_dataset()
+
+    @property
+    def base(self) -> Path:
+        return self.base_path
+
+    @property
+    def schema(self) -> pa.Schema:
+        return self._schema
 
     @abstractmethod
     def _create_schema(self) -> pa.Schema:
@@ -155,26 +189,61 @@ class BaseRepository(ABC):
                 context={"dataset_path": str(self.dataset_path)},
             )
 
-    def _build_filter_expression(self, **kwargs) -> Optional[ds.Expression]:
-        """
-        Build PyArrow dataset filter expression from keyword arguments.
+    # def _build_filter_expression(self, **kwargs) -> Optional[ds.Expression]:
+    #     """
+    #     Build PyArrow dataset filter expression from keyword arguments.
+    #
+    #     Handles date normalization automatically for *_date columns.
+    #     """
+    #     expr = None
+    #
+    #     for key, value in kwargs.items():
+    #         if value is None:
+    #             continue
+    #
+    #         # Normalize date-like columns
+    #         if key.endswith("_date") or key == "date":
+    #             value = self._normalize_date_value(value)
+    #
+    #         term = ds.field(key) == value
+    #         expr = term if expr is None else (expr & term)
+    #
+    #     return expr
 
-        Handles date normalization automatically for *_date columns.
-        """
-        expr = None
-
-        for key, value in kwargs.items():
-            if value is None:
-                continue
-
-            # Normalize date-like columns
-            if key.endswith("_date") or key == "date":
-                value = self._normalize_date_value(value)
-
-            term = ds.field(key) == value
-            expr = term if expr is None else (expr & term)
-
-        return expr
+    # def _build_filter_expression(self, **kwargs):
+    #     exprs = []
+    #
+    #     # symbol | symbols -> string or list
+    #     symbols = kwargs.get("symbol")
+    #     if symbols is None:
+    #         symbols = kwargs.get("symbols")
+    #     if symbols is not None:
+    #         sym_list = _as_list(symbols)
+    #         if len(sym_list) == 1:
+    #             exprs.append(ds.field("symbol") == sym_list[0])
+    #         elif len(sym_list) > 1:
+    #             exprs.append(ds.field("symbol").isin(sym_list))
+    #
+    #     # Optional: exact date or range (adjust field names to your schema)
+    #     # Accepts Python date/datetime; Arrow handles the coercion.
+    #     if "date" in kwargs and kwargs["date"] is not None:
+    #         d = kwargs["date"]
+    #         if isinstance(d, (list, tuple, set)):
+    #             exprs.append(ds.field("date").isin(list(d)))
+    #         else:
+    #             exprs.append(ds.field("date") == d)
+    #
+    #     start = kwargs.get("start") or kwargs.get("start_date")
+    #     end = kwargs.get("end") or kwargs.get("end_date")
+    #     if start is not None:
+    #         exprs.append(ds.field("date") >= start)
+    #     if end is not None:
+    #         exprs.append(ds.field("date") <= end)
+    #
+    #     # Combine all with AND; return None if no filters (read all)
+    #     if not exprs:
+    #         return None
+    #     return reduce(operator.and_, exprs)
 
     def _normalize_date_value(
         self, value: Union[str, date, datetime, pd.Timestamp]
@@ -358,19 +427,26 @@ class BaseRepository(ABC):
 
     @performance_log("repository_load")
     @track_repository_operation(OperationType.READ)
-    def load(self, **kwargs) -> pd.DataFrame:
+    def load(self,
+             **kwargs
+             # filters: Optional[Sequence[Filter]]=None,
+             # columns: Optional[Iterable[str]] = None,
+    ) -> pa.Table:
         """
         Load data from Parquet dataset with filtering.
 
         Args:
-            **kwargs: Filter parameters (symbol, date, etc.)
+            filters: Filters to apply to the query
+            columns: Columns to include in the result table
 
         Returns:
-            Filtered DataFrame
+            Filtered Arrow table
         """
         with log_context(
             operation="repository_load", repository=self.dataset_name, filters=kwargs
         ):
+            filters = kwargs.pop("filters", None)
+            columns = kwargs.pop("columns", None)
             try:
                 # Create dataset
                 dataset = ds.dataset(
@@ -380,19 +456,41 @@ class BaseRepository(ABC):
                     schema=self._schema,
                 )
 
-                # Build filter expression
-                filter_expr = self._build_filter_expression(**kwargs)
+                # Build filter expression: explicit filters + simple equality kwargs
+                expr = _build_arrow_expression(filters or [])
 
-                # Load data
-                table = dataset.to_table(filter=filter_expr)
-                df = table.to_pandas()
+                # Support equality kwargs like symbol="AAPL", trade_date=...
+                if kwargs:
+                    kw_expr = None
+                    F = ds.field
+                    for key, value in kwargs.items():
+                        if value is None:
+                            continue
+                        # Normalize date-like keys
+                        if key.endswith("_date") or key == "date":
+                            if isinstance(value, str):
+                                try:
+                                    value = pd.to_datetime(value).date()
+                                except Exception:
+                                    pass
+                            elif hasattr(value, "date") and not isinstance(value, date):
+                                try:
+                                    value = value.date()
+                                except Exception:
+                                    pass
+                        term = (F(key) == value)
+                        kw_expr = term if kw_expr is None else (kw_expr & term)
+                    if kw_expr is not None:
+                        expr = kw_expr if expr is None else (expr & kw_expr)
+
+                table = dataset.to_table(columns=columns, filter=expr)
 
                 self.logger.debug(
-                    f"Loaded {len(df)} records from {self.dataset_name}",
-                    extra={"record_count": len(df), "filter_params": kwargs},
+                    f"Loaded {int(table.num_rows)} records from {self.dataset_name}",
+                    extra={"record_count": int(table.num_rows), "filter_params": kwargs},
                 )
 
-                return df
+                return table
 
             except Exception as e:
                 self.logger.error(
@@ -459,15 +557,15 @@ class BaseRepository(ABC):
             end_date = self._normalize_date_value(end_date)
 
             # Load data with filters
-            df = self.load(**filter_kwargs)
+            table = self.load(**filter_kwargs)
 
-            if df.empty:
+            if table.num_rows == 0:
                 return set()
 
             # Find date column (try common names)
             date_col = None
-            for col_name in ["trade_date", "date", "snapshot_date"]:
-                if col_name in df.columns:
+            for col_name in ["trade_date", "date", "snapshot_date", "created_at"]:
+                if col_name in table.column_names:
                     date_col = col_name
                     break
 
@@ -476,7 +574,7 @@ class BaseRepository(ABC):
                 return set()
 
             # Filter by date range and return unique dates
-            date_series = pd.to_datetime(df[date_col]).dt.date
+            date_series = pd.to_datetime(table.select([date_col]).to_pandas()[date_col]).dt.date
             mask = (date_series >= pd.to_datetime(start_date).date()) & (
                 date_series <= pd.to_datetime(end_date).date()
             )

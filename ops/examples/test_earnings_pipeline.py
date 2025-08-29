@@ -6,19 +6,21 @@ This demonstrates the correct workflow for earnings-driven options trading
 without requiring API keys.
 """
 
-import logging
-import sys
 from datetime import date, datetime, timedelta
 from pathlib import Path
+
+import logging
+import sys
+
 
 # Add project root to path
 sys.path.append(str(Path(__file__).parent.parent))
 
-from earnings.fetcher import EarningsCalendarFetcher, EarningsEvent
-from earnings_trading.discovery import (EarningsCandidate,
-                                        EarningsDiscoveryEngine)
 # Setup logging
 from common.utils.logging_setup import setup_logging
+from earnings.fetcher import EarningsCalendarFetcher, EarningsEvent
+from earnings_trading.discovery import EarningsCandidate, EarningsDiscoveryEngine
+
 
 setup_logging()
 logger = logging.getLogger(__name__)

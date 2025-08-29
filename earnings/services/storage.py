@@ -8,15 +8,15 @@ local summaries.
 
 from __future__ import annotations
 
-import logging
+from common.repositories.earnings import EarningsCalendarRepository
+from common.utils.events.bus import EventBus, FileEventBus
+from config import DATA_ROOT
 from datetime import date
+from earnings.fetcher import EarningsEvent
 from pathlib import Path
 from typing import List, Optional
 
-from config import DATA_ROOT
-from earnings.fetcher import EarningsEvent
-from common.repositories.earnings import EarningsCalendarRepository
-from common.utils.events.bus import EventBus, FileEventBus
+import logging
 
 
 logger = logging.getLogger(__name__)

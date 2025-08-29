@@ -1,16 +1,21 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from datetime import date
-from typing import List, Optional
-
-import pandas as pd
-from ibx import (ContractDetailsService, HistoricalService, IBRuntime,
-                 SecDefService, make_option, make_stock)
-
 from .chains import OptionChainSnapshotRepository
 from .equity_bars import EquityBarRepository
 from .option_bars import OptionBarRepository, OptionMeta
+from dataclasses import dataclass
+from datetime import date
+from ibx import (
+    ContractDetailsService,
+    HistoricalService,
+    IBRuntime,
+    make_option,
+    make_stock,
+    SecDefService,
+)
+from typing import List, Optional
+
+import pandas as pd
 
 
 @dataclass

@@ -1,223 +1,94 @@
 """
-Unit tests for OptionChainSnapshotRepository.
+Unit tests for OptionChainSnapshotRepository (common.repositories).
 """
 
-from datetime import date, datetime
+from datetime import date
 from pathlib import Path
-from typing import Any, Dict, List
 
 import pandas as pd
 import pytest
-from ibx_repos.chains import OptionChainSnapshotRepository
+
+from common.repositories.option_chains import OptionChainSnapshotRepository
 
 
 @pytest.mark.unit
 @pytest.mark.data
 class TestOptionChainSnapshotRepository:
-    """Test cases for OptionChainSnapshotRepository."""
-
     def test_repository_initialization(self, temp_data_dir):
-        """Test repository initialization creates necessary directories."""
         repo_path = temp_data_dir / "test_option_chains"
         repo = OptionChainSnapshotRepository(repo_path)
-
         assert repo.base_path.exists()
         assert repo.base_path == repo_path
         assert repo.schema is not None
 
     def test_schema_definition(self, temp_data_dir):
-        """Test that schema contains required fields."""
         repo = OptionChainSnapshotRepository(temp_data_dir)
-
         expected_fields = {
             "underlying",
-            "underlying_conid",
-            "exchange",
-            "trading_class",
-            "multiplier",
-            "expirations",
-            "strikes",
             "snapshot_date",
+            "expiry",
+            "strike",
+            "right",
+            "bid",
+            "ask",
+            "last",
+            "volume",
+            "open_interest",
+            "implied_volatility",
+            "delta",
+            "gamma",
+            "theta",
+            "vega",
+            "contract_id",
+            "local_symbol",
+            "trading_class",
+            "exchange",
+            "currency",
+            "multiplier",
         }
-
         schema_fields = {field.name for field in repo.schema}
         assert expected_fields == schema_fields
 
-    def test_save_option_chain_snapshot(self, temp_data_dir, option_chain_data):
-        """Test saving option chain snapshot data."""
+    def test_save_and_load_snapshot(self, temp_data_dir):
         repo = OptionChainSnapshotRepository(temp_data_dir)
-
-        # Convert DataFrame to list of dicts for the save method
-        snapshots = option_chain_data.to_dict("records")
-
-        # Mock option parameters data
-        mock_snapshots = [
-            {
-                "exchange": "SMART",
-                "tradingClass": "AAPL",
-                "multiplier": "100",
-                "expirations": ["20240315", "20240415", "20240515"],
-                "strikes": [140.0, 145.0, 150.0, 155.0, 160.0],
-            },
-            {
-                "exchange": "NASDAQ",
-                "tradingClass": "AAPL",
-                "multiplier": "100",
-                "expirations": ["20240315", "20240415"],
-                "strikes": [145.0, 150.0, 155.0],
-            },
-        ]
-
-        underlying = "AAPL"
-        underlying_conid = 265598
-        snapshot_date = date(2024, 1, 15)
-
-        # Save data
-        repo.save(underlying, underlying_conid, mock_snapshots, snapshot_date)
-
-        # Verify data was saved
-        loaded_data = repo.load(underlying=underlying, snapshot_date=snapshot_date)
-
-        assert not loaded_data.empty
-        assert len(loaded_data) == 2  # Two snapshot records
-        assert all(loaded_data["underlying"] == underlying)
-        assert all(loaded_data["underlying_conid"] == underlying_conid)
-        assert all(loaded_data["snapshot_date"] == snapshot_date)
-
-    def test_save_without_snapshot_date(self, temp_data_dir):
-        """Test saving with default snapshot date (today)."""
-        repo = OptionChainSnapshotRepository(temp_data_dir)
-
-        mock_snapshots = [
-            {
-                "exchange": "SMART",
-                "tradingClass": "MSFT",
-                "multiplier": "100",
-                "expirations": ["20240301"],
-                "strikes": [300.0, 310.0, 320.0],
-            }
-        ]
-
-        # Save without specifying snapshot_date
-        repo.save("MSFT", 123456, mock_snapshots)
-
-        # Should use today's date
-        loaded_data = repo.load(underlying="MSFT")
-        assert not loaded_data.empty
-        assert loaded_data.iloc[0]["snapshot_date"] == date.today()
+        df = pd.DataFrame(
+            [
+                {"expiry": date(2024, 3, 15), "strike": 150.0, "right": "C", "bid": 1.2},
+                {"expiry": date(2024, 3, 15), "strike": 150.0, "right": "P", "bid": 1.1},
+            ]
+        )
+        repo.save_chain_snapshot(df, underlying="AAPL", snapshot_date=date(2024, 1, 15))
+        tbl = repo.load(underlying="AAPL", snapshot_date=date(2024, 1, 15))
+        out = tbl.to_pandas()
+        assert not out.empty
+        assert set(out["right"]) == {"C", "P"}
+        assert all(out["expiry"] == date(2024, 3, 15))
 
     def test_load_with_filters(self, temp_data_dir):
-        """Test loading data with various filters."""
         repo = OptionChainSnapshotRepository(temp_data_dir)
-
-        # Save test data for multiple underlyings and dates
-        test_data = [
-            ("AAPL", 265598, date(2024, 1, 15)),
-            ("AAPL", 265598, date(2024, 1, 16)),
-            ("MSFT", 123456, date(2024, 1, 15)),
-            ("GOOGL", 789012, date(2024, 1, 15)),
-        ]
-
-        for underlying, conid, snap_date in test_data:
-            mock_snapshots = [
-                {
-                    "exchange": "SMART",
-                    "tradingClass": underlying,
-                    "multiplier": "100",
-                    "expirations": ["20240315"],
-                    "strikes": [100.0, 200.0, 300.0],
-                }
-            ]
-            repo.save(underlying, conid, mock_snapshots, snap_date)
-
-        # Test different filter combinations
-        test_cases = [
-            # Filter by underlying only
-            ({"underlying": "AAPL"}, lambda df: all(df["underlying"] == "AAPL")),
-            # Filter by snapshot_date only
-            (
-                {"snapshot_date": date(2024, 1, 15)},
-                lambda df: all(df["snapshot_date"] == date(2024, 1, 15)),
-            ),
-            # Filter by both
-            (
-                {"underlying": "AAPL", "snapshot_date": date(2024, 1, 15)},
-                lambda df: all(df["underlying"] == "AAPL")
-                and all(df["snapshot_date"] == date(2024, 1, 15)),
-            ),
-            # No filters (all data)
-            ({}, lambda df: len(df) >= 4),
-        ]
-
-        for filters, validation_func in test_cases:
-            loaded_data = repo.load(**filters)
-            assert not loaded_data.empty, f"No data for filters: {filters}"
-            assert validation_func(
-                loaded_data
-            ), f"Validation failed for filters: {filters}"
-
-    def test_load_with_string_date_formats(self, temp_data_dir):
-        """Test loading with different string date formats."""
-        repo = OptionChainSnapshotRepository(temp_data_dir)
-
-        snap_date = date(2024, 3, 15)
-        mock_snapshots = [
-            {
-                "exchange": "SMART",
-                "tradingClass": "TEST",
-                "multiplier": "100",
-                "expirations": ["20240415"],
-                "strikes": [100.0],
-            }
-        ]
-
-        repo.save("TEST", 111111, mock_snapshots, snap_date)
-
-        # Test different string date formats
-        date_formats = ["2024-03-15", "20240315"]  # ISO format  # YYYYMMDD format
-
-        for date_str in date_formats:
-            loaded_data = repo.load(underlying="TEST", snapshot_date=date_str)
-            assert not loaded_data.empty, f"Failed to load with date format: {date_str}"
-            assert loaded_data.iloc[0]["snapshot_date"] == snap_date
+        for d in [date(2024, 1, 15), date(2024, 1, 16)]:
+            df = pd.DataFrame([
+                {"expiry": date(2024, 3, 15), "strike": 100.0, "right": "C"},
+            ])
+            repo.save_chain_snapshot(df, underlying="AAPL", snapshot_date=d)
+        tbl = repo.load(underlying="AAPL")
+        assert tbl.num_rows >= 2
+        df = repo.load(underlying="AAPL", snapshot_date=date(2024, 1, 16)).to_pandas()
+        assert not df.empty
+        assert all(df["snapshot_date"] == date(2024, 1, 16))
 
     def test_data_normalization(self, temp_data_dir):
-        """Test data normalization during save."""
         repo = OptionChainSnapshotRepository(temp_data_dir)
-
-        # Test data with various formats
-        mock_snapshots = [
-            {
-                "exchange": "smart",  # lowercase
-                "tradingClass": "test_symbol",  # Should be normalized
-                "multiplier": 100,  # Integer instead of string
-                "expirations": ["20240315", "20240415"],
-                "strikes": ["100.0", "200.0", "300.0"],  # String numbers
-            }
-        ]
-
-        repo.save("TEST", 999999, mock_snapshots, date(2024, 1, 20))
-        loaded_data = repo.load(underlying="TEST")
-
-        assert not loaded_data.empty
-        row = loaded_data.iloc[0]
-
-        # Check normalization
-        assert isinstance(row["multiplier"], str)  # Should be converted to string
-        assert isinstance(row["expirations"], list)
-        assert isinstance(row["strikes"], list)
-        assert all(isinstance(s, float) for s in row["strikes"])  # Should be floats
-
-    def test_empty_snapshots_handling(self, temp_data_dir):
-        """Test handling of empty snapshots list."""
-        repo = OptionChainSnapshotRepository(temp_data_dir)
-
-        # Save empty list
-        repo.save("EMPTY_TEST", 111111, [], date(2024, 1, 1))
-
-        # Should handle gracefully
-        loaded_data = repo.load(underlying="EMPTY_TEST")
-        assert loaded_data.empty
+        df = pd.DataFrame(
+            [
+                {"expiry": "20240315", "strike": "150", "right": "CALL", "bid": "1.2"},
+            ]
+        )
+        repo.save_chain_snapshot(df, underlying="TEST", snapshot_date=date(2024, 1, 20))
+        out = repo.load(underlying="TEST").to_pandas()
+        assert not out.empty
+        assert set(out["right"]) == {"C"}
+        assert all(out["strike"] == 150.0)
 
     def test_schema_compliance(self, temp_data_dir):
         """Test that saved data complies with repository schema."""

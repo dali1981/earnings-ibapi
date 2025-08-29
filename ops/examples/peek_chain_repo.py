@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-import argparse
+from common.repositories.option_chains import OptionChainSnapshotRepository as ChainRepository
 
+import argparse
 import numpy as np
 import pandas as pd
-from ibx_repos import ChainRepository
 
 
 def _to_list(x):

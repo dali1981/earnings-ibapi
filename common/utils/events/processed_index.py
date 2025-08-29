@@ -1,18 +1,22 @@
 from __future__ import annotations
 
-import time
+from .checkpoint import load_checkpoint, save_checkpoint
 from pathlib import Path
 from typing import Optional
 
 import config
-from .checkpoint import load_checkpoint, save_checkpoint
+import time
 
 
 class ProcessedIndex:
-    def __init__(self, service: str, topic: str, state_root: Optional[Path] = None) -> None:
+    def __init__(
+        self, service: str, topic: str, state_root: Optional[Path] = None
+    ) -> None:
         self.service = service
         self.topic = topic
-        self.state_root = Path(state_root) if state_root else (config.CACHE_PATH / "state")
+        self.state_root = (
+            Path(state_root) if state_root else (config.CACHE_PATH / "state")
+        )
         self.path = self.state_root / service / f"{topic}_processed.json"
         self._cache = None
 
@@ -30,4 +34,3 @@ class ProcessedIndex:
         keys = data.setdefault("keys", {})
         keys[key] = time.time()
         save_checkpoint(self.path, data)
-

@@ -3,12 +3,12 @@ Unit tests for ContractDescriptionsRepository.
 """
 
 from datetime import date, datetime
-from pathlib import Path
-from typing import Any, Dict, List
+from common.repositories.contract_descriptions import ContractDescriptionsRepository, DataValidationException
 
 import pandas as pd
+import pyarrow as pa
+import pyarrow.compute as pc
 import pytest
-from ibx_repos.contract_descriptions import ContractDescriptionsRepository
 
 
 @pytest.mark.unit
@@ -27,21 +27,24 @@ class TestContractDescriptionsRepository:
     def test_schema_definition(self, temp_data_dir):
         """Test that schema contains required fields."""
         repo = ContractDescriptionsRepository(temp_data_dir)
-        schema = repo._schema()
+        schema = repo.schema
 
         expected_fields = {
             "conid",
             "symbol",
             "sec_type",
             "currency",
+            'sec_id',
+            'sec_id_type',
             "primary_exchange",
             "derivative_sec_types",
-            "as_of_date",
+            "created_at",
         }
 
         schema_fields = {field.name for field in schema}
-        assert expected_fields == schema_fields
+        assert  schema_fields == expected_fields
 
+    @pytest.mark.skip(reason="REQUIRED is not implemented yet/will not be.")
     def test_required_fields_constant(self):
         """Test REQUIRED fields constant."""
         expected_required = [
@@ -93,17 +96,19 @@ class TestContractDescriptionsRepository:
         repo.save(contract_data)
 
         # Verify data was saved
-        loaded_data = repo.read()
+        loaded_data = repo.load()
 
-        assert not loaded_data.empty
+        assert not loaded_data.num_rows == 0
         assert len(loaded_data) >= 3  # At least our 3 records
 
         # Check that symbols are present
-        symbols = set(loaded_data["symbol"].unique())
+        symbols = set(loaded_data["symbol"].to_pylist())
         assert {"AAPL", "MSFT", "GOOGL"}.issubset(symbols)
 
     def test_data_normalization_during_save(self, temp_data_dir):
         """Test data normalization during save process."""
+        # import pytest;pytest.set_trace()
+
         repo = ContractDescriptionsRepository(temp_data_dir)
 
         # Data with various formats that need normalization
@@ -129,18 +134,31 @@ class TestContractDescriptionsRepository:
         )
 
         repo.save(test_data)
-        loaded_data = repo.read(symbol=["TEST", "TEST2"])
+        loaded_data = repo.load(filters=[("symbol", "in", ["TEST", "TEST2"])])
 
-        assert not loaded_data.empty
+        assert loaded_data.num_rows > 0
 
-        # Check normalization
-        for _, row in loaded_data.iterrows():
-            assert isinstance(row["conid"], (int, pd.Int64Dtype))
-            assert row["symbol"].isupper()  # Should be uppercase
-            assert row["sec_type"].isupper()
-            assert row["currency"].isupper()
-            assert row["primary_exchange"].isupper()
-            assert isinstance(row["derivative_sec_types"], list)
+        # # Check normalization
+        # for _, row in loaded_data.iterrows():
+        #     assert isinstance(row["conid"], (int, pd.Int64Dtype))
+        #     assert row["symbol"].isupper()  # Should be uppercase
+        #     assert row["sec_type"].isupper()
+        #     assert row["currency"].isupper()
+        #     assert row["primary_exchange"].isupper()
+        #     assert isinstance(row["derivative_sec_types"], list)
+
+        # uppercase checks vectorized on columns
+        for colname in ["symbol", "sec_type", "currency", "primary_exchange"]:
+            col = loaded_data[colname]
+            # ensure all are uppercase: value == upper(value)
+            uppered = pc.utf8_upper(col)
+            assert pc.all(pc.equal(col, uppered)).as_py() is True
+
+        # derivative_sec_types are list<string> and each cell is listy
+        lists = loaded_data["derivative_sec_types"]
+        # check each element is a Python list when materialized
+        for arr in lists.to_pylist():
+            assert isinstance(arr, list)
 
     def test_save_with_missing_columns(self, temp_data_dir):
         """Test saving data with missing required columns."""
@@ -158,13 +176,18 @@ class TestContractDescriptionsRepository:
         )
 
         # Should handle missing columns by adding them with None/default values
-        repo.save(incomplete_data)
-        loaded_data = repo.read(symbol=["INCOMPLETE"])
-
-        if not loaded_data.empty:  # Data might be filtered out if validation fails
-            row = loaded_data.iloc[0]
-            assert row["symbol"] == "INCOMPLETE"
-            assert "as_of_date" in loaded_data.columns  # Should be added
+        with pytest.raises(DataValidationException) as ei:
+            repo.save(incomplete_data)
+        # filter = ("symbol", "in", ["INCOMPLETE"])
+        # loaded_data = repo.load(filters=[filter])
+        #
+        # if loaded_data.num_rows > 0:  # Data might be filtered out if validation fails
+        #     # get first row's symbol
+        #     sym = loaded_data.column("symbol")[0].as_py()
+        #     assert sym == "INCOMPLETE"
+        #
+        #     # column existence (Arrow)
+        #     assert "created_at" in loaded.schema.names
 
     def test_duplicate_handling(self, temp_data_dir):
         """Test handling of duplicate contract descriptions."""
@@ -185,11 +208,12 @@ class TestContractDescriptionsRepository:
         )
 
         repo.save(initial_data)
-        initial_count = len(repo.read(symbol=["DUPLICATE_TEST"]))
+        filter = ("symbol", "in", ["DUPLICATE_TEST"])
+        initial_count = len(repo.load(filters=[filter]))
 
         # Save same data again (should be deduplicated)
         repo.save(initial_data)
-        final_count = len(repo.read(symbol=["DUPLICATE_TEST"]))
+        final_count = len(repo.load(filters=[filter]))
 
         # Should not create duplicates for same conid and date
         assert final_count == initial_count
@@ -248,7 +272,11 @@ class TestContractDescriptionsRepository:
 
         for test_case in test_cases:
             expected_count = test_case.pop("expected_count")
-            loaded_data = repo.read(**test_case)
+
+            tickers = test_case.get("symbol")
+            tickers = tickers if isinstance(tickers, list) else [tickers]
+            filter = ("symbol", "in", tickers)
+            loaded_data = repo.load(filters=[filter]).to_pandas()
 
             actual_count = len(loaded_data)
             assert (
@@ -276,8 +304,9 @@ class TestContractDescriptionsRepository:
         repo.save(test_data)
 
         # Test reading with specific columns
+        filter = ("symbol", "in", ["COLUMN_TEST"])
         columns_to_read = ["conid", "symbol", "sec_type"]
-        loaded_data = repo.read(columns=columns_to_read, symbol=["COLUMN_TEST"])
+        loaded_data = repo.load(columns=columns_to_read, filters=[filter]).to_pandas()
 
         if not loaded_data.empty:
             # Should only have requested columns (plus any partition columns)
@@ -313,7 +342,7 @@ class TestContractDescriptionsRepository:
         )
 
         # Manually set as_of_date for testing
-        initial_data["as_of_date"] = test_date
+        initial_data["created_at"] = test_date
         repo.save(initial_data)
 
         # Test _existing_keys method
@@ -371,28 +400,37 @@ class TestContractDescriptionsRepository:
         )
 
         repo.save(test_data)
-        loaded_data = repo.read(
-            symbol=["DERIV_TEST1", "DERIV_TEST2", "DERIV_TEST3", "DERIV_TEST4"]
+        loaded_data = repo.load(
+            filters=[
+                ("symbol", "in", ["DERIV_TEST1", "DERIV_TEST2", "DERIV_TEST3", "DERIV_TEST4"])
+        ]
         )
 
-        assert not loaded_data.empty
+        assert loaded_data.num_rows > 0, "No data loaded"
 
-        # Check that all derivative_sec_types are lists
-        for _, row in loaded_data.iterrows():
-            deriv_types = row["derivative_sec_types"]
-            assert isinstance(
-                deriv_types, list
-            ), f"derivative_sec_types should be list, got {type(deriv_types)}"
+        assert loaded_data["derivative_sec_types"].type == pa.list_(pa.string())
+        assert ( loaded_data.filter(pc.field('symbol') == 'DERIV_TEST1').select(["derivative_sec_types"]).to_pylist()
+                 == [{'derivative_sec_types': ['OPT', 'FUT', 'WAR']}]
+            )
+        assert (loaded_data.filter(pc.field('symbol') == 'DERIV_TEST2').select(["derivative_sec_types"]).to_pylist()
+                == [{'derivative_sec_types': ['OPT', 'FUT']}]
+                )
+        assert (loaded_data.filter(pc.field('symbol') == 'DERIV_TEST3').select(["derivative_sec_types"]).to_pylist()
+                == [{'derivative_sec_types': []}]
+                )
+        assert (loaded_data.filter(pc.field('symbol') == 'DERIV_TEST4').select(["derivative_sec_types"]).to_pylist()
+                == [{'derivative_sec_types': ['OPT']}]
+                )
 
-            # Check content based on symbol
-            if row["symbol"] == "DERIV_TEST1":
-                assert set(deriv_types) == {"OPT", "FUT", "WAR"}
-            elif row["symbol"] == "DERIV_TEST2":
-                assert set(deriv_types) == {"OPT", "FUT"}
-            elif row["symbol"] == "DERIV_TEST3":
-                assert deriv_types == []  # Should be empty list for None
-            elif row["symbol"] == "DERIV_TEST4":
-                assert deriv_types == ["OPT"]
+        symbol = "DERIV_TEST1"
+        expected = ['OPT', 'FUT', 'WAR']
+        t = loaded_data.filter(pc.field("symbol") == symbol)
+        assert t.num_rows == 1
+
+        # value check (pure Arrow, no dict conversion)
+        val = t.column("derivative_sec_types").combine_chunks()[0].as_py()
+        assert val == expected
+
 
     def test_as_of_date_handling(self, temp_data_dir):
         """Test as_of_date field handling."""
@@ -408,7 +446,7 @@ class TestContractDescriptionsRepository:
                     "currency": "USD",
                     "primary_exchange": "NYSE",
                     "derivative_sec_types": [],
-                    "as_of_date": date(2024, 2, 15),  # date object
+                    "created_at": datetime(2024, 2, 15),  # date object
                 },
                 {
                     "conid": 500002,
@@ -417,7 +455,7 @@ class TestContractDescriptionsRepository:
                     "currency": "USD",
                     "primary_exchange": "NYSE",
                     "derivative_sec_types": [],
-                    "as_of_date": "2024-02-16",  # String date
+                    "created_at": "2024-02-16 9:20:00",  # String date
                 },
                 {
                     "conid": 500003,
@@ -432,23 +470,33 @@ class TestContractDescriptionsRepository:
         )
 
         repo.save(test_data)
-        loaded_data = repo.read(symbol=["DATE_TEST1", "DATE_TEST2", "DATE_TEST3"])
 
-        assert not loaded_data.empty
+        filter = ("symbol", "in", ["DATE_TEST1", "DATE_TEST2", "DATE_TEST3"])
+        loaded_data = repo.load(filters=[filter])
 
-        # All records should have as_of_date
-        for _, row in loaded_data.iterrows():
-            assert "as_of_date" in row
-            assert isinstance(row["as_of_date"], date)
+        assert loaded_data.num_rows > 0, "No data loaded"
 
+
+        assert loaded_data["created_at"].type == pa.timestamp('s', 'UTC')
+
+
+        data_df = loaded_data.to_pandas()
+        # All records should have created_at as timestamp
+        for _, row in data_df.iterrows():
+            assert "created_at" in row
+            assert pd.notna(row["created_at"])
+            
+            # Extract date from timestamp for comparison
+            created_date = row["created_at"].date() if hasattr(row["created_at"], 'date') else row["created_at"]
+            
             # Check specific dates
             if row["symbol"] == "DATE_TEST1":
-                assert row["as_of_date"] == date(2024, 2, 15)
+                assert created_date == date(2024, 2, 15)
             elif row["symbol"] == "DATE_TEST2":
-                assert row["as_of_date"] == date(2024, 2, 16)
+                assert created_date == date(2024, 2, 16)
             elif row["symbol"] == "DATE_TEST3":
                 # Should be today's date
-                assert row["as_of_date"] == date.today()
+                assert created_date == date.today()
 
     def test_first_char_partitioning(self, temp_data_dir):
         """Test first character partitioning functionality."""
@@ -488,7 +536,8 @@ class TestContractDescriptionsRepository:
 
         # Check that partitioned files exist (implementation dependent)
         # This tests the partitioning logic indirectly
-        loaded_data = repo.read()
+        loaded_tbl = repo.load()
+        loaded_data = loaded_tbl.to_pandas()
         a_symbols = loaded_data[loaded_data["symbol"].str.startswith("A", na=False)]
         b_symbols = loaded_data[loaded_data["symbol"].str.startswith("B", na=False)]
 
@@ -528,7 +577,8 @@ class TestContractDescriptionsRepository:
 
         # Time the load operation
         start_time = time.time()
-        loaded_data = repo.read()
+        loaded_tbl = repo.load()
+        loaded_data = loaded_tbl.to_pandas()
         load_time = time.time() - start_time
 
         assert load_time < 10.0, f"Load took too long: {load_time:.2f}s"
@@ -580,7 +630,7 @@ class TestContractDescriptionsRepositoryEdgeCases:
 
         # Should handle invalid conids gracefully
         repo.save(invalid_data)
-        loaded_data = repo.read(symbol=["INVALID_CONID", "NULL_CONID"])
+        loaded_data = repo.load(symbol=["INVALID_CONID", "NULL_CONID"]).to_pandas()
 
         # Invalid conids might be filtered out or converted
         # The behavior depends on implementation
@@ -608,7 +658,7 @@ class TestContractDescriptionsRepositoryEdgeCases:
 
         # Should handle long symbols
         repo.save(long_symbol_data)
-        loaded_data = repo.read(symbol=["A" * 100])
+        loaded_data = repo.load(symbol=["A" * 100]).to_pandas()
 
         # Should either truncate or handle the long symbol
         if not loaded_data.empty:
@@ -633,7 +683,7 @@ class TestContractDescriptionsRepositoryEdgeCases:
         )
 
         repo.save(special_data)
-        loaded_data = repo.read(symbol=["SPECIAL-TEST.A"])
+        loaded_data = repo.load(symbol=["SPECIAL-TEST.A"]).to_pandas()
 
         # Should handle special characters without corruption
         if not loaded_data.empty:
@@ -680,7 +730,7 @@ class TestContractDescriptionsRepositoryIntegration:
         repo.save(ib_contract_details)
 
         # Query for stocks with options
-        stocks_with_options = repo.read()
+        stocks_with_options = repo.load().to_pandas()
         stocks_with_options = stocks_with_options[
             stocks_with_options["derivative_sec_types"].apply(
                 lambda x: "OPT" in x if isinstance(x, list) else False
@@ -744,7 +794,7 @@ class TestContractDescriptionsRepositoryIntegration:
         repo.save(day2_data)
 
         # Query all data
-        all_data = repo.read()
+        all_data = repo.load().to_pandas()
 
         # Should have data from both days
         unique_dates = set(all_data["as_of_date"].unique())

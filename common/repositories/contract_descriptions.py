@@ -6,7 +6,6 @@ Handles storage and retrieval of IB contract description data.
 from __future__ import annotations
 
 from .base import BaseRepository
-from datetime import date
 from pathlib import Path
 from typing import List, Optional, Union
 
@@ -30,15 +29,18 @@ class ContractDescriptionsRepository(BaseRepository):
     Repository for IB contract descriptions with Hive partitioning.
 
     Partitioning strategy:
-    - All descriptions: partitioned by [symbol, sec_type]
+    - All descriptions: partitioned by [created_at]
 
-    Expected DataFrame columns:
+    Canonical schema columns (see _create_schema):
     - symbol: contract symbol
     - sec_type: security type (STK, OPT, FUT, etc.)
-    - contract_id: IB contract ID
-    - exchange: primary exchange
-    - currency: contract currency
-    - Optional: local_symbol, trading_class, multiplier, etc.
+    - conid: IB contract ID (int64)
+    - primary_exchange: primary exchange (nullable)
+    - currency: contract currency (nullable)
+    - sec_id_type: security id type (nullable)
+    - sec_id: security id (nullable)
+    - derivative_sec_types: list<string>
+    - created_at: date32 (partition key)
     """
 
     def __init__(self, base_path: Union[str, Path]):
@@ -50,38 +52,19 @@ class ContractDescriptionsRepository(BaseRepository):
             [
                 pa.field("symbol", pa.string()),
                 pa.field("sec_type", pa.string()),
-                pa.field("contract_id", pa.int64()),
-                pa.field("exchange", pa.string(), nullable=True),
+                pa.field("conid", pa.int64()),
                 pa.field("primary_exchange", pa.string(), nullable=True),
                 pa.field("currency", pa.string(), nullable=True),
-                pa.field("local_symbol", pa.string(), nullable=True),
-                pa.field("trading_class", pa.string(), nullable=True),
-                pa.field("multiplier", pa.int64(), nullable=True),
-                pa.field("min_tick", pa.float64(), nullable=True),
-                pa.field("price_magnifier", pa.int64(), nullable=True),
-                pa.field("under_contract_id", pa.int64(), nullable=True),
-                pa.field("long_name", pa.string(), nullable=True),
-                pa.field("industry", pa.string(), nullable=True),
-                pa.field("category", pa.string(), nullable=True),
-                pa.field("subcategory", pa.string(), nullable=True),
-                pa.field("timezone_id", pa.string(), nullable=True),
-                pa.field("trading_hours", pa.string(), nullable=True),
-                pa.field("liquid_hours", pa.string(), nullable=True),
-                pa.field("market_data_size_multiplier", pa.int64(), nullable=True),
-                pa.field("agg_group", pa.int64(), nullable=True),
-                pa.field("under_symbol", pa.string(), nullable=True),
-                pa.field("under_sec_type", pa.string(), nullable=True),
-                pa.field("market_rule_ids", pa.string(), nullable=True),
-                pa.field("real_expiration_date", pa.string(), nullable=True),
-                pa.field("last_trade_time", pa.string(), nullable=True),
-                pa.field("stock_type", pa.string(), nullable=True),
-                pa.field("created_date", pa.date32()),
+                pa.field("sec_id_type", pa.string(), nullable=True),
+                pa.field("sec_id", pa.string(), nullable=True),
+                pa.field("derivative_sec_types", pa.list_(pa.string())),
+                pa.field("created_at", pa.timestamp('s', 'UTC'), nullable=False),
             ]
         )
 
     def _get_partition_columns(self, **kwargs) -> List[str]:
         """Get partition columns for contract descriptions."""
-        return ["symbol", "sec_type"]
+        return ["created_at"]
 
     def _normalize_data(self, df: pd.DataFrame, **kwargs) -> pd.DataFrame:
         """
@@ -102,58 +85,38 @@ class ContractDescriptionsRepository(BaseRepository):
         # Rename standard columns
         out = self._rename_standard_columns(out)
 
-        # Handle common column name variations for IB contract details
+        # Handle common column name variations for IB contract details → canonical schema
         column_mapping = {
-            "conid": "contract_id",
-            "conId": "contract_id",
-            "contractid": "contract_id",
-            "contractId": "contract_id",
+            # ID
+            "conId": "conid",
+            "contractId": "conid",
+            "contractid": "conid",
+            "con_id": "conid",
+            "contract_id": "conid",
+            # Security type / symbol
             "sectype": "sec_type",
             "secType": "sec_type",
+            # Exchanges / currency
             "primaryexchange": "primary_exchange",
             "primaryExchange": "primary_exchange",
-            "localsymbol": "local_symbol",
-            "localSymbol": "local_symbol",
-            "tradingclass": "trading_class",
-            "tradingClass": "trading_class",
-            "mintick": "min_tick",
-            "minTick": "min_tick",
-            "pricemagnifier": "price_magnifier",
-            "priceMagnifier": "price_magnifier",
-            "undercontractid": "under_contract_id",
-            "underConId": "under_contract_id",
-            "longname": "long_name",
-            "longName": "long_name",
-            "timezoneid": "timezone_id",
-            "timezoneId": "timezone_id",
-            "tradinghours": "trading_hours",
-            "tradingHours": "trading_hours",
-            "liquidhours": "liquid_hours",
-            "liquidHours": "liquid_hours",
-            "marketdatasizemultiplier": "market_data_size_multiplier",
-            "mdSizeMultiplier": "market_data_size_multiplier",
-            "agggroup": "agg_group",
-            "aggGroup": "agg_group",
-            "undersymbol": "under_symbol",
-            "underSymbol": "under_symbol",
-            "undersectype": "under_sec_type",
-            "underSecType": "under_sec_type",
-            "marketruleids": "market_rule_ids",
-            "marketRuleIds": "market_rule_ids",
-            "realexpirationdate": "real_expiration_date",
-            "realExpirationDate": "real_expiration_date",
-            "lasttradetime": "last_trade_time",
-            "lastTradeTime": "last_trade_time",
-            "stocktype": "stock_type",
-            "stockType": "stock_type",
+            "exchange": "primary_exchange",
+            # Sec ID
+            "secIdType": "sec_id_type",
+            "secidtype": "sec_id_type",
+            "secId": "sec_id",
+            "secid": "sec_id",
+            # Derivative types
+            "derivativeSecTypes": "derivative_sec_types",
+            # Legacy date naming
+            "as_of_date": "created_at",
         }
 
         for old_name, new_name in column_mapping.items():
             if old_name in out.columns and new_name not in out.columns:
                 out[new_name] = out[old_name]
 
-        # Validate required columns
-        required_columns = ["symbol", "contract_id"]
+        # Validate required columns consistent with schema
+        required_columns = ["symbol", "sec_type", "conid"]
         missing_required = [col for col in required_columns if col not in out.columns]
         if missing_required:
             raise DataValidationException(
@@ -161,52 +124,46 @@ class ContractDescriptionsRepository(BaseRepository):
                 field="required_columns",
             )
 
-        # Normalize sec_type
-        if "sec_type" not in out.columns:
-            # Default to STK if not specified
-            out["sec_type"] = "STK"
-            self.logger.warning("sec_type not provided, defaulting to 'STK'")
-
-        # Validate contract_id
-        if "contract_id" in out.columns:
-            out["contract_id"] = pd.to_numeric(out["contract_id"], errors="coerce")
-            invalid_contract_ids = out["contract_id"].isna() | (out["contract_id"] <= 0)
-            if invalid_contract_ids.any():
-                raise DataValidationException(
-                    f"Found {invalid_contract_ids.sum()} invalid contract IDs",
-                    field="contract_id",
-                )
-            out["contract_id"] = out["contract_id"].astype("int64")
+        # Normalize/validate conid
+        out["conid"] = pd.to_numeric(out["conid"], errors="coerce").astype("Int64")
+        invalid_conid = out["conid"].isna() | (out["conid"] <= 0)
+        if invalid_conid.any():
+            raise DataValidationException(
+                f"Found {int(invalid_conid.sum())} invalid conid values", field="conid"
+            )
+        out["conid"] = out["conid"].astype("int64")
 
         # Convert numeric columns
-        numeric_columns = [
-            "multiplier",
-            "min_tick",
-            "price_magnifier",
-            "under_contract_id",
-            "market_data_size_multiplier",
-            "agg_group",
-        ]
-
-        for col in numeric_columns:
+        # Normalize text fields to uppercase where appropriate
+        for col in ["symbol", "sec_type", "currency", "primary_exchange"]:
             if col in out.columns:
-                if col in [
-                    "multiplier",
-                    "price_magnifier",
-                    "under_contract_id",
-                    "market_data_size_multiplier",
-                    "agg_group",
-                ]:
-                    # Integer columns
-                    out[col] = pd.to_numeric(out[col], errors="coerce").astype("Int64")
-                else:
-                    # Float columns
-                    out[col] = pd.to_numeric(out[col], errors="coerce")
+                out[col] = out[col].astype(str).str.upper()
 
-        # Add created_date
-        out["created_date"] = pd.Timestamp.now().date()
+        # Derivative sec types: ensure list[str]
+        def _to_list_str(x):
+            if x is None or (isinstance(x, float) and pd.isna(x)):
+                return []
+            if isinstance(x, str):
+                return [s.strip().upper() for s in x.split(",") if s.strip()]
+            if isinstance(x, (list, tuple, set)):
+                return [str(s).upper() for s in x]
+            return [str(x).upper()]
 
-        # Ensure all schema columns exist
+        out["derivative_sec_types"] = (
+            out["derivative_sec_types"].map(_to_list_str)
+            if "derivative_sec_types" in out.columns
+            else [[]] * len(out)
+        )
+
+        # created_at: ensure present and as timestamp (schema expects timestamp, not date)
+        if "created_at" not in out.columns:
+            out["created_at"] = pd.Timestamp.now(tz='UTC').replace(microsecond=0)
+        else:
+            out["created_at"] = pd.to_datetime(out["created_at"], utc=True)
+            # Fill any null values with current timestamp
+            out["created_at"] = out["created_at"].fillna(pd.Timestamp.now(tz='UTC').replace(microsecond=0))
+
+        # Ensure all schema columns exist (PyArrow requires all schema fields present)
         schema_columns = [field.name for field in self._schema]
         out = self._ensure_schema_columns(out, schema_columns)
 
@@ -219,11 +176,11 @@ class ContractDescriptionsRepository(BaseRepository):
         """Validate contract description data quality."""
 
         # Check for duplicate contract IDs
-        if "contract_id" in df.columns:
-            duplicate_contracts = df.duplicated(subset=["contract_id"])
+        if "conid" in df.columns:
+            duplicate_contracts = df.duplicated(subset=["conid"])
             if duplicate_contracts.any():
                 self.logger.warning(
-                    f"Found {duplicate_contracts.sum()} duplicate contract IDs"
+                    f"Found {duplicate_contracts.sum()} duplicate conid values"
                 )
 
         # Check for valid security types
@@ -302,9 +259,9 @@ class ContractDescriptionsRepository(BaseRepository):
             filters["sec_type"] = sec_type
 
         df = self.load(**filters)
-        return df.sort_values(["contract_id"]) if not df.empty else df
+        return df.sort_values(["conid"]) if not df.empty else df
 
-    def load_contract_by_id(self, contract_id: int) -> pd.DataFrame:
+    def load_contract_by_id(self, conid: int) -> pd.DataFrame:
         """
         Load contract description by contract ID.
 
@@ -319,8 +276,8 @@ class ContractDescriptionsRepository(BaseRepository):
         if df.empty:
             return df
 
-        # Filter by contract_id
-        result = df[df["contract_id"] == contract_id]
+        # Filter by conid
+        result = df[df["conid"] == conid]
         return result
 
     def get_symbols_by_type(self, sec_type: str) -> List[str]:
@@ -371,7 +328,7 @@ class ContractDescriptionsRepository(BaseRepository):
             df = df[mask]
 
         if exchange:
-            df = df[df["exchange"] == exchange]
+            df = df[df["primary_exchange"] == exchange]
 
         if currency:
             df = df[df["currency"] == currency]
@@ -380,7 +337,7 @@ class ContractDescriptionsRepository(BaseRepository):
             df = df[df["sec_type"] == sec_type]
 
         return (
-            df.sort_values(["symbol", "sec_type", "contract_id"])
+            df.sort_values(["symbol", "sec_type", "conid"])
             if not df.empty
             else df
         )
@@ -395,12 +352,12 @@ class ContractDescriptionsRepository(BaseRepository):
         df = self.load()
 
         if df.empty:
-            return pd.DataFrame(columns=["exchange", "contract_count", "symbol_count"])
+            return pd.DataFrame(columns=["primary_exchange", "contract_count", "symbol_count"])
 
         summary = (
-            df.groupby("exchange")
-            .agg({"contract_id": "count", "symbol": "nunique"})
-            .rename(columns={"contract_id": "contract_count", "symbol": "symbol_count"})
+            df.groupby("primary_exchange")
+            .agg({"conid": "count", "symbol": "nunique"})
+            .rename(columns={"conid": "contract_count", "symbol": "symbol_count"})
             .reset_index()
         )
 

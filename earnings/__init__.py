@@ -5,31 +5,24 @@ Provides earnings data fetching and priority-based scheduling capabilities
 for the trading data system.
 """
 
+# Async fetcher for advanced usage
+from .async_fetcher import AsyncEarningsCalendarFetcher
+
 # Legacy imports (keep for backward compatibility)
 from .fetcher import EarningsCalendarFetcher as LegacyEarningsCalendarFetcher
 
 # New Pydantic-based models
 from .models import (
+    EarningsCalendarResponse,
     EarningsEvent,
     EarningsSource,
     EarningsTimeOfDay,
-    EarningsCalendarResponse,
     NasdaqEarningsResponse,
     NasdaqEarningsRow,
 )
 
-# New unified fetcher with proper async support
-from .unified_fetcher import (
-    UnifiedEarningsCalendarFetcher,
-    get_default_fetcher,
-    get_upcoming_earnings,
-    get_historical_earnings,
-    get_earnings_range,
-    async_get_upcoming_earnings,
-)
-
-# Async fetcher for advanced usage
-from .async_fetcher import AsyncEarningsCalendarFetcher
+# Storage
+from .services.storage import EarningsPersistence
 
 # Source abstractions and implementations
 from .sources import (
@@ -38,8 +31,16 @@ from .sources import (
     YahooEarningsSource,
 )
 
-# Storage
-from .services.storage import EarningsPersistence
+# New unified fetcher with proper async support
+from .unified_fetcher import (
+    async_get_upcoming_earnings,
+    get_default_fetcher,
+    get_earnings_range,
+    get_historical_earnings,
+    get_upcoming_earnings,
+    UnifiedEarningsCalendarFetcher,
+)
+
 
 # Default fetcher alias for backward compatibility
 EarningsCalendarFetcher = UnifiedEarningsCalendarFetcher
@@ -59,7 +60,7 @@ __all__ = [
     "LegacyEarningsCalendarFetcher",
     # Sources
     "EarningsCalendarSource",
-    "NasdaqEarningsSource", 
+    "NasdaqEarningsSource",
     "YahooEarningsSource",
     # Convenience functions
     "get_default_fetcher",

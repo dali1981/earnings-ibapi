@@ -1,6 +1,7 @@
-import pytest
 from datetime import date
 from fastapi.testclient import TestClient
+
+import pytest
 
 
 pytestmark = [pytest.mark.unit, pytest.mark.calendar]
@@ -28,7 +29,9 @@ def test_add_events_writes_and_dedup(monkeypatch):
             return {"total_events_stored": len(events)}
 
     # Patch repository used for duplicate check in the router
-    monkeypatch.setattr(cal_mod, "EarningsCalendarRepository", lambda: FakeRepo(), raising=True)
+    monkeypatch.setattr(
+        cal_mod, "EarningsCalendarRepository", lambda: FakeRepo(), raising=True
+    )
 
     # Patch CalendarService to ensure writes go through our fake and are observable
     class FakeCalendarService:
@@ -36,7 +39,9 @@ def test_add_events_writes_and_dedup(monkeypatch):
             written_batches["count"] = len(events)
             return len(events)
 
-    monkeypatch.setattr(cal_mod, "CalendarService", lambda: FakeCalendarService(), raising=True)
+    monkeypatch.setattr(
+        cal_mod, "CalendarService", lambda: FakeCalendarService(), raising=True
+    )
 
     c = TestClient(app)
     payload = [

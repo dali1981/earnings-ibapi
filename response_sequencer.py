@@ -1,11 +1,11 @@
-import threading
 from datetime import date, datetime
-from typing import Any, Callable, Dict, List, Optional
-
-import pandas as pd
 from ibapi.client import EClient
 from ibapi.contract import Contract
 from ibapi.wrapper import EWrapper
+from typing import Any, Callable, Dict, List, Optional
+
+import pandas as pd
+import threading
 
 
 class ResponseSequencer:

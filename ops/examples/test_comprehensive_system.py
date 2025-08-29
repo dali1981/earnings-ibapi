@@ -5,21 +5,23 @@ Test script for the comprehensive daily update system with sample earnings data.
 This demonstrates the full system workflow without requiring API keys.
 """
 
+from datetime import date, datetime, timedelta
+from pathlib import Path
+
 import json
 import logging
 import sys
-from datetime import date, datetime, timedelta
-from pathlib import Path
+
 
 # Add project root to path
 sys.path.append(str(Path(__file__).parent.parent))
 
-from earnings.fetcher import (EarningsCalendarFetcher, EarningsEvent,
-                              EarningsSource)
-from earnings.scheduler import EarningsPriorityScheduler, SchedulePriority
-from jobs.orchestrator import DataPipelineOrchestrator
 # Setup logging
 from common.utils.logging_setup import setup_logging
+from earnings.fetcher import EarningsCalendarFetcher, EarningsEvent, EarningsSource
+from earnings.scheduler import EarningsPriorityScheduler, SchedulePriority
+from jobs.orchestrator import DataPipelineOrchestrator
+
 
 setup_logging()
 logger = logging.getLogger(__name__)

@@ -3,11 +3,11 @@ Unit tests for EquityBarRepository.
 """
 
 from datetime import date, datetime
+from common.repositories.equity_bars import EquityBarRepository
 from pathlib import Path
 
 import pandas as pd
 import pytest
-from ibx_repos.equity_bars import EquityBarRepository
 
 
 @pytest.mark.unit
@@ -24,6 +24,10 @@ class TestEquityBarRepository:
         assert repo.base_path == repo_path
         assert repo.schema is not None
 
+    @pytest.fixture
+    def equity_repository(self, temp_data_dir):
+        return EquityBarRepository(temp_data_dir / "equity_bars")
+
     def test_save_daily_bars(self, equity_repository, sample_equity_data):
         """Test saving daily bar data."""
         symbol = "AAPL"
@@ -33,11 +37,12 @@ class TestEquityBarRepository:
         equity_repository.save(sample_equity_data, symbol, bar_size, "TRADES")
 
         # Verify data was saved
-        loaded_data = equity_repository.load(symbol=symbol)
-        assert not loaded_data.empty
-        assert len(loaded_data) == len(sample_equity_data)
-        assert "symbol" in loaded_data.columns
-        assert all(loaded_data["symbol"] == symbol)
+        loaded_table = equity_repository.load(symbol=symbol)
+        df = loaded_table.to_pandas()
+        assert not df.empty
+        assert len(df) == len(sample_equity_data)
+        assert "symbol" in df.columns
+        assert all(df["symbol"] == symbol)
 
     def test_save_intraday_bars(self, equity_repository):
         """Test saving intraday bar data."""
@@ -61,27 +66,29 @@ class TestEquityBarRepository:
         equity_repository.save(intraday_data, symbol, bar_size, "TRADES")
 
         # Verify data was saved
-        loaded_data = equity_repository.load(symbol=symbol)
-        assert not loaded_data.empty
-        assert "trade_date" in loaded_data.columns
+        loaded_table = equity_repository.load(symbol=symbol)
+        df = loaded_table.to_pandas()
+        assert not df.empty
+        assert "trade_date" in df.columns
 
     def test_load_with_filters(self, populated_equity_repo):
         """Test loading data with various filters."""
         symbol = "AAPL"
 
         # Load all data for symbol
-        all_data = populated_equity_repo.load(symbol=symbol)
+        all_table = populated_equity_repo.load(symbol=symbol)
+        all_data = all_table.to_pandas()
         assert not all_data.empty
         assert all(all_data["symbol"] == symbol)
 
         # Load data for specific trade date
         target_date = date(2024, 1, 1)
-        filtered_data = populated_equity_repo.load(
+        filtered_table = populated_equity_repo.load(
             symbol=symbol, trade_date=target_date
         )
-
-        if not filtered_data.empty:
-            assert all(filtered_data["trade_date"] == target_date)
+        df = filtered_table.to_pandas()
+        if not df.empty:
+            assert all(df["trade_date"] == target_date)
 
     def test_present_dates(self, populated_equity_repo):
         """Test present_dates method."""
@@ -117,7 +124,8 @@ class TestEquityBarRepository:
 
         # Save and reload
         equity_repository.save(test_data, symbol, bar_size)
-        loaded_data = equity_repository.load(symbol=symbol)
+        loaded_table = equity_repository.load(symbol=symbol)
+        loaded_data = loaded_table.to_pandas()
 
         # Verify data types are correct
         assert loaded_data["open"].dtype == "float64"
@@ -137,9 +145,9 @@ class TestEquityBarRepository:
         # Should not raise an error
         equity_repository.save(empty_data, symbol, bar_size)
 
-        # Loading should return empty dataframe
-        loaded_data = equity_repository.load(symbol=symbol)
-        assert loaded_data.empty
+        # Loading should return empty table
+        loaded_table = equity_repository.load(symbol=symbol)
+        assert loaded_table.num_rows == 0
 
     def test_schema_compliance(self, equity_repository, sample_equity_data):
         """Test that saved data complies with repository schema."""
@@ -147,7 +155,8 @@ class TestEquityBarRepository:
         bar_size = "1 day"
 
         equity_repository.save(sample_equity_data, symbol, bar_size)
-        loaded_data = equity_repository.load(symbol=symbol)
+        loaded_table = equity_repository.load(symbol=symbol)
+        loaded_data = loaded_table.to_pandas()
 
         # Check required columns exist
         required_columns = [
@@ -184,11 +193,11 @@ class TestEquityBarRepository:
 
         # Time the load operation
         start_time = time.time()
-        loaded_data = equity_repository.load(symbol=symbol)
+        loaded_table = equity_repository.load(symbol=symbol)
         load_time = time.time() - start_time
 
         assert load_time < 10.0, f"Load took too long: {load_time:.2f}s"
-        assert len(loaded_data) == len(large_dataset)
+        assert int(loaded_table.num_rows) == len(large_dataset)
 
     def test_concurrent_access(self, equity_repository, sample_equity_data):
         """Test concurrent access to repository."""
@@ -271,7 +280,6 @@ class TestEquityBarRepositoryEdgeCases:
     def test_memory_efficiency(self, equity_repository):
         """Test memory efficiency with multiple symbols."""
         import os
-
         import psutil
 
         process = psutil.Process(os.getpid())

@@ -127,12 +127,13 @@ __all__ = [
 # Notifications exports
 from .notifications import (
     FileNotifier,
+    get_default_notifier,
     LoggerNotifier,
     MultiNotifier,
     Notification,
     Notifier,
-    get_default_notifier,
 )
+
 
 __all__ += [
     "Notification",

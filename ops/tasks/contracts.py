@@ -1,12 +1,12 @@
 from __future__ import annotations
 
+from app_settings.settings import get_settings
+from celery import shared_task
+from ibx_flows.contracts_backfill import backfill_us_equity_contracts, ContractsConfig
 from pathlib import Path
 from typing import Iterable, List, Optional, Sequence
 
-from celery import shared_task
 
-from app_settings.settings import get_settings
-from ibx_flows.contracts_backfill import ContractsConfig, backfill_us_equity_contracts
 try:
     from ibx_repos.contracts import ContractRepository  # type: ignore
 except Exception:  # pragma: no cover - fallback for vendored layout
@@ -18,11 +18,14 @@ except Exception:  # pragma: no cover - fallback for vendored layout
     from ibx.runtime import IBRuntime  # type: ignore
 
 from ops.ib_service import get_runtime
+
 import httpx
 import pandas as pd
 
 
-def _expand_patterns_if_needed(patterns: Optional[Sequence[str]]) -> Optional[List[str]]:
+def _expand_patterns_if_needed(
+    patterns: Optional[Sequence[str]],
+) -> Optional[List[str]]:
     # If None, let ContractsConfig default expansion handle it inside task
     if patterns is None:
         return None
@@ -61,7 +64,10 @@ def backfill_contracts_task(
     repo = ContractRepository(base)
 
     cfg = ContractsConfig(
-        exchanges=[str(e).upper() for e in (exchanges or ["NYSE", "NASDAQ", "AMEX", "ARCA", "BATS", "IEX"])],
+        exchanges=[
+            str(e).upper()
+            for e in (exchanges or ["NYSE", "NASDAQ", "AMEX", "ARCA", "BATS", "IEX"])
+        ],
         currency=currency,
         patterns=_expand_patterns_if_needed(patterns),
     ).normalized()
@@ -99,10 +105,12 @@ def _backfill_via_api(base: Path, cfg: ContractsConfig, base_url: str) -> None:
         df = pd.DataFrame(rows)
         if df.empty:
             return df
-        df = df.rename(columns={
-            "sectype": "sec_type",
-            "primaryexchange": "primary_exchange",
-        })
+        df = df.rename(
+            columns={
+                "sectype": "sec_type",
+                "primaryexchange": "primary_exchange",
+            }
+        )
         for col in ["symbol", "conid", "sec_type", "currency", "primary_exchange"]:
             if col not in df.columns:
                 df[col] = None
@@ -119,9 +127,11 @@ def _backfill_via_api(base: Path, cfg: ContractsConfig, base_url: str) -> None:
         return df
 
     with httpx.Client(base_url=base_url, timeout=30.0) as client:
-        for pat in (cfg.patterns or []):
+        for pat in cfg.patterns or []:
             try:
-                resp = client.post("/ib/matching-symbols", json={"pattern": pat, "timeout": 10.0})
+                resp = client.post(
+                    "/ib/matching-symbols", json={"pattern": pat, "timeout": 10.0}
+                )
                 resp.raise_for_status()
                 matches = resp.json()
             except Exception:
@@ -131,7 +141,10 @@ def _backfill_via_api(base: Path, cfg: ContractsConfig, base_url: str) -> None:
                 continue
             for conid in df["conid"].astype(int).tolist():
                 try:
-                    resp = client.post("/ib/contract-details", json={"contract": {"conId": int(conid)}, "timeout": 20.0})
+                    resp = client.post(
+                        "/ib/contract-details",
+                        json={"contract": {"conId": int(conid)}, "timeout": 20.0},
+                    )
                     resp.raise_for_status()
                     details = resp.json()
                 except Exception:
@@ -148,10 +161,12 @@ def _backfill_via_api(base: Path, cfg: ContractsConfig, base_url: str) -> None:
 
 def _from_contract_details_json(cd: dict) -> dict:
     c = cd.get("contract", {}) if isinstance(cd, dict) else {}
+
     def g(obj, key, default=None):
         if not isinstance(obj, dict):
             return default
         return obj.get(key, default)
+
     row = {
         "conid": int(g(c, "conId", 0) or 0),
         "symbol": g(c, "symbol"),

@@ -1,8 +1,8 @@
-import asyncio
+from fastapi.testclient import TestClient
 from types import SimpleNamespace
 
+import asyncio
 import pytest
-from fastapi.testclient import TestClient
 
 
 pytestmark = [pytest.mark.integration, pytest.mark.calendar]
@@ -28,7 +28,9 @@ def test_calendar_integration_monkeypatch_fetcher(monkeypatch):
     # Patch the underlying fetcher coroutine used by EarningsService
     import earnings.fetcher as fetch_mod
 
-    async def fake_async_get_upcoming_earnings(self, *, symbols=None, days_ahead=14, sources=None):
+    async def fake_async_get_upcoming_earnings(
+        self, *, symbols=None, days_ahead=14, sources=None
+    ):
         return [_mk_event("AAPL"), _mk_event("MSFT")]
 
     monkeypatch.setattr(

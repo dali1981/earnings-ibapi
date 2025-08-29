@@ -1,4 +1,5 @@
 from datetime import date
+from ibx_time import parse_ib_datetime_series
 from pathlib import Path
 from typing import List, Optional, Union
 
@@ -6,8 +7,6 @@ import pandas as pd
 import pyarrow as pa
 import pyarrow.dataset as ds
 import pyarrow.parquet as pq
-
-from ibx_time import parse_ib_datetime_series
 
 
 class EquityBarRepository:

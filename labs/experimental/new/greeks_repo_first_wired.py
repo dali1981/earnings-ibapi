@@ -5,18 +5,17 @@ from IB via your `ibx` runtime/services. Writes to CalculatedGreeksRepo.
 """
 from __future__ import annotations
 
-import argparse
 from datetime import datetime, timezone
-from typing import List
-
-import pandas as pd
 from ibx.contracts import make_option, make_stock
 from ibx.runtime import IBRuntime
 from ibx.services import HistoricalService
+from ibx_flows.greeks_historical import AsOfInputs, compute_table, OptionMeta
 from ibx_repos.greeks import CalculatedGreeksRepo
-
-from ibx_flows.greeks_historical import AsOfInputs, OptionMeta, compute_table
 from ibx_time.timebox import ensure_utc, to_ib_end_datetime
+from typing import List
+
+import argparse
+import pandas as pd
 
 
 def parse_args():

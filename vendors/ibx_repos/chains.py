@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from ._util import _write_empty_dataset
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Union
@@ -8,8 +9,6 @@ import pandas as pd
 import pyarrow as pa
 import pyarrow.dataset as ds
 import pyarrow.parquet as pq
-
-from ._util import _write_empty_dataset
 
 
 def _dataset_hive(path: str):
@@ -229,7 +228,7 @@ class OptionChainSnapshotRepository:
                 pc.field("underlying"),
                 pa.scalar(underlying, type=schema.field("underlying").type),
             )
-            expr = expr_u if expr is None else pc.and_(expr, expr_u)
+            expr = expr_u if expr is None else expr & expr_u
 
         # snapshot_date filter (date32)
         if snapshot_date is not None and "snapshot_date" in schema.names:
@@ -249,7 +248,7 @@ class OptionChainSnapshotRepository:
                 pc.field("snapshot_date"),
                 pa.scalar(dt, type=schema.field("snapshot_date").type),
             )
-            expr = expr_d if expr is None else pc.and_(expr, expr_d)
+            expr = expr_d if expr is None else expr & expr_d
 
         table = dset.to_table(filter=expr) if expr is not None else dset.to_table()
         df = table.to_pandas()

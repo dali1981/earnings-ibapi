@@ -1,5 +1,6 @@
-import threading
 from typing import Optional
+
+import threading
 
 
 class RequestIdSequencer:

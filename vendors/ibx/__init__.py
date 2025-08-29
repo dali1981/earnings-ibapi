@@ -6,11 +6,15 @@ from .contracts import make_option, make_stock
 from .futures import FutureRegistry, IBFuture
 from .ids import RequestIdSequencer
 from .runtime import IBRuntime
-from .services import (ContractDetailsService, HistoricalService,
-                       SecDefService, SubscriptionService)
-from .subscriptions import (Subscription, SubscriptionHandle,
-                            SubscriptionRegistry)
+from .services import (
+    ContractDetailsService,
+    HistoricalService,
+    SecDefService,
+    SubscriptionService,
+)
+from .subscriptions import Subscription, SubscriptionHandle, SubscriptionRegistry
 from .wrapper import IBWrapperBridge
+
 
 __all__ = [
     "IBRuntime",

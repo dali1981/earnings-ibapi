@@ -1,12 +1,11 @@
 from __future__ import annotations
 
+import math
 from datetime import date
-from typing import Optional
-
-from pydantic import BaseModel
-
 from earnings.fetcher import EarningsEvent
 from enum import Enum
+from pydantic import BaseModel, validator
+from typing import Optional
 
 
 class EarningsEventModel(BaseModel):
@@ -20,11 +19,26 @@ class EarningsEventModel(BaseModel):
     revenue_actual: Optional[float] = None
     source: str
 
+    @validator('eps_estimate', 'eps_actual', 'revenue_estimate', 'revenue_actual', pre=True)
+    def validate_float_fields(cls, v):
+        """Convert NaN and Infinity to None for JSON compatibility."""
+        if v is not None and (math.isnan(v) or math.isinf(v)):
+            return None
+        return v
+
     @classmethod
     def from_entity(cls, e: EarningsEvent) -> "EarningsEventModel":
         # Handle enum types from Pydantic models gracefully
-        time_val = e.time.value if isinstance(getattr(e, "time", None), Enum) else getattr(e, "time", None)
-        source_val = e.source.value if isinstance(getattr(e, "source", None), Enum) else getattr(e, "source", None)
+        time_val = (
+            e.time.value
+            if isinstance(getattr(e, "time", None), Enum)
+            else getattr(e, "time", None)
+        )
+        source_val = (
+            e.source.value
+            if isinstance(getattr(e, "source", None), Enum)
+            else getattr(e, "source", None)
+        )
         return cls(
             symbol=e.symbol,
             company_name=e.company_name,

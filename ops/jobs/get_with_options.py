@@ -1,5 +1,6 @@
 import warnings
 
+
 warnings.warn(
     "get_with_options.py is deprecated (ad-hoc inspection). Prefer repository queries or examples/.",
     DeprecationWarning,

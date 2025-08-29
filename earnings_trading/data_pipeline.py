@@ -12,21 +12,31 @@ Workflow:
 4. Execution system implements trades
 """
 
-import sys
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 
+import sys
+
+
 # Add path for centralized logging
 sys.path.append(str(Path(__file__).parent.parent))
-from earnings_trading.discovery import (EarningsCandidate,
-                                        EarningsDiscoveryEngine,
-                                        OptionsStrategy)
-# Import existing components
-from jobs.orchestrator import (DataPipelineOrchestrator, DataValidation,
-                               JobResult, JobType)
 from common.utils.logging_setup import get_logger
+from earnings_trading.discovery import (
+    EarningsCandidate,
+    EarningsDiscoveryEngine,
+    OptionsStrategy,
+)
+
+# Import existing components
+from jobs.orchestrator import (
+    DataPipelineOrchestrator,
+    DataValidation,
+    JobResult,
+    JobType,
+)
+
 
 logger = get_logger(__name__)
 

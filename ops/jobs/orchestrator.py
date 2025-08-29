@@ -12,10 +12,6 @@ from __future__ import annotations
 
 # Job task imports
 from .tasks import BackfillEquityBarsTask, BackfillOptionBarsTask
-from dataclasses import dataclass
-from datetime import date, datetime, timedelta
-from enum import Enum
-from pathlib import Path
 
 # Repository imports
 from common.repositories import (
@@ -24,6 +20,10 @@ from common.repositories import (
     OptionChainSnapshotRepository,
 )
 from common.repositories.contract_descriptions import ContractDescriptionsRepository
+from dataclasses import dataclass
+from datetime import date, datetime, timedelta
+from enum import Enum
+from pathlib import Path
 from typing import Dict, List, Optional, Set, Tuple
 
 import logging
@@ -461,6 +461,7 @@ class DataPipelineOrchestrator:
         self.logger.info(f"Running contract backfill for {symbol}")
 
         try:
+
             def _op():
                 # Placeholder: invoke actual job when implemented
                 # from jobs.backfill_contracts_us_rt import backfill_us_equity_contracts
@@ -494,6 +495,7 @@ class DataPipelineOrchestrator:
         self.logger.info(f"Running option chain snapshot for {symbol}")
 
         try:
+
             def _op():
                 # Placeholder for snapshot job
                 return None
@@ -530,6 +532,7 @@ class DataPipelineOrchestrator:
         )
 
         try:
+
             def _op():
                 task = BackfillEquityBarsTask(
                     symbol=symbol,

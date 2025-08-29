@@ -1,14 +1,14 @@
 # ───────────────────────────────────────────────────────────────────────────────
 # Helpers – construct official IB *Contract* objects
 # ───────────────────────────────────────────────────────────────────────────────
-import threading
-import time
+from ibapi.contract import Contract
 from pathlib import Path
 from typing import Any, Dict, List
 
 import pyarrow as pa
 import pyarrow.parquet as pq
-from ibapi.contract import Contract
+import threading
+import time
 
 
 def make_stock(symbol: str, exchange: str = "SMART", currency: str = "USD") -> Contract:

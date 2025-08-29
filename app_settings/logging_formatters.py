@@ -27,4 +27,3 @@ class ColorFormatter(logging.Formatter):
         if getattr(r, "name", None):
             r.name = f"{DIM}{r.name}{RESET}"
         return super().format(r)
-

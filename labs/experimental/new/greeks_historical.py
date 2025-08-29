@@ -3,14 +3,19 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from ibx_pricing.black_scholes import (
+    delta,
+    gamma,
+    implied_vol_from_price,
+    rho,
+    Right,
+    theta,
+    vega,
+)
+from ibx_time.timebox import ensure_utc
 from typing import Dict, Iterable, List, Literal, Optional
 
 import pandas as pd
-from ibx_pricing.black_scholes import (Right, delta, gamma,
-                                       implied_vol_from_price, rho, theta,
-                                       vega)
-
-from ibx_time.timebox import ensure_utc
 
 
 @dataclass(frozen=True)

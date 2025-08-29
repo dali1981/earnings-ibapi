@@ -36,12 +36,13 @@ Notes
 
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Optional, Union
 
 import pandas as pd
+import re
+
 
 # ----------------------------- Parsing -----------------------------
 

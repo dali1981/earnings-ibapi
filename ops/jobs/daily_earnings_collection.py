@@ -31,13 +31,13 @@ import sys
 # Add project root to path
 sys.path.append(str(Path(__file__).parent.parent))
 
-from config import EARNINGS_PATH
-from earnings.fetcher import EarningsCalendarFetcher, EarningsSource
 from common.lineage.decorators import track_lineage
 from common.reliability.circuit_breaker import CircuitBreaker, CircuitBreakerConfig
 from common.reliability.retry import retry
 from common.repositories.earnings import EarningsCalendarRepository
 from common.utils.logging_setup import get_logger
+from config import EARNINGS_PATH
+from earnings.fetcher import EarningsCalendarFetcher, EarningsSource
 
 
 logger = get_logger(__name__)

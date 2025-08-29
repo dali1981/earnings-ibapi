@@ -1,7 +1,8 @@
-import logging
-
 from ibapi.common import *
 from ibapi.wrapper import EWrapper
+
+import logging
+
 
 log = logging.getLogger("ibx.wrapper")
 

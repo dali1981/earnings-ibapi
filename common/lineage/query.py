@@ -4,12 +4,12 @@ Lineage query engine for analyzing data lineage relationships.
 
 from __future__ import annotations
 
+from .core import DataOperation, LineageNode, LineageTracker, OperationType
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
 import pandas as pd
 
-from .core import DataOperation, LineageNode, LineageTracker, OperationType
 
 try:
     from common.reliability import get_trading_logger

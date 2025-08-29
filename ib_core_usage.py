@@ -1,5 +1,10 @@
-from api.ib_core import (ContractDetailsService, HistoricalService, IBRuntime,
-                         SecDefService, make_stock)
+from api.ib_core import (
+    ContractDetailsService,
+    HistoricalService,
+    IBRuntime,
+    make_stock,
+    SecDefService,
+)
 
 
 def main():

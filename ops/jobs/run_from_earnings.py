@@ -31,6 +31,7 @@ import sys
 # Add project root to path
 sys.path.append(str(Path(__file__).parent.parent))
 
+from common.repositories.option_chains import OptionChainSnapshotRepository
 from config import (
     CONTRACTS_PATH,
     DATA_ROOT,
@@ -41,7 +42,6 @@ from config import (
 )
 from earnings.discovery import EarningsDiscoveryEngine
 from jobs.tasks import BackfillEquityBarsTask, BackfillOptionBarsTask
-from common.repositories.option_chains import OptionChainSnapshotRepository
 
 
 try:

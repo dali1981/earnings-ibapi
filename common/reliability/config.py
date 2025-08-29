@@ -3,14 +3,14 @@ Configuration management for the reliability system.
 Provides centralized configuration for retry policies, circuit breakers, and logging.
 """
 
-import json
-import os
+from .exceptions import ErrorSeverity
+from .retry import JitterType, RetryStrategy
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Dict, Optional, Union
 
-from .exceptions import ErrorSeverity
-from .retry import JitterType, RetryStrategy
+import json
+import os
 
 
 @dataclass

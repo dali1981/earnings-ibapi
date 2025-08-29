@@ -1,7 +1,8 @@
 from .bus import Event, EventBus, FileEventBus
-from .consumer import JSONLConsumer, ConsumerCheckpoint
 from .checkpoint import load_checkpoint, save_checkpoint
+from .consumer import ConsumerCheckpoint, JSONLConsumer
 from .processed_index import ProcessedIndex
+
 
 __all__ = [
     "Event",
@@ -13,4 +14,3 @@ __all__ = [
     "save_checkpoint",
     "ProcessedIndex",
 ]
-

@@ -3,17 +3,21 @@ Circuit breaker pattern implementation for financial trading applications.
 Provides failure detection, automatic recovery, and system protection.
 """
 
-import logging
-import threading
-import time
+from .exceptions import (
+    BaseTradingException,
+    CircuitBreakerException,
+    ErrorSeverity,
+    get_error_severity,
+)
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from enum import Enum
 from functools import wraps
 from typing import Any, Callable, Dict, Optional
 
-from .exceptions import (BaseTradingException, CircuitBreakerException,
-                         ErrorSeverity, get_error_severity)
+import logging
+import threading
+import time
 
 
 class CircuitBreakerState(Enum):

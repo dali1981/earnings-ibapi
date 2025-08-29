@@ -8,17 +8,16 @@ Usage:
         --host 127.0.0.1 --port 7497 --client-id 17 \
         --expirations 20250117,20250221 --strikes 100,110,120
 """
-import argparse
-import datetime as dt
-from typing import List
-
-from ibapi.contract import Contract
-
+from common.utils import make_option, make_stock, RateLimiter
 from ib_client import IBClient
+from ibapi.contract import Contract
 from ibx_time import ib_end_datetime
 from request_sequencer import RequestSequencer
 from sink import Sink
-from common.utils import RateLimiter, make_option, make_stock
+from typing import List
+
+import argparse
+import datetime as dt
 
 
 def parse_args() -> argparse.Namespace:

@@ -1,6 +1,6 @@
-import json
 from pathlib import Path
 
+import json
 import pytest
 
 
@@ -18,7 +18,11 @@ def test_file_event_bus_publish_and_consume(tmp_path: Path, monkeypatch):
     from common.utils.events.consumer import JSONLConsumer
 
     bus = FileEventBus()
-    bus.publish("data.available", topic="equity_bars", payload={"symbol": "AAPL", "job_id": "job-1"})
+    bus.publish(
+        "data.available",
+        topic="equity_bars",
+        payload={"symbol": "AAPL", "job_id": "job-1"},
+    )
 
     # Assert log file and ready flag created
     events_file = cache / "events" / "equity_bars.jsonl"
@@ -33,4 +37,3 @@ def test_file_event_bus_publish_and_consume(tmp_path: Path, monkeypatch):
     payload = items[0]["payload"]
     # correlation_id should be set from job_id per bus enrichment
     assert payload.get("correlation_id") == "job-1"
-

@@ -1,15 +1,15 @@
 from __future__ import annotations
 
-from datetime import date, timedelta, datetime
-from typing import List, Optional
-from pathlib import Path
-import json
-
-from earnings.fetcher import EarningsEvent
-from common.repositories.earnings import EarningsCalendarRepository
 from common.reliability.logging import get_trading_logger
+from common.repositories.earnings import EarningsCalendarRepository
 from common.utils.events.bus import FileEventBus
+from datetime import date, datetime, timedelta
+from earnings.fetcher import EarningsEvent
+from pathlib import Path
+from typing import List, Optional
+
 import config
+import json
 
 
 class CalendarService:
@@ -24,7 +24,9 @@ class CalendarService:
         self._repo = EarningsCalendarRepository()
         self._logger = get_trading_logger(__name__)
 
-    def get_upcoming_events(self, *, days_ahead: int, symbols: Optional[List[str]] = None) -> List[EarningsEvent]:
+    def get_upcoming_events(
+        self, *, days_ahead: int, symbols: Optional[List[str]] = None
+    ) -> List[EarningsEvent]:
         start = date.today()
         end = start + timedelta(days=days_ahead)
         df = self._repo.get_earnings_by_date_range(start, end, symbols=symbols)
@@ -55,6 +57,7 @@ class CalendarService:
         normalized: List[EarningsEvent] = []
         try:
             from enum import Enum
+
             for e in events:
                 time_val = getattr(e, "time", None)
                 if isinstance(time_val, Enum):
@@ -95,11 +98,14 @@ class CalendarService:
                 existing_keys = set()
                 if df_existing is not None and not df_existing.empty:
                     for _, r in df_existing.iterrows():
-                        existing_keys.add((r.get("symbol"), r.get("earnings_date"), r.get("source")))
+                        existing_keys.add(
+                            (r.get("symbol"), r.get("earnings_date"), r.get("source"))
+                        )
                 to_write = [
                     e
                     for e in normalized
-                    if (e.symbol, e.earnings_date, getattr(e, "source", "unknown")) not in existing_keys
+                    if (e.symbol, e.earnings_date, getattr(e, "source", "unknown"))
+                    not in existing_keys
                 ]
             else:
                 to_write = []
@@ -117,9 +123,21 @@ class CalendarService:
             ebus = FileEventBus()
             ebus.notify_data_available(
                 dataset="earnings",
-                collection_date=(res.get("collection_date") or date.today().isoformat()),
+                collection_date=(
+                    res.get("collection_date") or date.today().isoformat()
+                ),
                 total_events=int(res.get("total_events_stored") or len(to_write)),
-                sources=list({(e.source.value if hasattr(e, "source") and hasattr(getattr(e, "source"), "value") else getattr(e, "source", "unknown")) for e in to_write}),
+                sources=list(
+                    {
+                        (
+                            e.source.value
+                            if hasattr(e, "source")
+                            and hasattr(getattr(e, "source"), "value")
+                            else getattr(e, "source", "unknown")
+                        )
+                        for e in to_write
+                    }
+                ),
             )
         except Exception:
             # Best-effort notification; do not fail write on event bus errors
@@ -156,7 +174,9 @@ class CalendarService:
             if not meta_path.exists():
                 return False
             data = json.loads(meta_path.read_text(encoding="utf-8"))
-            stored_at = data.get("stored_at") or data.get("collection_info", {}).get("stored_at")
+            stored_at = data.get("stored_at") or data.get("collection_info", {}).get(
+                "stored_at"
+            )
             if not stored_at:
                 return False
             try:

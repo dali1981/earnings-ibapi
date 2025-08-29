@@ -20,8 +20,6 @@ Usage:
     opportunities = analyzer.analyze_discoveries()
 """
 
-# Import configuration first
-import sys
 from dataclasses import asdict, dataclass
 from datetime import date, datetime, timedelta
 from enum import Enum
@@ -30,11 +28,17 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 
 import pandas as pd
 
+# Import configuration first
+import sys
+
+
 sys.path.append(str(Path(__file__).parent.parent))
+from common.utils.logging_setup import get_logger
 from config import DISCOVERY_CONFIG, EXPORTS_PATH
+
 # Import earnings discovery module
 from earnings.discovery import EarningsDiscovery, EarningsDiscoveryEngine
-from common.utils.logging_setup import get_logger
+
 
 logger = get_logger(__name__)
 
