@@ -68,6 +68,16 @@
         <pre id="chainOut" class="out"></pre>
       </section>
     </main>
+    <!-- Global bases for API client (non-breaking; used by /static/js/apiClient.js) -->
+    <script>
+      window.__BASES__ = {
+        calendar: "{{ calendar_base }}",
+        equity: "{{ equity_base }}",
+        chains: "{{ chains_base }}",
+        orchestrator: "{{ orchestrator_base }}"
+      };
+    </script>
+    <script src="/static/js/apiClient.js" defer></script>
     <script>
       // Injected via template context with env overrides
       const BASES = {
