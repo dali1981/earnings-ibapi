@@ -7,6 +7,7 @@ from fastapi.templating import Jinja2Templates
 from pathlib import Path
 
 import os
+from app_settings.settings import get_settings
 
 
 app = FastAPI(title="Trading Frontend", version="0.1.0")
@@ -25,17 +26,27 @@ def health():
 
 @app.get("/", response_class=HTMLResponse)
 def index(request: Request):
+    s = get_settings()
+    # Defaults from settings file, with legacy env override if provided
+    bases = {
+        "calendar": s.api.services.calendar.url,
+        "equity": s.api.services.equity.url,
+        "chains": s.api.services.chains.url,
+        "orchestrator": s.api.services.orchestrator.url,
+    }
+    # Legacy override support (FRONTEND_*_BASE) for compatibility
+    bases["calendar"] = os.getenv("FRONTEND_CALENDAR_BASE", bases["calendar"])  # type: ignore
+    bases["equity"] = os.getenv("FRONTEND_EQUITY_BASE", bases["equity"])  # type: ignore
+    bases["chains"] = os.getenv("FRONTEND_CHAINS_BASE", bases["chains"])  # type: ignore
+    bases["orchestrator"] = os.getenv("FRONTEND_ORCHESTRATOR_BASE", bases["orchestrator"])  # type: ignore
+
     return templates.TemplateResponse(
         "index.html",
         {
             "request": request,
-            "calendar_base": os.getenv(
-                "FRONTEND_CALENDAR_BASE", "http://localhost:9001"
-            ),
-            "equity_base": os.getenv("FRONTEND_EQUITY_BASE", "http://localhost:9002"),
-            "chains_base": os.getenv("FRONTEND_CHAINS_BASE", "http://localhost:9004"),
-            "orchestrator_base": os.getenv(
-                "FRONTEND_ORCHESTRATOR_BASE", "http://localhost:9005"
-            ),
+            "calendar_base": bases["calendar"],
+            "equity_base": bases["equity"],
+            "chains_base": bases["chains"],
+            "orchestrator_base": bases["orchestrator"],
         },
     )

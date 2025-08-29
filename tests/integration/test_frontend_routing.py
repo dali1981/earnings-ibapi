@@ -7,10 +7,13 @@ pytestmark = pytest.mark.integration
 
 
 def test_frontend_injects_custom_bases(monkeypatch):
-    # Provide custom bases to verify they are injected into the page and used by JS builder
-    monkeypatch.setenv("FRONTEND_CALENDAR_BASE", "http://svc-calendar:1234")
-    monkeypatch.setenv("FRONTEND_EQUITY_BASE", "http://svc-equity:2345")
-    monkeypatch.setenv("FRONTEND_CHAINS_BASE", "http://svc-chains:3456")
+    # Provide custom bases via settings env to verify they are injected
+    monkeypatch.setenv("APP_API__SERVICES__CALENDAR__HOST", "svc-calendar")
+    monkeypatch.setenv("APP_API__SERVICES__CALENDAR__PORT", "1234")
+    monkeypatch.setenv("APP_API__SERVICES__EQUITY__HOST", "svc-equity")
+    monkeypatch.setenv("APP_API__SERVICES__EQUITY__PORT", "2345")
+    monkeypatch.setenv("APP_API__SERVICES__CHAINS__HOST", "svc-chains")
+    monkeypatch.setenv("APP_API__SERVICES__CHAINS__PORT", "3456")
 
     from services.frontend.main import app
 

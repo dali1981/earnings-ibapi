@@ -88,10 +88,13 @@ def test_frontend_buttons_route_requests():
     _start_app_thread(eq, eq_port)
     _start_app_thread(ch, ch_port)
 
-    # Configure frontend to point to mocks
-    os.environ["FRONTEND_CALENDAR_BASE"] = f"http://127.0.0.1:{cal_port}"
-    os.environ["FRONTEND_EQUITY_BASE"] = f"http://127.0.0.1:{eq_port}"
-    os.environ["FRONTEND_CHAINS_BASE"] = f"http://127.0.0.1:{ch_port}"
+    # Configure frontend to point to mocks via app settings env
+    os.environ["APP_API__SERVICES__CALENDAR__HOST"] = "127.0.0.1"
+    os.environ["APP_API__SERVICES__CALENDAR__PORT"] = str(cal_port)
+    os.environ["APP_API__SERVICES__EQUITY__HOST"] = "127.0.0.1"
+    os.environ["APP_API__SERVICES__EQUITY__PORT"] = str(eq_port)
+    os.environ["APP_API__SERVICES__CHAINS__HOST"] = "127.0.0.1"
+    os.environ["APP_API__SERVICES__CHAINS__PORT"] = str(ch_port)
 
     # Start frontend
     from services.frontend.main import app as frontend
@@ -107,9 +110,9 @@ def test_frontend_buttons_route_requests():
         page.goto(f"http://127.0.0.1:{fe_port}")
 
         # Calendar: submit form and expect JSON to render
-        page.fill("#days", "7")
-        page.fill("#symbols", "AAPL")
-        page.click("#calendarForm button[type=submit]")
+        page.fill("#daysGet", "7")
+        page.fill("#symbolsGet", "AAPL")
+        page.click("#calendarGetForm button[type=submit]")
         page.wait_for_function(
             "document.querySelector('#calendarOut').textContent.includes('AAPL')"
         )
