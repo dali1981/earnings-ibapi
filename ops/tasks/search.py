@@ -81,7 +81,7 @@ def fetch_matching_symbols_task(
     api_base: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
     s = get_settings()
-    base = api_base or str(s.api.contracts_service_base)
+    base = api_base or str(s.api.ib_api_base)
     payload = {"pattern": pattern, "timeout": 10.0}
     with httpx.Client(base_url=base, timeout=30.0) as client:
         resp = client.post("/ib/matching-symbols", json=payload)

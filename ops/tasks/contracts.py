@@ -73,7 +73,7 @@ def backfill_contracts_task(
     ).normalized()
 
     if use_api:
-        base_url = api_base or str(settings.api.contracts_service_base)
+        base_url = api_base or str(settings.api.ib_api_base)
         _backfill_via_api(base, cfg, base_url)
     elif use_service:
         rt = get_runtime()

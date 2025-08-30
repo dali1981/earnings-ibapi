@@ -5,10 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Trading Services</title>
     <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
-    <link rel="alternate icon" href="/static/favicon.ico">
+    <link rel="icon" href="/static/favicon.ico" sizes="any">
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon">
     <link rel="stylesheet" href="/static/styles.css" />
   </head>
-  <body>getUpcoming
+  <body>
     <header>
       <h1>Trading Microservices</h1>
     </header>
@@ -33,7 +34,16 @@
           <label>Symbols <input type="text" id="symbolsFetch" placeholder="Required for yahoo (e.g. AAPL,MSFT)" /></label>
           <button type="submit">Fetch & persist (external)</button>
         </form>
+        <div class="view-toggle">
+          <span>JSON</span>
+          <label class="switch">
+            <input type="checkbox" id="calendarViewTable" />
+            <span class="slider"></span>
+          </label>
+          <span>Table</span>
+        </div>
         <pre id="calendarOut" class="out"></pre>
+        <div id="calendarTable" class="out" style="display:none"></div>
       </section>
       <section>
         <h2>Contracts Orchestrator</h2>

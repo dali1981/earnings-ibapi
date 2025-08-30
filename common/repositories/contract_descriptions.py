@@ -254,12 +254,12 @@ class ContractDescriptionsRepository(BaseRepository):
         Returns:
             DataFrame with contract descriptions
         """
-        filters = {"symbol": symbol}
+        filters = [ ("symbol", "in",  [symbol]) ]
         if sec_type:
-            filters["sec_type"] = sec_type
+            filters += [ ("sec_type", "in",  sec_type) ]
 
-        df = self.load(**filters)
-        return df.sort_values(["conid"]) if not df.empty else df
+        table = self.load(filters=filters)
+        return table
 
     def load_contract_by_id(self, conid: int) -> pd.DataFrame:
         """

@@ -18,27 +18,16 @@ class ContractRepository(BaseRepository):
     """Repository for basic contract information."""
     
     def __init__(self, base_path: Union[str, Path]):
-        # For ContractRepository, we don't append "contracts" to the path
-        # The path provided IS the contracts path
-        base = Path(base_path)
-        if base.name == "contracts":
-            # If already ends with contracts, use parent as base
-            super().__init__(base.parent, "contracts")
-        else:
-            # Otherwise, this IS the contracts directory
-            super().__init__(base.parent if base.parent != base else base, base.name)
-        
         # Override base_path to match what tests expect
-        self.base_path = Path(base_path)
-        self.base = self.base_path  # Alias for consistency with vendors/ibx_repos
-    
+        super().__init__(base_path, "contracts")
+
     def _create_schema(self) -> pa.Schema:
         """Define the schema for contracts data."""
         return pa.schema(
             [
                 pa.field("symbol", pa.string()),
                 pa.field("sec_type", pa.string()),
-                pa.field("contract_id", pa.int64()),
+                pa.field("conid", pa.int64()),
                 pa.field("exchange", pa.string(), nullable=True),
                 pa.field("primary_exchange", pa.string(), nullable=True),
                 pa.field("currency", pa.string(), nullable=True),
@@ -47,7 +36,7 @@ class ContractRepository(BaseRepository):
                 pa.field("multiplier", pa.int64(), nullable=True),
                 pa.field("min_tick", pa.float64(), nullable=True),
                 pa.field("price_magnifier", pa.int64(), nullable=True),
-                pa.field("under_contract_id", pa.int64(), nullable=True),
+                pa.field("under_conid", pa.int64(), nullable=True),
                 pa.field("long_name", pa.string(), nullable=True),
                 pa.field("industry", pa.string(), nullable=True),
                 pa.field("category", pa.string(), nullable=True),
@@ -63,7 +52,7 @@ class ContractRepository(BaseRepository):
                 pa.field("real_expiration_date", pa.string(), nullable=True),
                 pa.field("last_trade_time", pa.string(), nullable=True),
                 pa.field("stock_type", pa.string(), nullable=True),
-                pa.field("created_at", pa.date32()),
+                pa.field("created_at", pa.timestamp('s', 'UTC'), nullable=False),
             ]
         )
     
@@ -139,75 +128,75 @@ class ContractRepository(BaseRepository):
             compression="snappy",
         )
     
-    def read(self, columns: Optional[Sequence[str]] = None, **filters) -> pa.Table:
-        """Read contracts with optional filters.
-
-        Args:
-            columns: Optional list of columns to return
-            **filters: Keyword arguments for filtering. Common filters:
-                - symbol: filter by symbol(s)
-                - conid: filter by contract ID(s)
-                - sec_type: filter by security type(s)
-                - currency: filter by currency(s)
-                - primary_exchange: filter by primary exchange(s)
-                - is_us_listing: filter by US listing status
-
-        Returns:
-            DataFrame with filtered contracts
-        """
-        if not self.base_path.exists() or not any(self.base_path.rglob("*.parquet")):
-            schema = self._create_schema()
-            cols = list(columns) if columns else [f.name for f in schema]
-            empty_df = pd.DataFrame(columns=cols)
-            return pa.Table.from_pandas(empty_df, schema=schema, preserve_index=False)
-
-        dset = ds.dataset(
-            self.base_path,  # Use base_path instead of dataset_path
-            format="parquet",
-            partitioning="hive",
-            schema=self._create_schema(),
-        )
-        
-        schema = dset.schema
-        from pyarrow.dataset import field
-
-        expr = None
-        for k, v in filters.items():
-            if k not in schema.names:
-                continue
-                
-            # Handle list/tuple/set filters with isin
-            if isinstance(v, (list, tuple, set)):
-                # Normalize symbol filters to uppercase
-                if k == "symbol":
-                    v = [str(s).upper() for s in v]
-                cond = field(k).isin(list(v))
-            else:
-                # Single value filter
-                if k == "symbol":
-                    v = str(v).upper()
-                cond = field(k) == v
-
-            expr = cond if expr is None else (expr & cond)
-
-        cols = [c for c in (columns or schema.names) if c in schema.names]
-        tbl = dset.to_table(filter=expr, columns=cols)
-        return tbl
+    # def read(self, columns: Optional[Sequence[str]] = None, **filters) -> pa.Table:
+    #     """Read contracts with optional filters.
+    #
+    #     Args:
+    #         columns: Optional list of columns to return
+    #         **filters: Keyword arguments for filtering. Common filters:
+    #             - symbol: filter by symbol(s)
+    #             - conid: filter by contract ID(s)
+    #             - sec_type: filter by security type(s)
+    #             - currency: filter by currency(s)
+    #             - primary_exchange: filter by primary exchange(s)
+    #             - is_us_listing: filter by US listing status
+    #
+    #     Returns:
+    #         DataFrame with filtered contracts
+    #     """
+    #     if not self.base_path.exists() or not any(self.base_path.rglob("*.parquet")):
+    #         schema = self._create_schema()
+    #         cols = list(columns) if columns else [f.name for f in schema]
+    #         empty_df = pd.DataFrame(columns=cols)
+    #         return pa.Table.from_pandas(empty_df, schema=schema, preserve_index=False)
+    #
+    #     dset = ds.dataset(
+    #         self.base_path,  # Use base_path instead of dataset_path
+    #         format="parquet",
+    #         partitioning="hive",
+    #         schema=self._create_schema(),
+    #     )
+    #
+    #     schema = dset.schema
+    #     from pyarrow.dataset import field
+    #
+    #     expr = None
+    #     for k, v in filters.items():
+    #         if k not in schema.names:
+    #             continue
+    #
+    #         # Handle list/tuple/set filters with isin
+    #         if isinstance(v, (list, tuple, set)):
+    #             # Normalize symbol filters to uppercase
+    #             if k == "symbol":
+    #                 v = [str(s).upper() for s in v]
+    #             cond = field(k).isin(list(v))
+    #         else:
+    #             # Single value filter
+    #             if k == "symbol":
+    #                 v = str(v).upper()
+    #             cond = field(k) == v
+    #
+    #         expr = cond if expr is None else (expr & cond)
+    #
+    #     cols = [c for c in (columns or schema.names) if c in schema.names]
+    #     tbl = dset.to_table(filter=expr, columns=cols)
+    #     return tbl
     
-    def load(
-        self, sec_type: Optional[str] = None, primary_exchange: Optional[str] = None
-    ) -> pa.Table:
-        """Legacy method for backward compatibility. Use read() instead."""
-        filters = {}
-        if sec_type:
-            filters["sec_type"] = sec_type
-        if primary_exchange:
-            filters["primary_exchange"] = primary_exchange
-        return self.read(**filters)
+    # def load(
+    #     self, sec_type: Optional[str] = None, primary_exchange: Optional[str] = None
+    # ) -> pa.Table:
+    #     """Legacy method for backward compatibility. Use read() instead."""
+    #     filters = {}
+    #     if sec_type:
+    #         filters["sec_type"] = sec_type
+    #     if primary_exchange:
+    #         filters["primary_exchange"] = primary_exchange
+    #     return self.read(**filters)
     
     def present_conids(self) -> Set[int]:
         """Get set of contract IDs present in repository."""
-        tbl = self.read(columns=["conid"])
+        tbl = self.load(columns=["conid"])
         if tbl.num_rows == 0:
             return set()
         df = tbl.to_pandas()

@@ -83,7 +83,7 @@ class APISettings(BaseModel):
     services: ServicesConfig = Field(default_factory=ServicesConfig)
 
     @property
-    def contracts_service_base(self) -> str:
+    def ib_api_base(self) -> str:
         """Backward compatibility for contracts service"""
         return self.services.ib_api.url
 

@@ -29,9 +29,9 @@ def safe_convert_to_model(events: list, event_type=EarningsEventModel) -> List[E
             model = event_type.from_entity(event)
             
             # Validate JSON serialization
-            json.dumps(model.dict())
+            # json.dumps(model.dict())
             
-            result.append(model)
+            result.append(model.model_dump())
         except (ValueError, TypeError) as ex:
             # Log the problematic event details
             logger.error(f"Failed to serialize event {i}/{len(events)}: {ex}")

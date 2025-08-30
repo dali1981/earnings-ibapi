@@ -15,6 +15,44 @@
 (function () {
   const $ = (id) => document.getElementById(id);
   const parseList = (input) => (input || '').split(',').map(s => s.trim()).filter(Boolean);
+  let lastCalendarData = null;
+
+  function calendarViewMode() {
+    return $('calendarViewTable')?.checked ? 'table' : 'json';
+  }
+
+  function renderJSON(outEl, data) {
+    if (outEl) outEl.textContent = JSON.stringify(data ?? null, null, 2);
+  }
+
+  function renderCalendarTable(outEl, data) {
+    if (!outEl) return;
+    if (!Array.isArray(data) || data.length === 0) {
+      outEl.innerHTML = '<div>No events</div>';
+      return;
+    }
+    const cols = ['symbol','company_name','earnings_date','time','eps_estimate','revenue_estimate','source'];
+    const thead = '<tr>' + cols.map(c => `<th>${c}</th>`).join('') + '</tr>';
+    const rows = data.map(e => '<tr>' + cols.map(c => {
+      const v = (e && Object.prototype.hasOwnProperty.call(e, c)) ? e[c] : '';
+      return `<td>${(v ?? '')}</td>`;
+    }).join('') + '</tr>').join('');
+    outEl.innerHTML = `<table class="tbl">${thead}${rows}</table>`;
+  }
+
+  function renderCalendar(data) {
+    lastCalendarData = data;
+    const mode = calendarViewMode();
+    const pre = $('calendarOut');
+    const tbl = $('calendarTable');
+    if (mode === 'table') {
+      if (pre) pre.style.display = 'none';
+      if (tbl) { tbl.style.display = ''; renderCalendarTable(tbl, data); }
+    } else {
+      if (tbl) tbl.style.display = 'none';
+      if (pre) { pre.style.display = ''; renderJSON(pre, data); }
+    }
+  }
 
   /**
    * Render calendar source/collection metadata from response headers.
@@ -32,9 +70,13 @@
   async function calendarGet() {
     const days = $('daysGet')?.value;
     const symbols = $('symbolsGet')?.value;
+    const pre = $('calendarOut');
+    const tbl = $('calendarTable');
+    if (tbl) tbl.style.display = 'none';
+    if (pre) { pre.style.display = ''; pre.textContent = 'Loading...'; }
     const { data, res } = await window.TradingAPI.calendar.getUpcoming(days, symbols);
     setCalendarMeta(res);
-    $('calendarOut').textContent = JSON.stringify(data, null, 2);
+    renderCalendar(data);
   }
 
   /** Handle external calendar fetch + persist. */
@@ -42,13 +84,17 @@
     const days = $('daysFetch')?.value;
     const source = $('sourceFetch')?.value;
     const symbols = $('symbolsFetch')?.value;
+    const pre = $('calendarOut');
+    const tbl = $('calendarTable');
     if (source === 'yahoo' && !symbols) {
       alert('Yahoo requires symbols (comma-separated).');
       return;
     }
+    if (tbl) tbl.style.display = 'none';
+    if (pre) { pre.style.display = ''; pre.textContent = 'Fetching...'; }
     const { data, res } = await window.TradingAPI.calendar.fetchUpcoming(days, source, symbols);
     setCalendarMeta(res);
-    $('calendarOut').textContent = JSON.stringify(data, null, 2);
+    renderCalendar(data);
   }
 
   /** Handle equity bars fetch. */
@@ -95,4 +141,12 @@
     'orc.details': () => orc('details'),
     'orc.setup': () => orc('setup'),
   };
+
+  // Re-render calendar on view toggle changes
+  document.addEventListener('DOMContentLoaded', () => {
+    const t = $('calendarViewTable');
+    if (t) t.addEventListener('change', () => {
+      if (lastCalendarData !== null) renderCalendar(lastCalendarData);
+    });
+  });
 })();

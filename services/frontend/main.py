@@ -8,6 +8,7 @@ from pathlib import Path
 
 import os
 from app_settings.settings import get_settings
+from fastapi.responses import FileResponse
 
 
 app = FastAPI(title="Trading Frontend", version="0.1.0")
@@ -22,6 +23,15 @@ templates = Jinja2Templates(directory=str(templates_dir))
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+@app.get("/favicon.ico", include_in_schema=False)
+def favicon():
+    path = static_dir / "favicon.ico"
+    if path.exists():
+        # Explicit media type to help some browsers
+        return FileResponse(str(path), media_type="image/x-icon")
+    return HTMLResponse(status_code=404)
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -50,3 +60,6 @@ def index(request: Request):
             "orchestrator_base": bases["orchestrator"],
         },
     )
+
+
+# (No same-origin proxy: frontend JS calls services directly)

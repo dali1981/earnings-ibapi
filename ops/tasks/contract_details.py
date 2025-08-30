@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections import defaultdict
+
 from app_settings.settings import get_settings
 from celery import shared_task
 from pathlib import Path
@@ -8,6 +10,8 @@ from typing import Dict, List, Optional
 import httpx
 import pandas as pd
 
+from common.repositories.contract_descriptions import ContractDescriptionsRepository
+from common.repositories.contracts import ContractRepository
 
 @shared_task(
     bind=True,
@@ -29,9 +33,6 @@ def check_existing_details_task(
     logger = logging.getLogger(__name__)
     logger.info(f"check_existing_details_task called with symbols: {symbols}")
 
-    from common.repositories.contract_descriptions import ContractDescriptionsRepository
-    from common.repositories.contracts import ContractRepository
-
     settings = get_settings()
     base = Path(root) if root else settings.paths.data_root
 
@@ -44,10 +45,13 @@ def check_existing_details_task(
     import pyarrow as pa
     import pyarrow.compute as pc
 
-    desc_repo = ContractDescriptionsRepository(base / "contract_descriptions")
-    tbl = desc_repo.load(columns=["symbol", "conid"], symbol=symbols)
+    from celery.contrib import rdb; rdb.set_trace()
 
-    symbol_to_conids: Dict[str, List[int]] = {}
+    desc_repo = ContractDescriptionsRepository(base)
+    filter_ = ("symbol", "in", symbols)
+    tbl = desc_repo.load(columns=["symbol", "conid"], filters=[filter_])
+
+    symbol_to_conids: Dict[str, List[int]] = defaultdict(list)
     if tbl is not None and tbl.num_rows > 0:
         sym_col = tbl.column("symbol")
         conid_col = tbl.column("conid")
@@ -59,7 +63,7 @@ def check_existing_details_task(
             symbol_to_conids.setdefault(sym, []).append(int(conid_val))
 
     # Check which conids already have details
-    contracts_repo = ContractRepository(base / "contracts")
+    contracts_repo = ContractRepository(base)
     existing = contracts_repo.present_conids()
 
     existing_conids = []
@@ -107,7 +111,7 @@ def fetch_details_from_ib_task(
     """
     settings = get_settings()
     # Use IB API service base URL from settings
-    base_url = api_base or str(settings.api.contracts_service_base)
+    ib_api_base_url = api_base or str(settings.api.ib_api_base)
 
     missing_symbols = check_result.get("missing_symbols", [])
     symbol_to_conids = check_result.get("symbol_to_conids", {})
@@ -117,33 +121,34 @@ def fetch_details_from_ib_task(
 
     fetched_details = []
 
-    with httpx.Client(base_url=base_url, timeout=30.0) as client:
+    with httpx.Client(base_url=ib_api_base_url, timeout=30.0) as client:
         for symbol in missing_symbols:
             # Get conids for this symbol
             conids = symbol_to_conids.get(symbol, [])
 
-            if not conids:
-                # Need to search for the symbol first
-                try:
-                    resp = client.post(
-                        "/ib/matching-symbols",
-                        json={"pattern": symbol, "timeout": 10.0},
-                    )
-                    resp.raise_for_status()
-                    matches = resp.json()
-
-                    # Extract conids from matches
-                    for match in matches:
-                        if match.get("symbol") == symbol:
-                            conid = match.get("conId")
-                            if conid:
-                                conids.append(int(conid))
-                except Exception as e:
-                    print(f"Error searching for symbol {symbol}: {e}")
-                    continue
+            # if not conids:
+            #     # Need to search for the symbol first
+            #     try:
+            #         resp = client.post(
+            #             "/ib/matching-symbols",
+            #             json={"pattern": symbol, "timeout": 10.0},
+            #         )
+            #         resp.raise_for_status()
+            #         matches = resp.json()
+            #
+            #         # Extract conids from matches
+            #         for match in matches:
+            #             if match.get("symbol") == symbol:
+            #                 conid = match.get("conId")
+            #                 if conid:
+            #                     conids.append(int(conid))
+            #     except Exception as e:
+            #         print(f"Error searching for symbol {symbol}: {e}")
+            #         continue
 
             # Fetch details for each conid
-            for conid in conids[:1]:  # Take first conid for the symbol
+            # for conid in conids[:1]:  # Take first conid for the symbol
+            for conid in conids:  # Take first conid for the symbol
                 try:
                     resp = client.post(
                         "/ib/contract-details",
@@ -165,6 +170,8 @@ def fetch_details_from_ib_task(
                 except Exception as e:
                     print(f"Error fetching details for conid {conid}: {e}")
                     continue
+
+    from celery.contrib import rdb;rdb.set_trace()
 
     return {"fetched_details": fetched_details}
 
@@ -188,6 +195,8 @@ def save_details_to_repo_task(
         from ibx_repos.contracts import ContractRepository
     except Exception:
         from vendors.ibx_repos.contracts import ContractRepository
+
+    from celery.contrib import rdb; rdb.set_trace()
 
     settings = get_settings()
     base = Path(root) if root else settings.paths.data_root
