@@ -9,6 +9,7 @@ from .contracts import ContractRepository
 from .equity_bars import EquityBarRepository
 from .option_bars import OptionBarRepository
 from .option_chains import OptionChainSnapshotRepository
+from .option_contracts import OptionContractsRepository
 
 
 __all__ = [
@@ -18,6 +19,7 @@ __all__ = [
     "EquityBarRepository",
     "OptionBarRepository",
     "OptionChainSnapshotRepository",
+    "OptionContractsRepository",
 ]
 
 # Version info

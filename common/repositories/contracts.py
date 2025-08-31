@@ -52,13 +52,17 @@ class ContractRepository(BaseRepository):
                 pa.field("real_expiration_date", pa.string(), nullable=True),
                 pa.field("last_trade_time", pa.string(), nullable=True),
                 pa.field("stock_type", pa.string(), nullable=True),
-                pa.field("created_at", pa.timestamp('s', 'UTC'), nullable=False),
+                # Partition column (derived from created_at)
+                pa.field("snapshot", pa.date32(), nullable=False),
+                # Timestamp (UTC, nanosecond precision to match pandas)
+                pa.field("created_at", pa.timestamp('ns', 'UTC'), nullable=False),
             ]
         )
     
     def _get_partition_columns(self, **kwargs) -> List[str]:
         """Get partition columns for contract data."""
-        return ["sec_type", "is_us_listing", "primary_exchange", "sym_prefix"]
+        # Partition by security type and snapshot date for efficient scans
+        return ["sec_type", "snapshot"]
     
     def _normalize_data(self, df: pd.DataFrame, **kwargs) -> pd.DataFrame:
         """Normalize contract data and add partition columns."""
@@ -67,12 +71,18 @@ class ContractRepository(BaseRepository):
             
         df = df.copy()
         
-        # Add symbol prefix partition
-        if "symbol" in df.columns:
-            prefix = df["symbol"].astype(str).str[0].str.upper().fillna("")
-            prefix = prefix.where(prefix.str.match(r"[A-Z]"), "#")
-            df["sym_prefix"] = prefix
-            
+        # Derive snapshot date from created_at timestamp
+        if "created_at" in df.columns:
+            try:
+                ts = pd.to_datetime(df["created_at"], utc=True, errors="coerce")
+                df["snapshot"] = ts.dt.tz_convert("UTC").dt.date
+            except Exception:
+                # Fallback to naive date if tz conversion fails
+                df["snapshot"] = pd.to_datetime(df["created_at"], errors="coerce").dt.date
+        else:
+            # If created_at missing, use today's date to avoid partition errors
+            df["snapshot"] = pd.Timestamp.utcnow().date()
+        
         return df
     
     # Keep backward compatibility method
@@ -84,10 +94,12 @@ class ContractRepository(BaseRepository):
     def _with_partitions(self, df: pd.DataFrame) -> pd.DataFrame:
         """Add partition columns to dataframe."""
         df = df.copy()
-        # Add symbol prefix partition
-        prefix = df["symbol"].astype(str).str[0].str.upper().fillna("")
-        prefix = prefix.where(prefix.str.match(r"[A-Z]"), "#")
-        df["sym_prefix"] = prefix
+        if "snapshot" not in df.columns:
+            if "created_at" in df.columns:
+                ts = pd.to_datetime(df["created_at"], utc=True, errors="coerce")
+                df["snapshot"] = ts.dt.tz_convert("UTC").dt.date
+            else:
+                df["snapshot"] = pd.Timestamp.utcnow().date()
         return df
     
     def save(self, df: pd.DataFrame) -> None:

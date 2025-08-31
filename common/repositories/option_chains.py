@@ -8,7 +8,7 @@ from __future__ import annotations
 from .base import BaseRepository
 from datetime import date
 from pathlib import Path
-from typing import List, Optional, Union
+from typing import List, Optional, Union, Iterable
 
 import pandas as pd
 import pyarrow as pa
@@ -68,204 +68,139 @@ class OptionChainSnapshotRepository(BaseRepository):
     def _normalize_data(
         self,
         df: pd.DataFrame,
-        underlying: str = None,
-        snapshot_date: date = None,
+        underlying: str | None = None,
+        as_of: date | None = None,
         **kwargs,
     ) -> pd.DataFrame:
-        """
-        Normalize option chain snapshot data for storage.
+        """Normalize aggregated option chain snapshot data for storage.
 
-        Args:
-            df: Raw DataFrame with option chain data
-            underlying: Underlying symbol (can be inferred from df)
-            snapshot_date: Snapshot date (can be inferred from df)
-
-        Returns:
-            Normalized DataFrame ready for storage
+        Expects one row per parameter set with list fields for expirations and strikes.
         """
-        if df.empty:
+        if df is None or df.empty:
             raise DataValidationException("Cannot normalize empty DataFrame")
 
-        # Start with copy
         out = df.copy()
 
-        # Rename standard columns
-        out = self._rename_standard_columns(out)
-
-        # Handle common column name variations
-        column_mapping = {
-            "asof": "snapshot_date",
-            "as_of": "snapshot_date",
-            "date": "snapshot_date",
-            "openinterest": "open_interest",
-            "openInterest": "open_interest",
-            "impliedvolatility": "implied_volatility",
-            "impliedVolatility": "implied_volatility",
-            "iv": "implied_volatility",
-            "conid": "contract_id",
-            "contractid": "contract_id",
-            "localsymbol": "local_symbol",
-            "localSymbol": "local_symbol",
-            "tradingclass": "trading_class",
+        # Standardize column names
+        rename_map = {
+            "snapshot_date": "as_of",
+            "date": "as_of",
+            "asof": "as_of",
             "tradingClass": "trading_class",
+            "under_conid": "underlying_conid",
+            "conId": "underlying_conid",
         }
+        for k, v in rename_map.items():
+            if k in out.columns and v not in out.columns:
+                out[v] = out[k]
 
-        for old_name, new_name in column_mapping.items():
-            if old_name in out.columns and new_name not in out.columns:
-                out[new_name] = out[old_name]
-
-        # Handle underlying and snapshot_date
+        # Inject required params
         if underlying is not None:
             out["underlying"] = underlying
-        elif "underlying" not in out.columns:
-            raise DataValidationException(
-                "Must provide 'underlying' parameter or column"
-            )
-
-        if snapshot_date is not None:
-            out["snapshot_date"] = snapshot_date
-        elif "snapshot_date" not in out.columns:
-            # Try to infer from other date columns
-            for col in ["asof", "date", "as_of"]:
-                if col in out.columns:
-                    out["snapshot_date"] = pd.to_datetime(out[col]).dt.date
-                    break
-            else:
-                raise DataValidationException(
-                    "Must provide 'snapshot_date' parameter or column"
-                )
-        else:
-            # Ensure snapshot_date is date type
-            out["snapshot_date"] = pd.to_datetime(out["snapshot_date"]).dt.date
+        if as_of is not None:
+            out["as_of"] = as_of
 
         # Validate required columns
-        required_columns = ["expiry", "strike", "right"]
-        missing_required = [col for col in required_columns if col not in out.columns]
-        if missing_required:
+        required = ["underlying", "expirations", "strikes", "as_of"]
+        missing = [c for c in required if c not in out.columns]
+        if missing:
             raise DataValidationException(
-                f"Missing required columns: {missing_required}",
-                field="required_columns",
+                f"Missing required columns: {missing}", field="required_columns"
             )
 
-        # Normalize expiry dates
-        if "expiry" in out.columns:
-            out["expiry"] = pd.to_datetime(out["expiry"]).dt.date
+        # Normalize types
+        out["underlying"] = out["underlying"].astype(str).str.upper()
 
-        # Validate and normalize strikes
-        if "strike" in out.columns:
-            out["strike"] = pd.to_numeric(out["strike"], errors="coerce")
-            invalid_strikes = out["strike"].isna() | (out["strike"] <= 0)
-            if invalid_strikes.any():
-                raise DataValidationException(
-                    f"Found {invalid_strikes.sum()} invalid strike prices",
-                    field="strike",
-                )
+        # as_of to date
+        out["as_of"] = pd.to_datetime(out["as_of"]).dt.date
 
-        # Validate and normalize option rights
-        if "right" in out.columns:
-            # Normalize common variants
-            out["right"] = out["right"].replace(
-                {
-                    "CALL": "C",
-                    "Call": "C",
-                    "call": "C",
-                    "PUT": "P",
-                    "Put": "P",
-                    "put": "P",
-                }
-            )
+        # List coercion helpers
+        def _to_list(x) -> list:
+            if isinstance(x, (list, tuple, set)):
+                return list(x)
+            if pd.isna(x):
+                return []
+            return [x]
 
-            invalid_rights = ~out["right"].isin(["C", "P"])
-            if invalid_rights.any():
-                raise DataValidationException(
-                    f"Invalid option rights found: {out['right'][invalid_rights].unique()}. "
-                    "Must be 'C', 'P', 'CALL', or 'PUT'",
-                    field="right",
-                )
+        def _norm_expirations(seq: Iterable) -> list[str]:
+            vals = []
+            for e in _to_list(seq):
+                if pd.isna(e):
+                    continue
+                s = str(e)
+                # Normalize 20240920 -> 2024-09-20 if looks like yyyymmdd
+                if len(s) == 8 and s.isdigit():
+                    try:
+                        dt = pd.to_datetime(s, format="%Y%m%d").date()
+                        vals.append(dt.isoformat())
+                        continue
+                    except Exception:
+                        pass
+                try:
+                    dt = pd.to_datetime(s).date()
+                    vals.append(dt.isoformat())
+                except Exception:
+                    vals.append(s)
+            # dedupe + sort
+            return sorted(set(vals))
 
-        # Convert numeric columns
-        numeric_columns = [
-            "bid",
-            "ask",
-            "last",
-            "volume",
-            "open_interest",
-            "implied_volatility",
-            "delta",
-            "gamma",
-            "theta",
-            "vega",
-        ]
-        out = self._validate_numeric_columns(out, numeric_columns)
+        def _norm_strikes(seq: Iterable) -> list[float]:
+            vals = []
+            for x in _to_list(seq):
+                try:
+                    vals.append(float(x))
+                except Exception:
+                    continue
+            return sorted(set(vals))
 
-        # Handle integer columns
-        if "contract_id" in out.columns:
-            out["contract_id"] = pd.to_numeric(
-                out["contract_id"], errors="coerce"
+        out["expirations"] = out["expirations"].apply(_norm_expirations)
+        out["strikes"] = out["strikes"].apply(_norm_strikes)
+
+        # Ensure optional fields exist with proper types
+        if "underlying_conid" in out.columns:
+            out["underlying_conid"] = pd.to_numeric(
+                out["underlying_conid"], errors="coerce"
             ).astype("Int64")
-        if "multiplier" in out.columns:
-            out["multiplier"] = pd.to_numeric(
-                out["multiplier"], errors="coerce"
-            ).astype("Int64")
+        else:
+            out["underlying_conid"] = pd.NA
 
-        # Ensure all schema columns exist
-        schema_columns = [field.name for field in self._schema]
-        out = self._ensure_schema_columns(out, schema_columns)
+        for col in ["exchange", "trading_class", "multiplier"]:
+            if col not in out.columns:
+                out[col] = pd.NA
+            else:
+                out[col] = out[col].astype(str)
 
-        # Validate option chain data
-        self._validate_option_chain_data(out)
+        # Ensure schema columns presence
+        out = self._ensure_schema_columns(out, [f.name for f in self._schema])
 
         return out
 
     def _validate_option_chain_data(self, df: pd.DataFrame) -> None:
-        """Validate option chain data quality."""
+        """Validate option chain snapshot data quality (list form)."""
+        # Ensure expirations/strikes lists are not empty
+        if "expirations" in df.columns:
+            empties = df["expirations"].map(lambda x: len(x) == 0)
+            if empties.any():
+                self.logger.warning("Found snapshots with empty expirations list")
+        if "strikes" in df.columns:
+            empties = df["strikes"].map(lambda x: len(x) == 0)
+            if empties.any():
+                self.logger.warning("Found snapshots with empty strikes list")
 
-        # Check for valid bid/ask spreads
-        if "bid" in df.columns and "ask" in df.columns:
-            # Remove rows where both bid and ask are missing
-            valid_quotes = ~(df["bid"].isna() & df["ask"].isna())
-
-            if valid_quotes.any():
-                # Check for negative bid/ask
-                negative_bid = (df["bid"] < 0) & valid_quotes
-                negative_ask = (df["ask"] < 0) & valid_quotes
-
-                if negative_bid.any():
-                    self.logger.warning(
-                        f"Found {negative_bid.sum()} negative bid prices"
-                    )
-                if negative_ask.any():
-                    self.logger.warning(
-                        f"Found {negative_ask.sum()} negative ask prices"
-                    )
-
-                # Check for inverted bid/ask spreads
-                inverted_spread = (df["bid"] > df["ask"]) & valid_quotes
-                if inverted_spread.any():
-                    self.logger.warning(
-                        f"Found {inverted_spread.sum()} options with bid > ask"
-                    )
-
-        # Check for reasonable implied volatility values
-        if "implied_volatility" in df.columns:
-            valid_iv = ~df["implied_volatility"].isna()
-            if valid_iv.any():
-                # IV should be positive and typically < 5.0 (500%)
-                extreme_iv = (
-                    (df["implied_volatility"] <= 0) | (df["implied_volatility"] > 5.0)
-                ) & valid_iv
-                if extreme_iv.any():
-                    self.logger.warning(
-                        f"Found {extreme_iv.sum()} options with extreme implied volatility values"
-                    )
-
-        # Check expiry vs snapshot date
-        if "expiry" in df.columns and "snapshot_date" in df.columns:
-            expired_options = df["expiry"] <= df["snapshot_date"]
-            if expired_options.any():
-                self.logger.warning(
-                    f"Found {expired_options.sum()} expired options in chain"
-                )
+    # Convenience helpers
+    def get_latest_snapshot_date(self, underlying: str) -> Optional[date]:
+        """Return the most recent snapshot_date for an underlying, or None."""
+        try:
+            tbl = self.load(underlying=underlying.upper())
+            if tbl is None or tbl.num_rows == 0:
+                return None
+            # Compute max snapshot_date via Arrow to avoid full Pandas conversion
+            import pyarrow.compute as pc
+            val = pc.max(tbl.column("as_of")).as_py()
+            # Arrow date32 returns datetime.date already
+            return val
+        except Exception:
+            return None
 
     def save_chain_snapshot(
         self, df: pd.DataFrame, underlying: str, snapshot_date: date

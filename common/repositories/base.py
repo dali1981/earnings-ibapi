@@ -22,6 +22,12 @@ from datetime import date, datetime
 
 from jedi.inference.value.iterable import Sequence
 
+from common.utils.repositories import (
+    list_contains_mask,
+    list_contains_any_mask,
+    list_contains_all_mask,
+)
+
 Filter = Tuple[str, str, Any]
 
 def _ensure_list(x: Any) -> list:
@@ -456,8 +462,27 @@ class BaseRepository(ABC):
                     schema=self._schema,
                 )
 
-                # Build filter expression: explicit filters + simple equality kwargs
-                expr = _build_arrow_expression(filters or [])
+                # Split filters into pushdown vs post filters (e.g. list contains)
+                push_filters: List[Filter] = []
+                post_filters: List[Filter] = []
+                if filters:
+                    for f in filters:
+                        try:
+                            field, op, value = f
+                        except Exception:
+                            # Ignore malformed filters; let Arrow raise later if needed
+                            continue
+                        op_norm = str(op).lower().strip()
+                        if op_norm in {"==", "!=", ">=", ">", "<=", "<", "in", "not in", "between"}:
+                            push_filters.append((field, op, value))
+                        elif op_norm in {"contains", "contains_any", "contains_all"}:
+                            post_filters.append((field, op_norm, value))
+                        else:
+                            # Unknown op → treat as post filter to avoid hard failure
+                            post_filters.append((field, op_norm, value))
+
+                # Build filter expression: explicit pushdown filters + simple equality kwargs
+                expr = _build_arrow_expression(push_filters or [])
 
                 # Support equality kwargs like symbol="AAPL", trade_date=...
                 if kwargs:
@@ -484,6 +509,38 @@ class BaseRepository(ABC):
                         expr = kw_expr if expr is None else (expr & kw_expr)
 
                 table = dataset.to_table(columns=columns, filter=expr)
+
+                # Apply post-filters that Arrow can't push down (e.g., list contains)
+                if post_filters:
+                    import pyarrow.compute as pc
+                    for field, op_norm, value in post_filters:
+                        # Skip if column not present
+                        if field not in table.column_names:
+                            continue
+                        col = table.column(field)
+                        if op_norm == "contains":
+                            mask = list_contains_mask(col, value)
+                        elif op_norm == "contains_any":
+                            vals = _ensure_list(value)
+                            mask = None
+                            for v in vals:
+                                m = list_contains_mask(col, v)
+                                mask = m if mask is None else pc.or_(mask, m)
+                            if mask is None:
+                                # No values → keep all
+                                continue
+                        elif op_norm == "contains_all":
+                            vals = _ensure_list(value)
+                            mask = None
+                            for v in vals:
+                                m = list_contains_mask(col, v)
+                                mask = m if mask is None else pc.and_(mask, m)
+                            if mask is None:
+                                continue
+                        else:
+                            # Unknown op: skip
+                            continue
+                        table = pc.filter(table, mask)
 
                 self.logger.debug(
                     f"Loaded {int(table.num_rows)} records from {self.dataset_name}",

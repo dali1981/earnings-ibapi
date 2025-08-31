@@ -164,7 +164,72 @@ def save_historical_bars_task(
         else:
             raise ValueError(f"Unknown repository type: {repository_type}")
 
-        repo.save(df)
+        # Supply option metadata to repository normalization
+        if repository_type == "option":
+            underlying = contract.get("symbol")
+            # Derive expiry date from lastTradeDateOrContractMonth or localSymbol
+            expiry_raw = (
+                contract.get("lastTradeDateOrContractMonth")
+                or contract.get("expiry")
+                or contract.get("contractMonth")
+            )
+            expiry_dt = None
+            if expiry_raw:
+                s = str(expiry_raw).strip()
+                try:
+                    token = s.split()[0]
+                    if len(token) == 8 and token.isdigit():
+                        expiry_dt = pd.to_datetime(token, format="%Y%m%d").date()
+                    else:
+                        expiry_dt = pd.to_datetime(token).date()
+                except Exception:
+                    expiry_dt = None
+            if expiry_dt is None:
+                # fallback to parse from localSymbol like "BABA  250905C00135000"
+                import re
+                ls = contract.get("localSymbol") or contract.get("local_symbol")
+                if ls:
+                    m = re.search(r"(\d{6})([CP])(\d{8})", str(ls))
+                    if m:
+                        yymmdd = m.group(1)
+                        try:
+                            expiry_dt = pd.to_datetime("20" + yymmdd, format="%Y%m%d").date()
+                        except Exception:
+                            pass
+
+            # Right/Strike from contract or localSymbol fallback
+            right = contract.get("right")
+            strike = contract.get("strike")
+            if right is None or str(right).strip().lower() in ("", "none", "nan") or strike in (None, "", "None"):
+                ls = contract.get("localSymbol") or contract.get("local_symbol")
+                if ls:
+                    import re
+                    m = re.search(r"(\d{6})([CP])(\d{8})", str(ls))
+                    if m:
+                        if not right:
+                            right = m.group(2)
+                        if not strike:
+                            try:
+                                strike = int(m.group(3)) / 1000.0
+                            except Exception:
+                                pass
+            try:
+                strike = float(strike) if strike is not None else None
+            except Exception:
+                strike = None
+            right = (str(right).upper() if right is not None else None)
+
+            repo.save(
+                df,
+                underlying=underlying,
+                expiry=expiry_dt,
+                strike=strike,
+                right=right,
+                bar_size=parameters.get("bar_size_setting"),
+                data_type=parameters.get("what_to_show"),
+            )
+        else:
+            repo.save(df)
         logger.info(f"💾 Saved {len(df)} bars for {symbol}")
 
         return {
@@ -178,7 +243,7 @@ def save_historical_bars_task(
         }
 
     except Exception as e:
-        logger.error(f"💾 Error saving bars for {symbol}: {e}")
+        logger.error(f"💾 Error saving bars for {symbol}: {e}", exc_info=True)
         return {"saved_count": 0, "error": str(e)}
 
 
@@ -366,7 +431,6 @@ def fetch_historical_data_from_ib_task(
             # Fetch historical bars
             logger.info(f"   🔄 Fetching historical bars for {contract_symbol}...")
             fetch_result = fetch_historical_bars_task(
-                self,
                 contract=contract,
                 end_date_time=end_date_time,
                 duration_str=duration_str,
@@ -399,7 +463,6 @@ def fetch_historical_data_from_ib_task(
                 f"   💾 Saving {len(fetch_result.get('bars', []))} bars for {contract_symbol} to {repository_type} repository..."
             )
             save_result = save_historical_bars_task(
-                self,
                 fetch_result=fetch_result,
                 repository_type=repository_type,
                 root=root,
@@ -453,37 +516,44 @@ def _normalize_historical_bars(
     if not bars:
         return pd.DataFrame()
 
+    #TODO add bar_count and wap, volume to bars
     df = pd.DataFrame(bars)
+    df["time"] = pd.to_datetime(df["date"])
+    df["date"] = df["time"].dt.date
+    df["symbol"] = contract.get('symbol', None)
+    df["bar_size"] = parameters.get("bar_size_setting", None)
+    df["data_type"] = parameters.get("what_to_show", None)
+    df["created_at"] = pd.Timestamp.now()
 
-    # Ensure required columns exist
-    required_cols = ["time", "open", "high", "low", "close", "volume"]
-    for col in required_cols:
-        if col not in df.columns:
-            if col == "time":
-                df[col] = pd.NaT
-            elif col == "volume":
-                df[col] = 0
-            else:
-                df[col] = 0.0
+    # # Ensure required columns exist
+    # required_cols = ["time", "open", "high", "low", "close", "volume"]
+    # for col in required_cols:
+    #     if col not in df.columns:
+    #         if col == "time":
+    #             df[col] = pd.NaT
+    #         elif col == "volume":
+    #             df[col] = 0
+    #         else:
+    #             df[col] = 0.0
+    #
+    # # Add contract and parameter information
+    # df["symbol"] = contract.get("symbol", "")
+    # df["bar_size"] = parameters.get("bar_size_setting", "")
+    # df["data_type"] = parameters.get("what_to_show", "TRADES").lower()
 
-    # Add contract and parameter information
-    df["symbol"] = contract.get("symbol", "")
-    df["bar_size"] = parameters.get("bar_size_setting", "")
-    df["data_type"] = parameters.get("what_to_show", "TRADES").lower()
-
-    # Convert time to datetime if it's a string
-    if not df.empty and not pd.api.types.is_datetime64_any_dtype(df["time"]):
-        df["time"] = pd.to_datetime(df["time"])
+    # # Convert time to datetime if it's a string
+    # if not df.empty and not pd.api.types.is_datetime64_any_dtype(df["time"]):
+    #     df["time"] = pd.to_datetime(df["time"])
 
     # Add trade_date for partitioning (date part of time)
-    if not df.empty:
-        df["trade_date"] = df["time"].dt.date
+    # if not df.empty:
+    #     df["trade_date"] = df["time"].dt.date
 
-    # Optional columns that may be present
-    optional_cols = ["wap", "bar_count"]
-    for col in optional_cols:
-        if col not in df.columns:
-            df[col] = None
+    # # Optional columns that may be present
+    # optional_cols = ["wap", "bar_count"]
+    # for col in optional_cols:
+    #     if col not in df.columns:
+    #         df[col] = None
 
     return df
 
@@ -542,7 +612,8 @@ def process_historical_data_for_resolved_contracts_task(
     missing_symbols = []
 
     for sym in symbols:
-        result = resolve_contract_for_symbol_task(self, symbol=sym)
+        # Do not pass outer task self when calling another Celery task directly
+        result = resolve_contract_for_symbol_task(symbol=sym)
         if result.get("resolved_contracts"):
             resolved_contracts.extend(result["resolved_contracts"])
         if result.get("missing_symbols"):
@@ -689,7 +760,7 @@ def process_historical_data_for_resolved_contracts_task(
     max_retries=3,
 )
 def resolve_single_contract_v2_task(
-    self,
+    # self,
     *,
     symbol: str,
     root: str | None = None,
@@ -707,9 +778,10 @@ def resolve_single_contract_v2_task(
     import pyarrow as pa
     import pyarrow.compute as pc
 
-    repo = ContractRepository(base / "contracts")
-    tbl = repo.read(
-        columns=["conid", "symbol", "sec_type", "currency"], symbol=[symbol.upper()]
+    repo = ContractRepository(base)
+    filter_ = ("symbol", "in", symbol.upper())
+    tbl = repo.load(
+        columns=["conid", "symbol", "sec_type", "currency"], filters=[filter_]
     )
 
     if tbl is None or tbl.num_rows == 0:
@@ -878,6 +950,7 @@ def save_bars_v2_task(
                 from factories.repository_factory import create_repository
             repository = create_repository(repository_type, base)
 
+        from celery.contrib import rdb; rdb.set_trace()
         repository.save(df)
         logger.info(f"💾 Saved {len(df)} bars for {symbol}")
 
@@ -888,5 +961,5 @@ def save_bars_v2_task(
         }
 
     except Exception as e:
-        logger.error(f"💾 Error saving bars for {symbol}: {e}")
+        logger.error(f"💾 Error saving bars for {symbol}: {e}", exc_info=True)
         return {"saved_count": 0, "error": str(e)}

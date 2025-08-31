@@ -45,9 +45,11 @@
   }
 
   document.addEventListener('DOMContentLoaded', () => {
+    const actions = [];
     document.querySelectorAll('[data-action]').forEach((el) => {
       const action = el.getAttribute('data-action');
-      if (action) bindAction(el, action);
+      if (action) { bindAction(el, action); actions.push(action); }
     });
+    try { console.log('[bootstrap] bound actions:', actions); } catch (_) {}
   });
 })();

@@ -185,16 +185,16 @@ run-options:
 	uvicorn services.option_history_api.app:app --host 0.0.0.0 --port 9003 --reload
 
 run-chains:
-	uvicorn services.option_chain_api.app:app --host 0.0.0.0 --port 9004 --reload
+	uvicorn api.option_chain_api.app:app --host 0.0.0.0 --port 9004 --reload
 
 run-frontend:
 	uvicorn services.frontend.main:app --host 0.0.0.0 --port 9000 --reload
 
 run-orchestrator:
-	uvicorn services.orchestrator_api.app:app --host 0.0.0.0 --port 9005 --reload
+	uvicorn api.orchestrator_api.app:app --host 0.0.0.0 --port 9005 --reload
 
 run-ib:
-	uvicorn services.ib_api.app:app --host 0.0.0.0 --port 9010 --reload
+	uvicorn api.ib_api.app:app --host 0.0.0.0 --port 9010 --reload
 
 run-flower:
 	celery -A ibx_celery.app flower --port=5555

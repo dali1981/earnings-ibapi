@@ -62,13 +62,41 @@
       </section>
       <section>
         <h2>Equity History</h2>
-        <form id="equityForm" data-action="equity.fetch">
+        <form id="equityReadForm" data-action="equity.read">
           <label>Symbol <input type="text" id="eqSymbol" placeholder="AAPL" /></label>
           <label>Start <input type="date" id="eqStart" /></label>
           <label>End <input type="date" id="eqEnd" /></label>
           <label>Bar Size <input type="text" id="eqBar" value="1 day" /></label>
-          <button type="submit">Fetch</button>
+          <button type="submit">Read from Repository</button>
         </form>
+        <form id="equityFetchForm" data-action="equity.fetchTWS" style="margin-top:.6rem">
+          <label>Symbol(s) <input type="text" id="eqSymbolTWS" placeholder="AAPL or AAPL,MSFT" /></label>
+          <label>Duration 
+            <select id="eqDuration">
+              <option value="1 D">1 Day</option>
+              <option value="5 D" selected>5 Days</option>
+              <option value="1 W">1 Week</option>
+              <option value="2 W">2 Weeks</option>
+              <option value="1 M">1 Month</option>
+              <option value="3 M">3 Months</option>
+              <option value="6 M">6 Months</option>
+              <option value="1 Y">1 Year</option>
+            </select>
+          </label>
+          <label>Bar Size 
+            <select id="eqBarTWS">
+              <option value="1 min">1 minute</option>
+              <option value="5 mins">5 minutes</option>
+              <option value="15 mins">15 minutes</option>
+              <option value="30 mins">30 minutes</option>
+              <option value="1 hour">1 hour</option>
+              <option value="1 day" selected>1 day</option>
+            </select>
+          </label>
+          <label>End Date <input type="date" id="eqEndTWS" /></label>
+          <button type="submit">Fetch from TWS (via Orchestrator)</button>
+        </form>
+        <div id="equityStatus" style="margin:.5rem 0; color:#8a90ad; font-size:.9rem;"></div>
         <pre id="equityOut" class="out"></pre>
       </section>
       <section>

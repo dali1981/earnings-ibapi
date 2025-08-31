@@ -97,14 +97,76 @@
     renderCalendar(data);
   }
 
-  /** Handle equity bars fetch. */
-  async function equityFetch() {
+  /** Handle equity bars read from repository. */
+  async function equityRead() {
+    console.log('equityRead called');
     const s = $('eqSymbol')?.value;
     const st = $('eqStart')?.value;
     const en = $('eqEnd')?.value;
     const bar = $('eqBar')?.value;
-    const { data } = await window.TradingAPI.equity.bars(s, st, en, bar);
-    $('equityOut').textContent = JSON.stringify(data, null, 2);
+    const status = $('equityStatus');
+    const out = $('equityOut');
+    
+    if (status) status.textContent = 'Reading from repository...';
+    out.textContent = 'Loading...';
+    
+    try {
+      const { data } = await window.TradingAPI.equity.bars(s, st, en, bar);
+      out.textContent = JSON.stringify(data, null, 2);
+      if (status) status.textContent = `Read ${data.rows || 0} bars from repository`;
+    } catch (err) {
+      out.textContent = `Error: ${err.message}`;
+      if (status) status.textContent = 'Read failed';
+    }
+  }
+
+  /** Handle equity bars fetch from TWS via orchestrator. */
+  async function equityFetchTWS() {
+    console.log('equityFetchTWS called');
+    const symbols = $('eqSymbolTWS')?.value;
+    const duration = $('eqDuration')?.value;
+    const barSize = $('eqBarTWS')?.value;
+    const endDate = $('eqEndTWS')?.value;
+    const status = $('equityStatus');
+    const out = $('equityOut');
+    
+    console.log('Form values:', { symbols, duration, barSize, endDate });
+    
+    if (!symbols) {
+      alert('Please enter symbol(s)');
+      return;
+    }
+    
+    // Format end date time for IB API
+    const endDateTime = endDate 
+      ? `${endDate.replace(/-/g, '')} 23:59:59`
+      : new Date().toISOString().slice(0, 10).replace(/-/g, '') + ' 23:59:59';
+    
+    if (status) status.textContent = 'Fetching from TWS...';
+    out.textContent = 'Dispatching request to orchestrator...';
+    try { console.log('[equity.fetchTWS] base:', window.TradingAPI?._bases?.orchestrator); } catch (_) {}
+    if (status && window.TradingAPI?._bases?.orchestrator) {
+      status.textContent = `${status.textContent} → ${window.TradingAPI._bases.orchestrator}/orchestrator/historical/bars-by-symbols`;
+    }
+    
+    try {
+      const { data } = await window.TradingAPI.orchestrator.fetchHistoricalBars({
+        symbols: symbols.split(',').map(s => s.trim()),
+        end_date_time: endDateTime,
+        duration_str: duration,
+        bar_size_setting: barSize,
+        repository_type: 'equity'
+      });
+      
+      out.textContent = JSON.stringify(data, null, 2);
+      if (status) {
+        status.textContent = `Fetching ${data.processed || 0} symbol(s) from TWS. ` +
+          `Job ID: ${data.details?.group_id || data.details?.chain_id || 'N/A'}`;
+      }
+    } catch (err) {
+      out.textContent = `Error: ${err.message}`;
+      if (status) status.textContent = 'Fetch failed';
+    }
   }
 
   /** Handle option chain latest snapshot. */
@@ -135,7 +197,8 @@
   window.TradingControllers = {
     'calendar.get': calendarGet,
     'calendar.fetch': calendarFetch,
-    'equity.fetch': equityFetch,
+    'equity.read': equityRead,
+    'equity.fetchTWS': equityFetchTWS,
     'chains.latest': chainLatest,
     'orc.search': () => orc('search'),
     'orc.details': () => orc('details'),
@@ -148,5 +211,16 @@
     if (t) t.addEventListener('change', () => {
       if (lastCalendarData !== null) renderCalendar(lastCalendarData);
     });
+    // Redundant explicit binding in case bootstrap misses wiring
+    const fetchForm = $('equityFetchForm');
+    if (fetchForm && window.TradingControllers?.['equity.fetchTWS']) {
+      fetchForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        Promise.resolve(window.TradingControllers['equity.fetchTWS']()).catch(err => {
+          console.error('equity.fetchTWS failed:', err);
+          alert(err?.message || String(err));
+        });
+      });
+    }
   });
 })();

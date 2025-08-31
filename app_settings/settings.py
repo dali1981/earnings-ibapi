@@ -104,7 +104,7 @@ class CeleryHistoricalLimits(BaseModel):
 
 class CelerySettings(BaseModel):
     broker_url: Optional[str] = "amqp://localhost:5672/"
-    result_backend: Optional[str] = "rpc://"
+    result_backend: Optional[str] = "redis://localhost:6379/0"
     contracts: CeleryContractsLimits = CeleryContractsLimits()
     search: CelerySearchLimits = CelerySearchLimits()
     historical: CeleryHistoricalLimits = CeleryHistoricalLimits()

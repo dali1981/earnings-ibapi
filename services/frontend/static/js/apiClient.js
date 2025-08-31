@@ -108,6 +108,17 @@
           method: 'POST', headers: hdrs, body: json(payload),
         });
       },
+      /**
+       * Fetch historical bars from TWS via orchestrator.
+       * @param {{symbols:string[], end_date_time:string, duration_str:string, bar_size_setting:string, repository_type:string}} payload
+       */
+      fetchHistoricalBars(payload) {
+        // Debug: log URL and payload for visibility in console
+        try { console.log('[api] POST', `${BASES.orchestrator}/orchestrator/historical/bars-by-symbols`, payload); } catch (_) {}
+        return fetchJson(`${BASES.orchestrator}/orchestrator/historical/bars-by-symbols`, {
+          method: 'POST', headers: hdrs, body: json(payload),
+        });
+      },
     },
     equity: {
       /**

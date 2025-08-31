@@ -1,6 +1,7 @@
 from .routers.equity import router as equity_router
 from common.utils.logging_setup import disable_noisy_loggers, setup_logging
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 import logging
 import os
@@ -8,6 +9,15 @@ import os
 
 app = FastAPI(title="Equity History Service", version="0.2.0")
 app.include_router(equity_router)
+
+# Enable CORS for the frontend UI, consistent with other services
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.on_event("startup")
