@@ -84,6 +84,11 @@ export const api = {
         Object.entries(params||{}).forEach(([k,v])=>{ if (v!==undefined && v!==null && v!=='') qs.append(k, String(v)) })
         return fetchJson(`${BASES.orchestrator}/option-contracts/option-bars?${qs.toString()}`)
       },
+      availability(symbol, expiry) {
+        const qs = new URLSearchParams({ symbol })
+        if (expiry) qs.append('expiry', expiry)
+        return fetchJson(`${BASES.orchestrator}/option-contracts/availability?${qs.toString()}`)
+      },
     },
   },
 }

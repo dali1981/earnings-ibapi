@@ -26,12 +26,26 @@ export default function OptionContracts() {
   const [previewParams, setPreviewParams] = useState({ expiry: '', right: 'C', strike: '', bar_size: '1 day', start_date:'', end_date:'' })
   const [previewRows, setPreviewRows] = useState([])
   const [previewTotal, setPreviewTotal] = useState(0)
+  const [avail, setAvail] = useState(null)
   const selectTaskIdRef = useRef(null)
   const pollTimerRef = useRef(null)
 
   useEffect(()=>{
+    // fetch availability on symbol/expiry change
+    (async ()=>{
+      try {
+        const { data } = await api.orchestrator.optionContracts.availability((sym||'').trim().toUpperCase(), expiry||'')
+        setAvail(data)
+      } catch {}
+    })()
     return ()=> { if (pollTimerRef.current) clearInterval(pollTimerRef.current) }
   }, [])
+
+  useEffect(()=>{
+    (async ()=>{
+      try { const { data } = await api.orchestrator.optionContracts.availability((sym||'').trim().toUpperCase(), expiry||''); setAvail(data) } catch {}
+    })()
+  }, [sym, expiry])
 
   const R = () => rights.split(',').map(x=>x.trim().toUpperCase()).filter(x=>x==='C' || x==='P')
 
@@ -188,10 +202,18 @@ export default function OptionContracts() {
   return (
     <section>
       <h2>Option Contracts (React)</h2>
-      <nav style={{display:'flex', gap:'.5rem', borderBottom:'1px solid #e5e7eb', marginBottom:'.75rem'}}>
+      <nav style={{display:'flex', gap:'.5rem', borderBottom:'1px solid #e5e7eb', marginBottom:'.75rem', alignItems:'center'}}>
         {['select','enrich','historical','preview'].map(k=> (
           <button key={k} type="button" onClick={()=>setActive(k)} style={{borderBottom: active===k? '2px solid #6366f1':'2px solid transparent'}}>{k.toUpperCase()}</button>
         ))}
+        <div style={{flex:1}} />
+        {avail && (
+          <div style={{display:'flex', gap:'1rem', fontSize:'.85rem'}}>
+            <span title="Option chain snapshot">Chain: {avail.has_chain_snapshot? '✓':'–'} {avail.latest_chain_as_of?`(${avail.latest_chain_as_of})`:''}</span>
+            <span title="Saved option contracts">Contracts: {avail.contracts_count||0}</span>
+            <span title="Saved option bars">Bars: {avail.bars_count||0}</span>
+          </div>
+        )}
       </nav>
 
       {active==='select' && (

@@ -42,6 +42,62 @@ def select_option_contracts(payload: SelectionRequest) -> OrchestratorResult:
     )
 
 
+@router.get("/availability")
+def get_availability(
+    symbol: str = Query(..., description="Underlying symbol"),
+    expiry: str | None = Query(None, description="Filter for a specific expiry (YYYY-MM-DD)"),
+):
+    """Report availability of option chain snapshots, option contracts, and option bars for a symbol.
+
+    Returns counts and booleans to help the UI enable/disable actions.
+    """
+    import pandas as pd
+    from app_settings.settings import get_settings
+    from common.repositories.option_chains import OptionChainSnapshotRepository
+    from common.repositories.option_contracts import OptionContractsRepository
+    from common.repositories.option_bars import OptionBarRepository
+
+    settings = get_settings()
+    sym = symbol.strip().upper()
+
+    # Chain snapshots
+    chain_repo = OptionChainSnapshotRepository(settings.paths.data_root)
+    try:
+        latest = chain_repo.get_latest_snapshot_date(sym)
+        has_chain = latest is not None
+    except Exception:
+        latest = None
+        has_chain = False
+
+    # Option contracts (enriched/saved)
+    oc_repo = OptionContractsRepository(settings.paths.data_root)
+    try:
+        oc_tbl = oc_repo.load(symbol=sym)
+        contracts_count = int(oc_tbl.num_rows)
+    except Exception:
+        contracts_count = 0
+
+    # Option bars
+    ob_repo = OptionBarRepository(settings.paths.data_root)
+    try:
+        if expiry:
+            exp = pd.to_datetime(expiry).date()
+            ob_tbl = ob_repo.load(underlying=sym, expiry=exp)
+        else:
+            ob_tbl = ob_repo.load(underlying=sym)
+        bars_count = int(ob_tbl.num_rows)
+    except Exception:
+        bars_count = 0
+
+    return {
+        "symbol": sym,
+        "has_chain_snapshot": has_chain,
+        "latest_chain_as_of": latest.isoformat() if latest else None,
+        "contracts_count": contracts_count,
+        "bars_count": bars_count,
+    }
+
+
 @router.post("/fullflow", response_model=OrchestratorResult)
 def option_fullflow(payload: OptionHistoricalRequest) -> OrchestratorResult:
     """
