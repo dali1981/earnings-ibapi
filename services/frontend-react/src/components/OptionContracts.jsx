@@ -27,6 +27,7 @@ export default function OptionContracts() {
   const [previewRows, setPreviewRows] = useState([])
   const [previewTotal, setPreviewTotal] = useState(0)
   const [avail, setAvail] = useState(null)
+  const [expiries, setExpiries] = useState([])
   const selectTaskIdRef = useRef(null)
   const pollTimerRef = useRef(null)
 
@@ -36,6 +37,10 @@ export default function OptionContracts() {
       try {
         const { data } = await api.orchestrator.optionContracts.availability((sym||'').trim().toUpperCase(), expiry||'')
         setAvail(data)
+      } catch {}
+      try {
+        const { data } = await api.orchestrator.optionContracts.expiries((sym||'').trim().toUpperCase())
+        setExpiries(data?.expiries||[])
       } catch {}
     })()
     return ()=> { if (pollTimerRef.current) clearInterval(pollTimerRef.current) }
@@ -280,7 +285,7 @@ export default function OptionContracts() {
             </label>
           </div>
           <div style={{marginTop:'.5rem', display:'flex', gap:'.5rem', flexWrap:'wrap', alignItems:'center'}}>
-            <button type="button" onClick={select}>Select</button>
+            <button type="button" onClick={select} disabled={avail && !avail.has_chain_snapshot} title={avail && !avail.has_chain_snapshot ? 'No chain snapshot available' : ''}>Select</button>
           </div>
           <div style={{display:'flex', alignItems:'center', gap:'.5rem', marginTop:'.25rem'}}>
             <label style={{display:'inline-flex', alignItems:'center', gap:'.25rem'}}>
@@ -339,7 +344,7 @@ export default function OptionContracts() {
         <section>
           <h3>Historical & Full Flow</h3>
           <div style={{marginTop:'.5rem', display:'flex', gap:'.5rem', flexWrap:'wrap', alignItems:'center'}}>
-            <button type="button" onClick={historical}>Run Historical</button>
+            <button type="button" onClick={historical} disabled={avail && (avail.contracts_count||0)===0} title={avail && (avail.contracts_count||0)===0 ? 'No saved contracts yet — use Full Flow' : ''}>Run Historical</button>
             <button type="button" onClick={async ()=>{
               setStatus('Dispatching full flow...')
               try{
@@ -364,7 +369,7 @@ export default function OptionContracts() {
                   use_underlying_iv: mode==='delta' ? !!useUnderlyingIv : undefined,
                   timeout_seconds: 20.0,
                 }
-                const { data } = await api.orchestrator.optionContracts.fullflow(base)
+                const { data } = await api.orchestrator.optionContracts.fullflowSmart(base)
                 setOut(JSON.stringify(data, null, 2))
                 const taskId = data?.details?.task_id
                 if (!taskId) { setStatus('Dispatched full flow (no task id)'); return }
@@ -404,7 +409,10 @@ export default function OptionContracts() {
           <h3>Preview Saved Option Bars</h3>
           <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))', gap:'.5rem'}}>
             <label>Expiry
-              <input value={previewParams.expiry} onChange={e=>setPreviewParams({...previewParams, expiry:e.target.value})} placeholder="YYYY-MM-DD" />
+              <select value={previewParams.expiry} onChange={e=>setPreviewParams({...previewParams, expiry:e.target.value})}>
+                <option value="">(any)</option>
+                {expiries.map(e=> (<option key={e} value={e}>{e}</option>))}
+              </select>
             </label>
             <label>Right
               <select value={previewParams.right} onChange={e=>setPreviewParams({...previewParams, right:e.target.value})}><option value="C">C</option><option value="P">P</option></select>

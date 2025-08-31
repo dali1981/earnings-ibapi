@@ -79,11 +79,13 @@ export const api = {
       save(payload) { return fetchJson(`${BASES.orchestrator}/option-contracts/save`, { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify(payload) }) },
       historical(payload) { return fetchJson(`${BASES.orchestrator}/option-contracts/historical`, { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify(payload) }) },
       fullflow(payload) { return fetchJson(`${BASES.orchestrator}/option-contracts/fullflow`, { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify(payload) }) },
+      fullflowSmart(payload) { return fetchJson(`${BASES.orchestrator}/option-contracts/fullflow-smart`, { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify(payload) }) },
       browseBars(params) {
         const qs = new URLSearchParams()
         Object.entries(params||{}).forEach(([k,v])=>{ if (v!==undefined && v!==null && v!=='') qs.append(k, String(v)) })
         return fetchJson(`${BASES.orchestrator}/option-contracts/option-bars?${qs.toString()}`)
       },
+      expiries(symbol) { return fetchJson(`${BASES.orchestrator}/option-contracts/expiries?symbol=${encodeURIComponent(symbol)}`) },
       availability(symbol, expiry) {
         const qs = new URLSearchParams({ symbol })
         if (expiry) qs.append('expiry', expiry)

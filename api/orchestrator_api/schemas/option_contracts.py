@@ -69,3 +69,10 @@ class OptionHistoricalRequest(BaseModel):
     delta_targets: Optional[List[float]] = None
     iv_assumption: Optional[float] = None
     use_underlying_iv: Optional[bool] = None
+
+
+class FullFlowSmartRequest(OptionHistoricalRequest):
+    force_select: Optional[bool] = False
+    force_enrich: Optional[bool] = False
+    force_save: Optional[bool] = False
+    force_historical: Optional[bool] = True

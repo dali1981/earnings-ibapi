@@ -6,11 +6,13 @@ from ..schemas.option_contracts import (
     EnrichRequest,
     SaveRequest,
     OptionHistoricalRequest,
+    FullFlowSmartRequest,
 )
 from ops.schemas.option_contracts import OptionSelection, OptionHistoricalArgs, SelectedContracts
 from fastapi import Response
 from ibx_celery.app import app as celery_app
 from fastapi import APIRouter, HTTPException, Query
+from pydantic import BaseModel
 
 
 router = APIRouter(prefix="/option-contracts", tags=["option-contracts"])
@@ -136,6 +138,112 @@ def option_fullflow(payload: OptionHistoricalRequest) -> OrchestratorResult:
     return OrchestratorResult(processed=1, saved=0, skipped=0, details={"task_id": res.id, "symbol": payload.symbol})
 
 
+@router.post("/fullflow-smart", response_model=OrchestratorResult)
+def option_fullflow_smart(payload: FullFlowSmartRequest) -> OrchestratorResult:
+    """
+    Smart flow:
+    - If option contracts already exist (and not forced), skip selection/enrich/save and run historical from repo.
+    - Otherwise, run the full chain.
+    Returns {task_id, plan} where plan describes which steps executed.
+    """
+    import pandas as pd
+    from app_settings.settings import get_settings
+    from common.repositories.option_contracts import OptionContractsRepository
+    from ops.schemas.option_contracts import SelectedContracts
+    from ops.tasks.option_bars import (
+        get_option_contracts_for_bars_task,
+        fetch_option_contract_details_task,
+        save_selected_option_contracts_to_repo_task,
+        fetch_option_historical_data_task,
+    )
+
+    settings = get_settings()
+    base = settings.paths.data_root
+
+    sym = payload.symbol.strip().upper()
+    plan: list[str] = []
+
+    # If not forced, check if we already have contracts saved
+    have_contracts = False
+    tbl = None
+    try:
+        oc_repo = OptionContractsRepository(base)
+        if payload.expiry_filter:
+            exp = pd.to_datetime(payload.expiry_filter).date()
+            tbl = oc_repo.load(symbol=sym, expiry=exp)
+        else:
+            tbl = oc_repo.load(symbol=sym)
+        have_contracts = tbl is not None and tbl.num_rows > 0
+    except Exception:
+        have_contracts = False
+
+    # If contracts exist and user didn't force selection/enrich/save, run historical directly using repo contracts
+    if have_contracts and not (payload.force_select or payload.force_enrich or payload.force_save):
+        plan.append("historical_from_repo")
+        # Build SelectedContracts from repo
+        df = tbl.to_pandas()
+        contracts = []
+        for r in df.itertuples(index=False):
+            try:
+                expiry_raw = None
+                if getattr(r, "expiry", None):
+                    try:
+                        expiry_raw = pd.to_datetime(r.expiry).strftime("%Y%m%d")
+                    except Exception:
+                        expiry_raw = None
+                contracts.append({
+                    "symbol": sym,
+                    "secType": "OPT",
+                    "exchange": getattr(r, "exchange", None) or "SMART",
+                    "currency": getattr(r, "currency", None) or "USD",
+                    "lastTradeDateOrContractMonth": expiry_raw,
+                    "strike": float(getattr(r, "strike", None) or 0),
+                    "right": str(getattr(r, "right", "")).upper(),
+                    "multiplier": str(getattr(r, "multiplier", None) or 100),
+                    "tradingClass": getattr(r, "trading_class", None) or sym,
+                    "localSymbol": getattr(r, "local_symbol", None) or None,
+                    "conId": int(getattr(r, "conid", 0) or 0) or None,
+                })
+            except Exception:
+                continue
+        sc = SelectedContracts(symbol=sym, contracts=contracts, contract_count=len(contracts))
+        job = fetch_option_historical_data_task.s(
+            contracts_result=sc.model_dump(),
+            end_date_time=payload.end_date_time,
+            duration_str=payload.duration_str,
+            bar_size_setting=payload.bar_size_setting,
+            what_to_show=payload.what_to_show,
+            use_rth=payload.use_rth,
+            timeout_seconds=getattr(payload, "timeout_seconds", 20.0),
+        ).apply_async()
+        return OrchestratorResult(
+            processed=1,
+            saved=0,
+            skipped=0,
+            details={"task_id": job.id, "symbol": sym, "plan": plan},
+        )
+
+    # Else fallback to full chain
+    plan.append("full_chain")
+    selection = OptionSelection(**payload.model_dump())
+    hist_kwargs = dict(
+        end_date_time=payload.end_date_time,
+        duration_str=payload.duration_str,
+        bar_size_setting=payload.bar_size_setting,
+        what_to_show=payload.what_to_show,
+        use_rth=payload.use_rth,
+        timeout_seconds=payload.timeout_seconds if hasattr(payload, 'timeout_seconds') else 20.0,
+    )
+    flow = (
+        get_option_contracts_for_bars_task.s(selection=selection.model_dump())
+        | fetch_option_contract_details_task.s()
+        | save_selected_option_contracts_to_repo_task.s()
+        | fetch_option_historical_data_task.s(**hist_kwargs)
+    )
+    res = flow.apply_async()
+    return OrchestratorResult(processed=1, saved=0, skipped=0, details={"task_id": res.id, "symbol": sym, "plan": plan})
+
+
 @router.get("/option-bars")
 def browse_option_bars(
     symbol: str = Query(..., description="Underlying symbol"),
@@ -199,6 +307,56 @@ def browse_option_bars(
         out["expiry"] = pd.to_datetime(out["expiry"]).dt.strftime("%Y-%m-%d")
     rows = out.to_dict(orient="records")
     return {"rows": rows, "total": int(len(df))}
+
+
+@router.get("/expiries")
+def list_expiries(
+    symbol: str = Query(..., description="Underlying symbol"),
+):
+    """List known expiries for a symbol from option_contracts; fallback to latest chain snapshot."""
+    import pandas as pd
+    from app_settings.settings import get_settings
+    from common.repositories.option_contracts import OptionContractsRepository
+    from common.repositories.option_chains import OptionChainSnapshotRepository
+
+    settings = get_settings()
+    sym = symbol.strip().upper()
+
+    expiries: list[str] = []
+
+    # Try option_contracts first
+    try:
+        oc_repo = OptionContractsRepository(settings.paths.data_root)
+        tbl = oc_repo.load(symbol=sym)
+        if tbl and tbl.num_rows:
+            df = tbl.select(["expiry"]).to_pandas()
+            if not df.empty and "expiry" in df.columns:
+                vals = pd.to_datetime(df["expiry"], errors="coerce").dt.date.dropna().unique().tolist()
+                expiries = sorted({d.isoformat() for d in vals})
+    except Exception:
+        pass
+
+    # Fallback to chain snapshot expirations
+    if not expiries:
+        try:
+            ch_repo = OptionChainSnapshotRepository(settings.paths.data_root)
+            latest = ch_repo.get_latest_snapshot_date(sym)
+            if latest:
+                tbl = ch_repo.load(filters=[("underlying", "==", sym), ("as_of", "==", latest)])
+                if tbl and tbl.num_rows:
+                    lsts = tbl.column("expirations").to_pylist()
+                    all_exps = set()
+                    for seq in lsts:
+                        for v in (seq or []):
+                            try:
+                                all_exps.add(pd.to_datetime(str(v)).date().isoformat())
+                            except Exception:
+                                continue
+                    expiries = sorted(all_exps)
+        except Exception:
+            pass
+
+    return {"symbol": sym, "expiries": expiries}
 
 
 @router.post("/select-sync", response_model=SelectedContracts)
