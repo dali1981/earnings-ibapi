@@ -1,8 +1,12 @@
 :root {
-  --bg: #0f1220; --fg: #e2e6f3; --muted: #8a90ad; --card: #161a2b; --line: #22263b;
+  --bg: #0f1220; --fg: #e2e6f3; --muted: #8a90ad; --card: #161a2b; --line: #22263b; --accent: #6366f1;
 }
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--bg); color: var(--fg); font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
+/* Tame heading sizes for compact UI */
+h1 { font-size: 1.25rem; line-height: 1.6; margin: .2rem 0 .6rem; }
+h2 { font-size: 1.1rem; line-height: 1.5; margin: .2rem 0 .6rem; }
+h3 { font-size: 1rem; line-height: 1.4; margin: .2rem 0 .5rem; }
 header { padding: 1rem; border-bottom: 1px solid var(--line); }
 main { padding: 1rem; display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(360px,1fr)); }
 section { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 1rem; }
@@ -31,3 +35,16 @@ table.tbl tbody tr:nth-child(odd) { background: #0e1223; }
 table.tbl tbody tr:nth-child(even) { background: #0b0f1f; }
 table.tbl tbody tr:hover { background: #121735; }
 
+/* App layout & navigation */
+.layout { display: grid; grid-template-columns: 220px 1fr; gap: 1rem; }
+.sidebar { position: sticky; top: 0; align-self: start; height: 100vh; padding: 1rem; border-right: 1px solid var(--line); }
+.nav-menu { display: flex; flex-direction: column; gap: .25rem; }
+.nav-item { text-align: left; background: transparent; border: none; padding: .4rem .5rem; cursor: pointer; color: #b7bdd6; border-radius: 8px; }
+.nav-item:hover { background: #141a34; color: #e5e7eb; }
+.nav-item.active { background: #1b2140; color: #ffffff; }
+
+/* In-page tabs */
+.tabs { display: flex; gap: .5rem; border-bottom: 1px solid var(--line); margin-bottom: .75rem; align-items: center; }
+.tab-btn { background: transparent; border: none; padding: .35rem .6rem; color: #b7bdd6; border-bottom: 2px solid transparent; border-radius: 6px 6px 0 0; }
+.tab-btn:hover { color: #e5e7eb; }
+.tab-btn.active { color: #ffffff; border-bottom-color: var(--accent); }

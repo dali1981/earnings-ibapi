@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { api } from '../apiClient'
 
-export default function OptionContracts() {
+export default function OptionContracts({ initialActive } = {}) {
   const [sym, setSym] = useState('AAPL')
   const [asOf, setAsOf] = useState('')
   const [expiry, setExpiry] = useState('')
@@ -22,7 +22,7 @@ export default function OptionContracts() {
   const [showTable, setShowTable] = useState(false)
   const hasEnriched = !!(contractsResult && Array.isArray(contractsResult.contracts) && contractsResult.contracts.some(c => c && c.conId))
   const [historicalRes, setHistoricalRes] = useState(null)
-  const [active, setActive] = useState('select')
+  const [active, setActive] = useState(initialActive || 'select')
   const [previewParams, setPreviewParams] = useState({ expiry: '', right: 'C', strike: '', bar_size: '1 day', start_date:'', end_date:'' })
   const [previewRows, setPreviewRows] = useState([])
   const [previewTotal, setPreviewTotal] = useState(0)
@@ -45,6 +45,13 @@ export default function OptionContracts() {
     })()
     return ()=> { if (pollTimerRef.current) clearInterval(pollTimerRef.current) }
   }, [])
+
+  useEffect(()=>{
+    if (initialActive && ['select','enrich','historical','preview'].includes(initialActive)) {
+      setActive(initialActive)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialActive])
 
   useEffect(()=>{
     (async ()=>{
@@ -207,9 +214,10 @@ export default function OptionContracts() {
   return (
     <section>
       <h2>Option Contracts (React)</h2>
-      <nav style={{display:'flex', gap:'.5rem', borderBottom:'1px solid #e5e7eb', marginBottom:'.75rem', alignItems:'center'}}>
+      {/* Removed in-component left index; global nav handles module navigation. */}
+      <nav className="tabs">
         {['select','enrich','historical','preview'].map(k=> (
-          <button key={k} type="button" onClick={()=>setActive(k)} style={{borderBottom: active===k? '2px solid #6366f1':'2px solid transparent'}}>{k.toUpperCase()}</button>
+          <button key={k} type="button" onClick={()=>setActive(k)} className={`tab-btn ${active===k? 'active':''}`}>{k.toUpperCase()}</button>
         ))}
         <div style={{flex:1}} />
         {avail && (
@@ -295,7 +303,7 @@ export default function OptionContracts() {
           </div>
           {showTable && contractsResult && Array.isArray(contractsResult.contracts) ? (
             <div style={{overflowX:'auto', marginTop:'.5rem'}}>
-              <table style={{width:'100%', borderCollapse:'collapse'}}>
+              <table className="tbl">
                 <thead>
                   <tr>
                     <th style={th}>Expiry</th>
@@ -444,7 +452,7 @@ export default function OptionContracts() {
           </div>
           {previewRows.length>0 && (
             <div style={{overflowX:'auto', marginTop:'.5rem'}}>
-              <table style={{borderCollapse:'collapse', minWidth:'720px'}}>
+              <table className="tbl">
                 <thead>
                   <tr>
                     {['time','expiry','right','strike','open','high','low','close','volume','bar_size'].map(h=> (<th key={h} style={th}>{h}</th>))}
