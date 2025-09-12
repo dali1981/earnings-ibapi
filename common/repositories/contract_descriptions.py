@@ -13,15 +13,7 @@ import pandas as pd
 import pyarrow as pa
 
 
-# Import with fallback
-try:
-    from common.reliability import DataValidationException
-except ImportError:
-
-    class DataValidationException(ValueError):
-        def __init__(self, message: str, field: str = None, **kwargs):
-            super().__init__(message)
-            self.field = field
+from common.exceptions import DataValidationException
 
 
 class ContractDescriptionsRepository(BaseRepository):
@@ -58,7 +50,7 @@ class ContractDescriptionsRepository(BaseRepository):
                 pa.field("sec_id_type", pa.string(), nullable=True),
                 pa.field("sec_id", pa.string(), nullable=True),
                 pa.field("derivative_sec_types", pa.list_(pa.string())),
-                pa.field("created_at", pa.timestamp('s', 'UTC'), nullable=False),
+                pa.field("created_at", pa.timestamp("s", "UTC"), nullable=False),
             ]
         )
 
@@ -157,11 +149,13 @@ class ContractDescriptionsRepository(BaseRepository):
 
         # created_at: ensure present and as timestamp (schema expects timestamp, not date)
         if "created_at" not in out.columns:
-            out["created_at"] = pd.Timestamp.now(tz='UTC').replace(microsecond=0)
+            out["created_at"] = pd.Timestamp.now(tz="UTC").replace(microsecond=0)
         else:
             out["created_at"] = pd.to_datetime(out["created_at"], utc=True)
             # Fill any null values with current timestamp
-            out["created_at"] = out["created_at"].fillna(pd.Timestamp.now(tz='UTC').replace(microsecond=0))
+            out["created_at"] = out["created_at"].fillna(
+                pd.Timestamp.now(tz="UTC").replace(microsecond=0)
+            )
 
         # Ensure all schema columns exist (PyArrow requires all schema fields present)
         schema_columns = [field.name for field in self._schema]
@@ -254,9 +248,9 @@ class ContractDescriptionsRepository(BaseRepository):
         Returns:
             DataFrame with contract descriptions
         """
-        filters = [ ("symbol", "in",  [symbol]) ]
+        filters = [("symbol", "in", [symbol])]
         if sec_type:
-            filters += [ ("sec_type", "in",  sec_type) ]
+            filters += [("sec_type", "in", sec_type)]
 
         table = self.load(filters=filters)
         return table
@@ -336,11 +330,7 @@ class ContractDescriptionsRepository(BaseRepository):
         if sec_type:
             df = df[df["sec_type"] == sec_type]
 
-        return (
-            df.sort_values(["symbol", "sec_type", "conid"])
-            if not df.empty
-            else df
-        )
+        return df.sort_values(["symbol", "sec_type", "conid"]) if not df.empty else df
 
     def get_exchange_summary(self) -> pd.DataFrame:
         """
@@ -352,7 +342,9 @@ class ContractDescriptionsRepository(BaseRepository):
         df = self.load()
 
         if df.empty:
-            return pd.DataFrame(columns=["primary_exchange", "contract_count", "symbol_count"])
+            return pd.DataFrame(
+                columns=["primary_exchange", "contract_count", "symbol_count"]
+            )
 
         summary = (
             df.groupby("primary_exchange")

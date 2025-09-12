@@ -15,22 +15,22 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 from typing import Any, Callable
+
 import logging
+
+# Import centralized exceptions
+from common.exceptions import DataValidationException
 
 
 # ----------------------------------------------------------------------------
 # Reliability: exceptions, logger, context, perf decorators
 # ----------------------------------------------------------------------------
 try:
-    from common.reliability import (  # type: ignore
-        DataValidationException as _DataValidationException,
-        StorageException as _StorageException,
-        get_trading_logger as _get_trading_logger,
-        log_context as _log_context,
-        performance_log as _performance_log,
-    )
+    from common.reliability import get_trading_logger as _get_trading_logger
+    from common.reliability import log_context as _log_context
+    from common.reliability import performance_log as _performance_log
+    from common.reliability import StorageException as _StorageException
 
-    DataValidationException = _DataValidationException  # noqa: N816
     StorageException = _StorageException  # noqa: N816
     get_trading_logger = _get_trading_logger  # noqa: N816
     log_context = _log_context  # noqa: N816
@@ -40,14 +40,10 @@ try:
 
 except Exception:
 
-    class DataValidationException(ValueError):
-        def __init__(self, message: str, field: str | None = None, **kwargs: Any):
-            super().__init__(message)
-            self.field = field
-            self.context = kwargs
-
     class StorageException(Exception):
-        def __init__(self, message: str, storage_type: str | None = None, **kwargs: Any):
+        def __init__(
+            self, message: str, storage_type: str | None = None, **kwargs: Any
+        ):
             super().__init__(message)
             self.storage_type = storage_type
             self.context = kwargs
@@ -71,7 +67,9 @@ except Exception:
 # ----------------------------------------------------------------------------
 try:
     from common.lineage.core import OperationType as _OperationType  # type: ignore
-    from common.lineage.decorators import track_repository_operation as _track_repo  # type: ignore
+    from common.lineage.decorators import (
+        track_repository_operation as _track_repo,  # type: ignore
+    )
 
     OperationType = _OperationType  # noqa: N816
 

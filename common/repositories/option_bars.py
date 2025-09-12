@@ -14,15 +14,7 @@ import pandas as pd
 import pyarrow as pa
 
 
-# Import with fallback
-try:
-    from common.reliability import DataValidationException
-except ImportError:
-
-    class DataValidationException(ValueError):
-        def __init__(self, message: str, field: str = None, **kwargs):
-            super().__init__(message)
-            self.field = field
+from common.exceptions import DataValidationException
 
 
 class OptionBarRepository(BaseRepository):

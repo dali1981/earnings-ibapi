@@ -15,15 +15,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 
-# Import with fallback
-try:
-    from common.reliability import DataValidationException
-except ImportError:
-
-    class DataValidationException(ValueError):
-        def __init__(self, message: str, field: str = None, **kwargs):
-            super().__init__(message)
-            self.field = field
+from common.exceptions import DataValidationException
 
 
 class EquityBarRepository(BaseRepository):
@@ -303,15 +295,15 @@ class EquityBarRepository(BaseRepository):
 
         root = self.daily_path if is_daily else self.intraday_path
 
-        dataset = ds.dataset(
-            str(root), format="parquet", partitioning="hive"
-        )
+        dataset = ds.dataset(str(root), format="parquet", partitioning="hive")
 
         F = ds.field
-        expr = (F("symbol") == symbol)
+        expr = F("symbol") == symbol
         # Date filter (on `date` column) for both datasets
-        expr = expr & (F("date") >= pd.to_datetime(start_date).date()) & (
-            F("date") <= pd.to_datetime(end_date).date()
+        expr = (
+            expr
+            & (F("date") >= pd.to_datetime(start_date).date())
+            & (F("date") <= pd.to_datetime(end_date).date())
         )
 
         # Also prune by bar_size in intraday dataset
@@ -360,15 +352,18 @@ class EquityBarRepository(BaseRepository):
     ) -> set:
         """Return set of dates already stored for symbol and bar_size in range."""
         import pyarrow.dataset as ds
+
         bs = str(bar_size).strip().lower()
         is_daily = bs in ("1 day", "1d")
         root = self.daily_path if is_daily else self.intraday_path
 
         dataset = ds.dataset(str(root), format="parquet", partitioning="hive")
         F = ds.field
-        expr = (F("symbol") == symbol)
-        expr = expr & (F("date") >= pd.to_datetime(start_date).date()) & (
-            F("date") <= pd.to_datetime(end_date).date()
+        expr = F("symbol") == symbol
+        expr = (
+            expr
+            & (F("date") >= pd.to_datetime(start_date).date())
+            & (F("date") <= pd.to_datetime(end_date).date())
         )
         if not is_daily:
             expr = expr & (F("bar_size") == bar_size)

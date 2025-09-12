@@ -6,29 +6,26 @@ Provides common functionality for data normalization, schema validation, and Par
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from common.utils.repositories import (
+    list_contains_all_mask,
+    list_contains_any_mask,
+    list_contains_mask,
+)
 from datetime import date, datetime
+from functools import reduce
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Union, Tuple, Iterable
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Set, Tuple, Union
 
+import operator
 import pandas as pd
 import pyarrow as pa
 import pyarrow.dataset as ds
 import pyarrow.parquet as pq
 import re
 
-from functools import reduce
-import operator
-from datetime import date, datetime
-
-from jedi.inference.value.iterable import Sequence
-
-from common.utils.repositories import (
-    list_contains_mask,
-    list_contains_any_mask,
-    list_contains_all_mask,
-)
 
 Filter = Tuple[str, str, Any]
+
 
 def _ensure_list(x: Any) -> list:
     if x is None:
@@ -39,6 +36,7 @@ def _ensure_list(x: Any) -> list:
         return list(x)
     except TypeError:
         return [x]
+
 
 def _build_arrow_expression(filters: Sequence[Filter]) -> Optional[ds.Expression]:
     if not filters:
@@ -51,17 +49,17 @@ def _build_arrow_expression(filters: Sequence[Filter]) -> Optional[ds.Expression
         op = op.lower().strip()
 
         if op == "==":
-            e = (F(field) == value)
+            e = F(field) == value
         elif op == "!=":
-            e = (F(field) != value)
+            e = F(field) != value
         elif op == ">=":
-            e = (F(field) >= value)
+            e = F(field) >= value
         elif op == ">":
-            e = (F(field) > value)
+            e = F(field) > value
         elif op == "<=":
-            e = (F(field) <= value)
+            e = F(field) <= value
         elif op == "<":
-            e = (F(field) < value)
+            e = F(field) < value
         elif op == "in":
             vals = _ensure_list(value)
             e = F(field).isin(vals)  # empty list => always False (fine)
@@ -93,14 +91,14 @@ def _build_arrow_expression(filters: Sequence[Filter]) -> Optional[ds.Expression
 # Lightweight instrumentation shim (no-op in tests when LIGHTWEIGHT_REPOS=1)
 from common.instrumentation import (
     DataValidationException,
-    StorageException,
     get_trading_logger,
     log_context,
+    OperationType,
     performance_log,
+    StorageException,
+    track_repository_operation,
 )
 
-
-from common.instrumentation import OperationType, track_repository_operation
 
 LINEAGE_AVAILABLE = True
 
@@ -111,6 +109,7 @@ def _as_list(x):
     if isinstance(x, (list, tuple, set)):
         return [str(v) for v in x]
     return [str(x)]
+
 
 class BaseRepository(ABC):
     """
@@ -433,10 +432,11 @@ class BaseRepository(ABC):
 
     @performance_log("repository_load")
     @track_repository_operation(OperationType.READ)
-    def load(self,
-             **kwargs
-             # filters: Optional[Sequence[Filter]]=None,
-             # columns: Optional[Iterable[str]] = None,
+    def load(
+        self,
+        **kwargs,
+        # filters: Optional[Sequence[Filter]]=None,
+        # columns: Optional[Iterable[str]] = None,
     ) -> pa.Table:
         """
         Load data from Parquet dataset with filtering.
@@ -473,7 +473,17 @@ class BaseRepository(ABC):
                             # Ignore malformed filters; let Arrow raise later if needed
                             continue
                         op_norm = str(op).lower().strip()
-                        if op_norm in {"==", "!=", ">=", ">", "<=", "<", "in", "not in", "between"}:
+                        if op_norm in {
+                            "==",
+                            "!=",
+                            ">=",
+                            ">",
+                            "<=",
+                            "<",
+                            "in",
+                            "not in",
+                            "between",
+                        }:
                             push_filters.append((field, op, value))
                         elif op_norm in {"contains", "contains_any", "contains_all"}:
                             post_filters.append((field, op_norm, value))
@@ -503,7 +513,7 @@ class BaseRepository(ABC):
                                     value = value.date()
                                 except Exception:
                                     pass
-                        term = (F(key) == value)
+                        term = F(key) == value
                         kw_expr = term if kw_expr is None else (kw_expr & term)
                     if kw_expr is not None:
                         expr = kw_expr if expr is None else (expr & kw_expr)
@@ -513,6 +523,7 @@ class BaseRepository(ABC):
                 # Apply post-filters that Arrow can't push down (e.g., list contains)
                 if post_filters:
                     import pyarrow.compute as pc
+
                     for field, op_norm, value in post_filters:
                         # Skip if column not present
                         if field not in table.column_names:
@@ -544,7 +555,10 @@ class BaseRepository(ABC):
 
                 self.logger.debug(
                     f"Loaded {int(table.num_rows)} records from {self.dataset_name}",
-                    extra={"record_count": int(table.num_rows), "filter_params": kwargs},
+                    extra={
+                        "record_count": int(table.num_rows),
+                        "filter_params": kwargs,
+                    },
                 )
 
                 return table
@@ -631,7 +645,9 @@ class BaseRepository(ABC):
                 return set()
 
             # Filter by date range and return unique dates
-            date_series = pd.to_datetime(table.select([date_col]).to_pandas()[date_col]).dt.date
+            date_series = pd.to_datetime(
+                table.select([date_col]).to_pandas()[date_col]
+            ).dt.date
             mask = (date_series >= pd.to_datetime(start_date).date()) & (
                 date_series <= pd.to_datetime(end_date).date()
             )

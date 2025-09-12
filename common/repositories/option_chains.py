@@ -8,21 +8,13 @@ from __future__ import annotations
 from .base import BaseRepository
 from datetime import date
 from pathlib import Path
-from typing import List, Optional, Union, Iterable
+from typing import Iterable, List, Optional, Union
 
 import pandas as pd
 import pyarrow as pa
 
 
-# Import with fallback
-try:
-    from common.reliability import DataValidationException
-except ImportError:
-
-    class DataValidationException(ValueError):
-        def __init__(self, message: str, field: str = None, **kwargs):
-            super().__init__(message)
-            self.field = field
+from common.exceptions import DataValidationException
 
 
 class OptionChainSnapshotRepository(BaseRepository):
@@ -196,6 +188,7 @@ class OptionChainSnapshotRepository(BaseRepository):
                 return None
             # Compute max snapshot_date via Arrow to avoid full Pandas conversion
             import pyarrow.compute as pc
+
             val = pc.max(tbl.column("as_of")).as_py()
             # Arrow date32 returns datetime.date already
             return val
