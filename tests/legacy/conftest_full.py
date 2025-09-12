@@ -16,7 +16,7 @@ from ibx_repos.option_bars import OptionBarRepository
 from pathlib import Path
 
 # from api.ib_core import IBRuntime, RequestIdSequencer, FutureRegistry, IBWrapperBridge
-from streamer import Config, EarningsStreamer
+from archive.experimental.streamer import Config, EarningsStreamer
 from typing import Any, Dict, List, Optional
 from unittest.mock import MagicMock, Mock, patch
 

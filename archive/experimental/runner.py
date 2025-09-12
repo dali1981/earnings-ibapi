@@ -1,4 +1,4 @@
-from option_ticks import LiveVolTap
+from .option_ticks import LiveVolTap
 
 import logging
 import threading

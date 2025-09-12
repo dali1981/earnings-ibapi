@@ -3,10 +3,10 @@ Integration tests for streaming components.
 """
 
 from datetime import date, datetime, timedelta
-from request_sequencer import RequestSequencer
-from response_sequencer import ResponseSequencer
-from sink import EquityBarSink, OptionBarSink, Sink
-from streamer import Config, EarningsStreamer
+from archive.experimental.request_sequencer import RequestSequencer
+from archive.experimental.response_sequencer import ResponseSequencer
+from archive.experimental.sink import EquityBarSink, OptionBarSink, Sink
+from archive.experimental.streamer import Config, EarningsStreamer
 from unittest.mock import MagicMock, Mock, patch
 
 import pandas as pd
