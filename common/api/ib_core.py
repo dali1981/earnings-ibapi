@@ -1,5 +1,5 @@
 # ib_core.py
-from api.subscriptions import SubscriptionRegistry
+from common.api.subscriptions import SubscriptionRegistry
 from dataclasses import dataclass
 from ibapi.client import EClient
 from ibapi.contract import Contract

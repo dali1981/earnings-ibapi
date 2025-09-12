@@ -169,7 +169,7 @@ class OptionContractsRepository(BaseRepository):
 
         # Timestamps: created_at and snapshot (date)
         if "created_at" not in out.columns or out["created_at"].isna().all():
-            out["created_at"] = pd.Timestamp.utcnow(tz="UTC")
+            out["created_at"] = pd.Timestamp.now(tz="UTC")
         else:
             out["created_at"] = pd.to_datetime(
                 out["created_at"], utc=True, errors="coerce"

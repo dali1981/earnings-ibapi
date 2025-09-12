@@ -61,25 +61,25 @@ test-setup:
 	python tests/test_runner.py --validate
 
 test: test-setup
-	python tests/test_runner.py --report
+	. venv/bin/activate && python tests/test_runner.py --report
 
 test-unit:
-	python tests/test_runner.py --unit
+	. venv/bin/activate && python tests/test_runner.py --unit
 
 test-integration:
-	python tests/test_runner.py --integration
+	. venv/bin/activate && python tests/test_runner.py --integration
 
 test-data:
-	python tests/test_runner.py --data
+	. venv/bin/activate && python tests/test_runner.py --data
 
 test-api:
-	python tests/test_runner.py --api
+	. venv/bin/activate && python tests/test_runner.py --api
 
 test-performance:
-	python tests/test_runner.py --performance
+	. venv/bin/activate && python tests/test_runner.py --performance
 
 test-smoke:
-	python tests/test_runner.py --smoke
+	. venv/bin/activate && python tests/test_runner.py --smoke
 
 # Coverage
 coverage:

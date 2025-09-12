@@ -24,7 +24,7 @@ from ops.tasks.option_chains import (
     process_option_chains_for_symbols_task,
     save_chain_snapshot_task,
 )
-from services.orchestrator_api.schemas.contracts import (
+from api.orchestrator_api.schemas.contracts import (
     OptionChainRequest,
     OptionHistoricalDataRequest,
 )

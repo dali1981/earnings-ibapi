@@ -104,6 +104,7 @@ class EarningsCalendarRepository(BaseRepository):
                 pa.field("symbol", pa.string()),
                 pa.field("company_name", pa.string()),
                 pa.field("earnings_date", pa.string()),  # Stored as ISO string
+                pa.field("period_ending", pa.string()),  # Required field for quarterly periods
                 pa.field("time", pa.string()),
                 pa.field("eps_estimate", pa.float64()),
                 pa.field("eps_actual", pa.float64()),
