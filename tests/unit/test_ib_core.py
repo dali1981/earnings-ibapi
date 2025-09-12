@@ -2,7 +2,7 @@
 Unit tests for IB API core components.
 """
 
-from api.ib_core import (
+from common.api.ib_core import (
     ContractDetailsService,
     FutureRegistry,
     HistoricalService,
