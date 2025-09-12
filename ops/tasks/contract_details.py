@@ -1,17 +1,16 @@
 from __future__ import annotations
 
-from collections import defaultdict
-
 from app_settings.settings import get_settings
 from celery import shared_task
+from collections import defaultdict
+from common.repositories.contract_descriptions import ContractDescriptionsRepository
+from common.repositories.contracts import ContractRepository
 from pathlib import Path
 from typing import Dict, List, Optional
 
 import httpx
 import pandas as pd
 
-from common.repositories.contract_descriptions import ContractDescriptionsRepository
-from common.repositories.contracts import ContractRepository
 
 @shared_task(
     bind=True,
@@ -42,10 +41,12 @@ def check_existing_details_task(
         return {"existing_conids": [], "missing_symbols": []}
 
     # Get conids for symbols from contract descriptions
+    from celery.contrib import rdb
+
     import pyarrow as pa
     import pyarrow.compute as pc
 
-    from celery.contrib import rdb; rdb.set_trace()
+    rdb.set_trace()
 
     desc_repo = ContractDescriptionsRepository(base)
     filter_ = ("symbol", "in", symbols)
@@ -171,7 +172,9 @@ def fetch_details_from_ib_task(
                     print(f"Error fetching details for conid {conid}: {e}")
                     continue
 
-    from celery.contrib import rdb;rdb.set_trace()
+    from celery.contrib import rdb
+
+    rdb.set_trace()
 
     return {"fetched_details": fetched_details}
 
@@ -196,7 +199,9 @@ def save_details_to_repo_task(
     except Exception:
         from vendors.ibx_repos.contracts import ContractRepository
 
-    from celery.contrib import rdb; rdb.set_trace()
+    from celery.contrib import rdb
+
+    rdb.set_trace()
 
     settings = get_settings()
     base = Path(root) if root else settings.paths.data_root

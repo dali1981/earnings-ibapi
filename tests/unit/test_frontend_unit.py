@@ -30,9 +30,9 @@ def test_frontend_index_renders_defaults(monkeypatch):
     assert 'id="calendarFetchForm"' in html
     assert 'id="equityForm"' in html
     assert 'id="chainForm"' in html
-    assert '/static/js/apiClient.js' in html
-    assert '/static/js/controllers.js' in html
-    assert '/static/js/bootstrap.js' in html
+    assert "/static/js/apiClient.js" in html
+    assert "/static/js/controllers.js" in html
+    assert "/static/js/bootstrap.js" in html
 
 
 def test_static_css_served():

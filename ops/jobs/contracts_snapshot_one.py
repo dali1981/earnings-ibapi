@@ -7,12 +7,12 @@ warnings.warn(
     stacklevel=2,
 )
 
+from common.repositories.contract_descriptions import ContractDescriptionsRepository
 from ibx import IBRuntime
 from ibx_flows.contracts_backfill import (
     ContractDescriptionsSnapshotJob,
     ContractsConfig,
 )
-from common.repositories.contract_descriptions import ContractDescriptionsRepository
 
 
 if __name__ == "__main__":

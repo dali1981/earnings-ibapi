@@ -34,8 +34,11 @@ help:
 	@echo "  run-options    Run option history API locally (uvicorn)"
 	@echo "  run-chains     Run option chain API locally (uvicorn)"
 	@echo "  run-frontend   Run frontend locally (uvicorn)"
+	@echo "  run-frontend-react  Run React frontend locally (vite)"
+	@echo "  run-frontend-next   Run Next.js frontend locally (next dev)"
 	@echo "  run-orchestrator Run orchestrator API locally (uvicorn)"
 	@echo "  run-ib         Run IBX service API locally (uvicorn)"
+	@echo "  run-backend    Run all backend APIs (calendar, equity, options, chains, orchestrator, ib)"
 	@echo "  run-flower     Run Flower monitoring for Celery (flower)"
 	@echo "  test-frontend  Run frontend unit/integration tests (pytest)"
 	@echo "  test-frontend-e2e  Run browser E2E tests (Playwright)"
@@ -188,13 +191,39 @@ run-chains:
 	uvicorn api.option_chain_api.app:app --host 0.0.0.0 --port 9004 --reload
 
 run-frontend:
-	uvicorn services.frontend.main:app --host 0.0.0.0 --port 9000 --reload
+	uvicorn frontend.main:app --host 0.0.0.0 --port 9000 --reload
+
+run-frontend-react:
+	cd frontend-react && npm run dev
+
+run-frontend-next:
+	cd frontend-nextjs && npm run dev
+
+build-frontend-next:
+	cd frontend-nextjs && npm run build
 
 run-orchestrator:
 	uvicorn api.orchestrator_api.app:app --host 0.0.0.0 --port 9005 --reload
 
 run-ib:
 	uvicorn api.ib_api.app:app --host 0.0.0.0 --port 9010 --reload
+
+run-backend:
+	@echo "Starting all backend APIs..."
+	@echo "Calendar API: http://localhost:9001"
+	@echo "Equity API: http://localhost:9002"
+	@echo "Options API: http://localhost:9003"
+	@echo "Chains API: http://localhost:9004"
+	@echo "Orchestrator API: http://localhost:9005"
+	@echo "IB API: http://localhost:9010"
+	@echo ""
+	uvicorn services.calendar_api.app:app --host 0.0.0.0 --port 9001 --reload & \
+	uvicorn services.equity_api.app:app --host 0.0.0.0 --port 9002 --reload & \
+	uvicorn services.option_history_api.app:app --host 0.0.0.0 --port 9003 --reload & \
+	uvicorn api.option_chain_api.app:app --host 0.0.0.0 --port 9004 --reload & \
+	uvicorn api.orchestrator_api.app:app --host 0.0.0.0 --port 9005 --reload & \
+	uvicorn api.ib_api.app:app --host 0.0.0.0 --port 9010 --reload & \
+	wait
 
 run-flower:
 	celery -A ibx_celery.app flower --port=5555

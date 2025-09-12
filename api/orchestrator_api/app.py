@@ -1,6 +1,6 @@
+from .routers.option_contracts import router as option_contracts_router
 from .routers.orchestrator import router as orchestrator_router
 from .routers.orchestrator import router_public as orchestrator_public_router
-from .routers.option_contracts import router as option_contracts_router
 from common.utils.logging_setup import disable_noisy_loggers, setup_logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware

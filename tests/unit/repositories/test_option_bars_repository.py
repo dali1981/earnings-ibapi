@@ -2,13 +2,12 @@
 Unit tests for OptionBarRepository (common.repositories).
 """
 
+from common.repositories.option_bars import OptionBarRepository
 from datetime import date
 from pathlib import Path
 
 import pandas as pd
 import pytest
-
-from common.repositories.option_bars import OptionBarRepository
 
 
 @pytest.mark.unit

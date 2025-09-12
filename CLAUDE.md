@@ -57,6 +57,9 @@ make run-orchestrator # Orchestrator API on :9005
 make run-ib         # IB API on :9010
 make run-flower     # Flower monitoring on :5555
 
+# Run all backend APIs in parallel
+make run-backend    # All APIs simultaneously
+
 # Docker compose for all services
 make services-up    # Start all services
 make services-down  # Stop all services
@@ -304,6 +307,254 @@ Features:
 - **Failure debugging** - Exact error messages and stack traces
 
 Browse to `/tasks` to see all job executions, including the historical data and contract search jobs from the orchestrator.
+
+## Frontend Architecture
+
+The system includes **multiple frontend implementations** providing unified access to trading microservices:
+
+### **Next.js Frontend** (Recommended) - `/frontend-nextjs/`
+**Tech Stack**: Next.js 15.5.2 + React 19 + TypeScript + shadcn/ui
+
+```bash
+# Development
+cd frontend-nextjs
+npm run dev          # Start dev server on :3000
+npm run build        # Build for production
+npm run start        # Start production server
+
+# Commands from root
+make run-frontend    # Legacy frontend on :9000
+```
+
+#### **Features:**
+- **Modern Component Architecture**: shadcn/ui with Radix UI primitives
+- **Type Safety**: Full TypeScript support with strict typing
+- **Responsive Design**: Tailwind CSS with mobile-first approach
+- **Accessibility**: WCAG compliant components out of the box
+- **Performance**: Turbopack bundler for fast builds
+- **State Management**: TanStack Query for server state
+- **Form Handling**: React Hook Form with Zod validation
+
+#### **UI Components:**
+```typescript
+// Example component usage
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Calendar, TrendingUp, Database } from 'lucide-react';
+
+// Service navigation cards
+const services = [
+  { title: 'Calendar Service', href: '/calendar', icon: Calendar },
+  { title: 'Equity History', href: '/equity', icon: TrendingUp },
+  { title: 'Option Chains', href: '/chains', icon: Database },
+];
+```
+
+#### **Theme System:**
+- **Official shadcn/ui Blue Theme**: Professional, accessible color palette
+- **Light/Dark Mode Support**: `next-themes` integration
+- **CSS Custom Properties**: Consistent theming across components
+
+```css
+/* Light theme */
+:root {
+  --primary: 221.2 83.2% 53.3%;        /* Beautiful blue */
+  --background: 0 0% 100%;             /* Clean white */
+  --foreground: 222.2 84% 4.9%;        /* Dark text */
+  --card: 0 0% 100%;                   /* White cards */
+}
+
+/* Dark theme */
+.dark {
+  --primary: 217.2 91.2% 59.8%;        /* Bright blue */
+  --background: 222.2 84% 4.9%;        /* Dark background */
+  --foreground: 210 40% 98%;           /* Light text */
+}
+```
+
+### **React Frontend** (Legacy) - `/frontend-react/`
+**Tech Stack**: React + Vite + Custom CSS
+
+#### **Features:**
+- **Context API Integration**: Data persistence with localStorage
+- **Cache Management**: 5-minute TTL for API responses
+- **Unified Styling**: Consistent color scheme across components
+- **Navigation System**: Breadcrumb and sidebar navigation
+
+```javascript
+// Data persistence example
+const { cacheData, getCachedData } = useDataPersistence();
+
+async function fetchCalendar() {
+  const { data } = await api.calendar.getUpcoming(days, symbols);
+  cacheData('calendar', { days, symbols }, data);
+}
+```
+
+### **Navigation Architecture**
+
+Both frontends implement consistent navigation patterns:
+
+#### **Service Structure:**
+```javascript
+const services = [
+  { title: 'Calendar Service', href: '/calendar', icon: Calendar },
+  { title: 'Contract Management', href: '/contracts', icon: Settings },
+  { title: 'Equity History', href: '/equity', icon: TrendingUp },
+  { title: 'Option Chains', href: '/chains', icon: Database },
+  { title: 'Option Workflow', href: '/options', icon: Building2 },
+  { title: 'Option History', href: '/history', icon: History },
+];
+```
+
+#### **Navigation Features:**
+- **Home Navigation**: Clickable home button/header on all pages
+- **Breadcrumb System**: Current page context with navigation links
+- **Sidebar Navigation**: Persistent service menu with active states
+- **Responsive Design**: Mobile-friendly navigation patterns
+
+### **Data Management Pattern**
+
+#### **Cache-First Strategy:**
+```javascript
+// 1. Check cache first
+const cachedData = getCachedData('calendar', params);
+if (cachedData && !isExpired(cachedData)) {
+  return cachedData;
+}
+
+// 2. Fetch from API if cache miss/expired
+const freshData = await api.calendar.getUpcoming(params);
+cacheData('calendar', params, freshData);
+
+// 3. Return fresh data
+return freshData;
+```
+
+#### **State Persistence:**
+- **localStorage Integration**: Survives browser refresh/navigation
+- **TTL Management**: Automatic cache expiration (5 minutes default)
+- **Component State**: React Context for cross-component data sharing
+- **API Response Caching**: Reduces redundant network requests
+
+### **API Integration**
+
+Both frontends consume the same REST APIs with consistent patterns:
+
+```javascript
+// API client structure
+const api = {
+  calendar: {
+    getUpcoming: (days, symbols) => get(`/calendar/upcoming?days=${days}&symbols=${symbols}`),
+    getRange: (start, end, symbols) => get(`/calendar/range?start=${start}&end=${end}&symbols=${symbols}`)
+  },
+  equity: {
+    getDates: (symbol, barSize) => get(`/equity/${symbol}/dates?bar_size=${barSize}`),
+    getBars: (symbol, start, end, barSize) => get(`/equity/${symbol}/bars?start=${start}&end=${end}&bar_size=${barSize}`)
+  },
+  chains: {
+    getSnapshots: (params) => get(`/chains/snapshots`, { params }),
+    getCurrent: (symbol) => get(`/chains/current/${symbol}`)
+  }
+};
+```
+
+### **Development Workflow**
+
+#### **Recommended Development Stack:**
+```bash
+# Backend APIs
+make run-backend     # All APIs on respective ports
+
+# Frontend (choose one)
+cd frontend-nextjs && npm run dev    # Modern Next.js (recommended)
+# OR
+make run-frontend    # Legacy React frontend
+```
+
+#### **Frontend Development Commands:**
+```bash
+# Next.js Frontend
+cd frontend-nextjs
+npm install          # Install dependencies
+npm run dev          # Start development server
+npm run build        # Build for production
+npm run lint         # Lint TypeScript/JavaScript
+
+# Build verification
+npm run build        # Should complete successfully
+```
+
+### **Component Architecture Examples**
+
+#### **Trading Service Card (Next.js):**
+```typescript
+interface ServiceCardProps {
+  title: string;
+  description: string;
+  href: string;
+  icon: LucideIcon;
+}
+
+function ServiceCard({ title, description, href, icon: Icon }: ServiceCardProps) {
+  return (
+    <Link href={href}>
+      <Card className="hover:bg-accent/50 hover:shadow-lg transition-all">
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <Icon className="h-6 w-6 text-primary" />
+            <CardTitle>{title}</CardTitle>
+          </div>
+          <CardDescription>{description}</CardDescription>
+        </CardHeader>
+      </Card>
+    </Link>
+  );
+}
+```
+
+#### **Data Persistence Hook (React):**
+```javascript
+function useDataPersistence() {
+  const [cache, setCache] = useState({});
+  
+  const cacheData = useCallback((component, params, data, meta = {}) => {
+    const key = createCacheKey(component, params);
+    const entry = {
+      data,
+      timestamp: Date.now(),
+      ttl: CACHE_TTL,
+      meta
+    };
+    
+    setCache(prev => ({ ...prev, [key]: entry }));
+    localStorage.setItem(key, JSON.stringify(entry));
+  }, []);
+  
+  return { cacheData, getCachedData, clearCache };
+}
+```
+
+### **Best Practices**
+
+#### **Component Development:**
+- **Use TypeScript**: Strict typing for better development experience
+- **Follow shadcn/ui patterns**: Consistent component architecture
+- **Implement proper loading states**: Skeleton components during data fetching
+- **Handle error boundaries**: Graceful error handling and user feedback
+- **Optimize performance**: Memoization and lazy loading where appropriate
+
+#### **State Management:**
+- **Cache API responses**: Reduce redundant network requests
+- **Implement TTL**: Prevent stale data issues
+- **Persist navigation state**: Maintain context across page changes
+- **Use Context wisely**: Share common state without prop drilling
+
+#### **Styling Guidelines:**
+- **Use CSS custom properties**: Consistent theming approach
+- **Follow design tokens**: shadcn/ui color palette and spacing
+- **Implement responsive design**: Mobile-first approach
+- **Maintain accessibility**: Proper contrast ratios and ARIA labels
 
 ## API Services Architecture
 

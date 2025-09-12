@@ -29,6 +29,10 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 # -------------------------------------------------------------------------------
 
+from common.repositories.option_bars import OptionBarRepository
+from common.repositories.option_chains import (
+    OptionChainSnapshotRepository as ChainRepository,
+)
 from datetime import date
 from ibx import (
     HistoricalService,
@@ -39,8 +43,6 @@ from ibx import (
 )
 from ibx.greeks_repo_first import option_greeks_repo_first
 from ibx.time import ib_end_datetime_instrument
-from common.repositories.option_chains import OptionChainSnapshotRepository as ChainRepository
-from common.repositories.option_bars import OptionBarRepository
 from typing import Dict, Iterable, List, Optional, Tuple
 
 import argparse

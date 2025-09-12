@@ -5,18 +5,18 @@ Separate from ContractDescriptions which stores detailed IB contract description
 
 from __future__ import annotations
 
+from common.repositories.base import BaseRepository
 from pathlib import Path
 from typing import List, Optional, Sequence, Set, Union
 
 import pandas as pd
 import pyarrow as pa
 import pyarrow.dataset as ds
-from common.repositories.base import BaseRepository
 
 
 class ContractRepository(BaseRepository):
     """Repository for basic contract information."""
-    
+
     def __init__(self, base_path: Union[str, Path]):
         # Override base_path to match what tests expect
         super().__init__(base_path, "contracts")
@@ -55,22 +55,22 @@ class ContractRepository(BaseRepository):
                 # Partition column (derived from created_at)
                 pa.field("snapshot", pa.date32(), nullable=False),
                 # Timestamp (UTC, nanosecond precision to match pandas)
-                pa.field("created_at", pa.timestamp('ns', 'UTC'), nullable=False),
+                pa.field("created_at", pa.timestamp("ns", "UTC"), nullable=False),
             ]
         )
-    
+
     def _get_partition_columns(self, **kwargs) -> List[str]:
         """Get partition columns for contract data."""
         # Partition by security type and snapshot date for efficient scans
         return ["sec_type", "snapshot"]
-    
+
     def _normalize_data(self, df: pd.DataFrame, **kwargs) -> pd.DataFrame:
         """Normalize contract data and add partition columns."""
         if df is None or df.empty:
             return df
-            
+
         df = df.copy()
-        
+
         # Derive snapshot date from created_at timestamp
         if "created_at" in df.columns:
             try:
@@ -78,19 +78,21 @@ class ContractRepository(BaseRepository):
                 df["snapshot"] = ts.dt.tz_convert("UTC").dt.date
             except Exception:
                 # Fallback to naive date if tz conversion fails
-                df["snapshot"] = pd.to_datetime(df["created_at"], errors="coerce").dt.date
+                df["snapshot"] = pd.to_datetime(
+                    df["created_at"], errors="coerce"
+                ).dt.date
         else:
             # If created_at missing, use today's date to avoid partition errors
             df["snapshot"] = pd.Timestamp.utcnow().date()
-        
+
         return df
-    
+
     # Keep backward compatibility method
     @staticmethod
     def _contracts_schema() -> pa.Schema:
         """Legacy method for schema - use _create_schema() instead."""
         return ContractRepository(Path("/tmp"))._create_schema()
-    
+
     def _with_partitions(self, df: pd.DataFrame) -> pd.DataFrame:
         """Add partition columns to dataframe."""
         df = df.copy()
@@ -101,18 +103,18 @@ class ContractRepository(BaseRepository):
             else:
                 df["snapshot"] = pd.Timestamp.utcnow().date()
         return df
-    
+
     def save(self, df: pd.DataFrame) -> None:
         """Save contracts to repository.
-        
+
         Args:
             df: DataFrame with contract data
         """
         if df is None or df.empty:
             return
-            
+
         df = df.copy()
-        
+
         # Check required columns
         req = {"conid", "symbol", "sec_type", "currency"}
         missing = req - set(df.columns)
@@ -120,17 +122,17 @@ class ContractRepository(BaseRepository):
             raise ValueError(
                 f"ContractRepository.save missing columns: {sorted(missing)}"
             )
-        
+
         # Deduplicate by contract ID
         df = df.drop_duplicates(subset=["conid"])
-        
+
         # Normalize data (adds partition columns)
         df = self._normalize_data(df)
-        
+
         # Write to dataset using write_to_dataset for append behavior
         partition_cols = self._get_partition_columns()
         import pyarrow.parquet as pq
-        
+
         table = pa.Table.from_pandas(df, schema=self._create_schema())
         pq.write_to_dataset(
             table,
@@ -139,7 +141,7 @@ class ContractRepository(BaseRepository):
             use_dictionary=True,
             compression="snappy",
         )
-    
+
     # def read(self, columns: Optional[Sequence[str]] = None, **filters) -> pa.Table:
     #     """Read contracts with optional filters.
     #
@@ -194,7 +196,7 @@ class ContractRepository(BaseRepository):
     #     cols = [c for c in (columns or schema.names) if c in schema.names]
     #     tbl = dset.to_table(filter=expr, columns=cols)
     #     return tbl
-    
+
     # def load(
     #     self, sec_type: Optional[str] = None, primary_exchange: Optional[str] = None
     # ) -> pa.Table:
@@ -205,7 +207,7 @@ class ContractRepository(BaseRepository):
     #     if primary_exchange:
     #         filters["primary_exchange"] = primary_exchange
     #     return self.read(**filters)
-    
+
     def present_conids(self) -> Set[int]:
         """Get set of contract IDs present in repository."""
         tbl = self.load(columns=["conid"])

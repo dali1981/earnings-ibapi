@@ -2,11 +2,9 @@
 Basic repository tests to check setup.
 """
 
-from datetime import (
-    date,
-    datetime as dt
-)
 from common.repositories.equity_bars import EquityBarRepository
+from datetime import date
+from datetime import datetime as dt
 from pathlib import Path
 
 import pandas as pd

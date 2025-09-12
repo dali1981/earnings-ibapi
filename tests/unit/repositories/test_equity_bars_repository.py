@@ -2,8 +2,8 @@
 Unit tests for EquityBarRepository.
 """
 
-from datetime import date, datetime
 from common.repositories.equity_bars import EquityBarRepository
+from datetime import date, datetime
 from pathlib import Path
 
 import pandas as pd

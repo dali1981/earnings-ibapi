@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+
 """
 Repair script for option_contracts dataset:
 - Finds rows saved under expiry=__HIVE_DEFAULT_PARTITION__ (i.e., missing expiry)
@@ -9,13 +10,13 @@ Repair script for option_contracts dataset:
 Run: python scripts/repair_option_contracts_partitions.py
 """
 
-import re
-from pathlib import Path
-import pandas as pd
-import pyarrow.dataset as ds
-
 from app_settings.settings import get_settings
 from common.repositories.option_contracts import OptionContractsRepository
+from pathlib import Path
+
+import pandas as pd
+import pyarrow.dataset as ds
+import re
 
 
 def parse_from_local_symbol(local_symbol: str):
@@ -54,12 +55,15 @@ def main():
 
     df = tbl.to_pandas()
     # Identify missing expiry
-    mask = df.get("expiry").isna() if "expiry" in df.columns else pd.Series([], dtype=bool)
+    mask = (
+        df.get("expiry").isna() if "expiry" in df.columns else pd.Series([], dtype=bool)
+    )
     if not mask.any():
         print("No rows with missing expiry found")
         return
 
     fix = df[mask].copy()
+
     # Derive from expiry_raw
     def norm_exp(val):
         if pd.isna(val):
@@ -83,7 +87,10 @@ def main():
                 e, r, k = parse_from_local_symbol(row.get("local_symbol"))
                 if e:
                     fix.at[i, "expiry"] = e
-                if (pd.isna(row.get("right")) or str(row.get("right")).strip().lower() in ("", "none", "nan")) and r:
+                if (
+                    pd.isna(row.get("right"))
+                    or str(row.get("right")).strip().lower() in ("", "none", "nan")
+                ) and r:
                     fix.at[i, "right"] = r
                 if pd.isna(row.get("strike")) and k is not None:
                     fix.at[i, "strike"] = k
@@ -97,11 +104,15 @@ def main():
     # Add timestamps/partition date
     if "created_at" not in fix.columns or fix["created_at"].isna().all():
         fix["created_at"] = pd.Timestamp.utcnow(tz="UTC")
-    fix["snapshot"] = pd.to_datetime(fix["created_at"], utc=True).dt.tz_convert("UTC").dt.date
+    fix["snapshot"] = (
+        pd.to_datetime(fix["created_at"], utc=True).dt.tz_convert("UTC").dt.date
+    )
 
     # Deduplicate by conid + expiry + right
     if "conid" in fix.columns:
-        fix = fix.drop_duplicates(subset=[c for c in ["conid", "expiry", "right"] if c in fix.columns])
+        fix = fix.drop_duplicates(
+            subset=[c for c in ["conid", "expiry", "right"] if c in fix.columns]
+        )
 
     repo = OptionContractsRepository(base)
     repo.save(fix)
@@ -110,4 +121,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

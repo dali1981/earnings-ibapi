@@ -53,7 +53,7 @@ class OptionContractsRepository(BaseRepository):
                 pa.field("contract_month", pa.string(), nullable=True),
                 # Partitions / timestamps
                 pa.field("snapshot", pa.date32(), nullable=False),
-                pa.field("created_at", pa.timestamp('ns', 'UTC'), nullable=False),
+                pa.field("created_at", pa.timestamp("ns", "UTC"), nullable=False),
             ]
         )
 
@@ -107,9 +107,9 @@ class OptionContractsRepository(BaseRepository):
 
         # Multiplier as int if present
         if "multiplier" in out.columns:
-            out["multiplier"] = pd.to_numeric(out["multiplier"], errors="coerce").astype(
-                "Int64"
-            )
+            out["multiplier"] = pd.to_numeric(
+                out["multiplier"], errors="coerce"
+            ).astype("Int64")
 
         # Expiry normalization
         # Accept either 'expiry' as date/string or 'lastTradeDateOrContractMonth' or 'expiry_raw'
@@ -148,6 +148,7 @@ class OptionContractsRepository(BaseRepository):
             ls = out.get("local_symbol")
             if ls is not None:
                 import re
+
                 def _from_local(sym: str) -> Optional[date]:
                     if not isinstance(sym, str):
                         return None
@@ -160,14 +161,19 @@ class OptionContractsRepository(BaseRepository):
                         return pd.to_datetime("20" + yymmdd, format="%Y%m%d").date()
                     except Exception:
                         return None
+
                 mask2 = out["expiry"].isna()
-                out.loc[mask2, "expiry"] = out.loc[mask2, "local_symbol"].map(_from_local)
+                out.loc[mask2, "expiry"] = out.loc[mask2, "local_symbol"].map(
+                    _from_local
+                )
 
         # Timestamps: created_at and snapshot (date)
         if "created_at" not in out.columns or out["created_at"].isna().all():
             out["created_at"] = pd.Timestamp.utcnow(tz="UTC")
         else:
-            out["created_at"] = pd.to_datetime(out["created_at"], utc=True, errors="coerce")
+            out["created_at"] = pd.to_datetime(
+                out["created_at"], utc=True, errors="coerce"
+            )
         out["snapshot"] = out["created_at"].dt.tz_convert("UTC").dt.date
 
         # Cast optional metadata to pandas StringDtype to preserve missing as <NA>

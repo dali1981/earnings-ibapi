@@ -1,10 +1,10 @@
 from __future__ import annotations
 
+from api.ib_api.service.ib_runtime import get_runtime
 from app_settings.settings import get_settings
 from fastapi import APIRouter, HTTPException, status, WebSocket, WebSocketDisconnect
 from ibapi.contract import Contract
 from pydantic import BaseModel, Field
-from api.ib_api.service.ib_runtime import get_runtime
 from typing import Any, Dict, List, Optional
 from vendors.ibx.services import (
     ContractDetailsService,

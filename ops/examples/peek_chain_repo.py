@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-from common.repositories.option_chains import OptionChainSnapshotRepository as ChainRepository
+from common.repositories.option_chains import (
+    OptionChainSnapshotRepository as ChainRepository,
+)
 
 import argparse
 import numpy as np

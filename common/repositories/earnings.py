@@ -35,8 +35,8 @@ from config import EARNINGS_CONFIG, EARNINGS_PATH
 if TYPE_CHECKING:
     from earnings.fetcher import EarningsEvent
 
-from common.repositories.base import BaseRepository
 from common.instrumentation import get_trading_logger as get_logger
+from common.repositories.base import BaseRepository
 
 
 logger = get_logger(__name__)

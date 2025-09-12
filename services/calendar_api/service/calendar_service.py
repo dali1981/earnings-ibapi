@@ -52,7 +52,10 @@ class CalendarService:
 
     def save_events(self, events: List[EarningsEvent]) -> int:
         if not events:
+            self._logger.info("📭 No events to save")
             return 0
+
+        self._logger.info(f"💾 Saving {len(events)} earnings events")
         # Normalize potential Pydantic enum fields (time/source) to strings for storage
         normalized: List[EarningsEvent] = []
         try:
@@ -114,8 +117,14 @@ class CalendarService:
             to_write = normalized
 
         if not to_write:
+            self._logger.info(
+                f"✅ All {len(normalized)} events already exist (deduplicated)"
+            )
             return 0
 
+        self._logger.info(
+            f"📝 Writing {len(to_write)} new events (filtered {len(normalized) - len(to_write)} duplicates)"
+        )
         res = self._repo.store_earnings_batch(to_write)
 
         # Publish a data-available event for downstream consumers

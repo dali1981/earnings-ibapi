@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 from common.repositories import OptionChainSnapshotRepository
+from datetime import date, datetime
 from fastapi import APIRouter, HTTPException
-from typing import List
-from datetime import datetime, date
 from pathlib import Path
+from typing import List
 
 import config
 
@@ -34,7 +34,9 @@ def _parse_as_of(as_of_str: str) -> date:
     try:
         return datetime.fromisoformat(as_of_str).date()
     except Exception:
-        raise HTTPException(status_code=400, detail="Invalid as_of date format; use YYYY-MM-DD")
+        raise HTTPException(
+            status_code=400, detail="Invalid as_of date format; use YYYY-MM-DD"
+        )
 
 
 @router.get("/chains/{symbol}/as-ofs")
@@ -62,8 +64,14 @@ def snapshot_summary(symbol: str, as_of: str):
         tbl = repo.load(underlying=symbol.upper(), as_of=as_of_date)
         if tbl is None or tbl.num_rows == 0:
             raise HTTPException(status_code=404, detail="Snapshot not found")
-        expirations_col = tbl.column("expirations").to_pylist() if "expirations" in tbl.column_names else []
-        strikes_col = tbl.column("strikes").to_pylist() if "strikes" in tbl.column_names else []
+        expirations_col = (
+            tbl.column("expirations").to_pylist()
+            if "expirations" in tbl.column_names
+            else []
+        )
+        strikes_col = (
+            tbl.column("strikes").to_pylist() if "strikes" in tbl.column_names else []
+        )
         all_exp = sorted({e for lst in expirations_col for e in (lst or [])})
         all_str = sorted({float(s) for lst in strikes_col for s in (lst or [])})
         strike_range = [all_str[0], all_str[-1]] if all_str else [None, None]
@@ -88,9 +96,17 @@ def list_expiries(symbol: str, as_of: str):
         tbl = repo.load(underlying=symbol.upper(), as_of=as_of_date)
         if tbl is None or tbl.num_rows == 0:
             raise HTTPException(status_code=404, detail="Snapshot not found")
-        expirations_col = tbl.column("expirations").to_pylist() if "expirations" in tbl.column_names else []
+        expirations_col = (
+            tbl.column("expirations").to_pylist()
+            if "expirations" in tbl.column_names
+            else []
+        )
         all_exp = sorted({e for lst in expirations_col for e in (lst or [])})
-        return {"symbol": symbol.upper(), "as_of": as_of_date.isoformat(), "expirations": all_exp}
+        return {
+            "symbol": symbol.upper(),
+            "as_of": as_of_date.isoformat(),
+            "expirations": all_exp,
+        }
     except HTTPException:
         raise
     except Exception as e:
@@ -105,9 +121,15 @@ def list_strikes(symbol: str, as_of: str):
         tbl = repo.load(underlying=symbol.upper(), as_of=as_of_date)
         if tbl is None or tbl.num_rows == 0:
             raise HTTPException(status_code=404, detail="Snapshot not found")
-        strikes_col = tbl.column("strikes").to_pylist() if "strikes" in tbl.column_names else []
+        strikes_col = (
+            tbl.column("strikes").to_pylist() if "strikes" in tbl.column_names else []
+        )
         all_str = sorted({float(s) for lst in strikes_col for s in (lst or [])})
-        return {"symbol": symbol.upper(), "as_of": as_of_date.isoformat(), "strikes": all_str}
+        return {
+            "symbol": symbol.upper(),
+            "as_of": as_of_date.isoformat(),
+            "strikes": all_str,
+        }
     except HTTPException:
         raise
     except Exception as e:
@@ -127,7 +149,11 @@ def get_params(symbol: str, as_of: str):
         rows: List[dict] = []
         for i in range(tbl.num_rows):
             rows.append({name: cols[name][i] for name in tbl.column_names})
-        return {"symbol": symbol.upper(), "as_of": as_of_date.isoformat(), "params": rows}
+        return {
+            "symbol": symbol.upper(),
+            "as_of": as_of_date.isoformat(),
+            "params": rows,
+        }
     except HTTPException:
         raise
     except Exception as e:

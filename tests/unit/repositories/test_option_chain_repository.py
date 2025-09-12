@@ -2,13 +2,12 @@
 Unit tests for OptionChainSnapshotRepository (common.repositories).
 """
 
+from common.repositories.option_chains import OptionChainSnapshotRepository
 from datetime import date
 from pathlib import Path
 
 import pandas as pd
 import pytest
-
-from common.repositories.option_chains import OptionChainSnapshotRepository
 
 
 @pytest.mark.unit
@@ -53,8 +52,18 @@ class TestOptionChainSnapshotRepository:
         repo = OptionChainSnapshotRepository(temp_data_dir)
         df = pd.DataFrame(
             [
-                {"expiry": date(2024, 3, 15), "strike": 150.0, "right": "C", "bid": 1.2},
-                {"expiry": date(2024, 3, 15), "strike": 150.0, "right": "P", "bid": 1.1},
+                {
+                    "expiry": date(2024, 3, 15),
+                    "strike": 150.0,
+                    "right": "C",
+                    "bid": 1.2,
+                },
+                {
+                    "expiry": date(2024, 3, 15),
+                    "strike": 150.0,
+                    "right": "P",
+                    "bid": 1.1,
+                },
             ]
         )
         repo.save_chain_snapshot(df, underlying="AAPL", snapshot_date=date(2024, 1, 15))
@@ -67,9 +76,11 @@ class TestOptionChainSnapshotRepository:
     def test_load_with_filters(self, temp_data_dir):
         repo = OptionChainSnapshotRepository(temp_data_dir)
         for d in [date(2024, 1, 15), date(2024, 1, 16)]:
-            df = pd.DataFrame([
-                {"expiry": date(2024, 3, 15), "strike": 100.0, "right": "C"},
-            ])
+            df = pd.DataFrame(
+                [
+                    {"expiry": date(2024, 3, 15), "strike": 100.0, "right": "C"},
+                ]
+            )
             repo.save_chain_snapshot(df, underlying="AAPL", snapshot_date=d)
         tbl = repo.load(underlying="AAPL")
         assert tbl.num_rows >= 2

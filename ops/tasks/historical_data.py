@@ -187,23 +187,31 @@ def save_historical_bars_task(
             if expiry_dt is None:
                 # fallback to parse from localSymbol like "BABA  250905C00135000"
                 import re
+
                 ls = contract.get("localSymbol") or contract.get("local_symbol")
                 if ls:
                     m = re.search(r"(\d{6})([CP])(\d{8})", str(ls))
                     if m:
                         yymmdd = m.group(1)
                         try:
-                            expiry_dt = pd.to_datetime("20" + yymmdd, format="%Y%m%d").date()
+                            expiry_dt = pd.to_datetime(
+                                "20" + yymmdd, format="%Y%m%d"
+                            ).date()
                         except Exception:
                             pass
 
             # Right/Strike from contract or localSymbol fallback
             right = contract.get("right")
             strike = contract.get("strike")
-            if right is None or str(right).strip().lower() in ("", "none", "nan") or strike in (None, "", "None"):
+            if (
+                right is None
+                or str(right).strip().lower() in ("", "none", "nan")
+                or strike in (None, "", "None")
+            ):
                 ls = contract.get("localSymbol") or contract.get("local_symbol")
                 if ls:
                     import re
+
                     m = re.search(r"(\d{6})([CP])(\d{8})", str(ls))
                     if m:
                         if not right:
@@ -217,7 +225,7 @@ def save_historical_bars_task(
                 strike = float(strike) if strike is not None else None
             except Exception:
                 strike = None
-            right = (str(right).upper() if right is not None else None)
+            right = str(right).upper() if right is not None else None
 
             repo.save(
                 df,
@@ -516,11 +524,11 @@ def _normalize_historical_bars(
     if not bars:
         return pd.DataFrame()
 
-    #TODO add bar_count and wap, volume to bars
+    # TODO add bar_count and wap, volume to bars
     df = pd.DataFrame(bars)
     df["time"] = pd.to_datetime(df["date"])
     df["date"] = df["time"].dt.date
-    df["symbol"] = contract.get('symbol', None)
+    df["symbol"] = contract.get("symbol", None)
     df["bar_size"] = parameters.get("bar_size_setting", None)
     df["data_type"] = parameters.get("what_to_show", None)
     df["created_at"] = pd.Timestamp.now()
@@ -775,6 +783,7 @@ def resolve_single_contract_v2_task(
     base = Path(root) if root else settings.paths.data_root
 
     from common.repositories.contracts import ContractRepository
+
     import pyarrow as pa
     import pyarrow.compute as pc
 
@@ -950,7 +959,9 @@ def save_bars_v2_task(
                 from factories.repository_factory import create_repository
             repository = create_repository(repository_type, base)
 
-        from celery.contrib import rdb; rdb.set_trace()
+        from celery.contrib import rdb
+
+        rdb.set_trace()
         repository.save(df)
         logger.info(f"💾 Saved {len(df)} bars for {symbol}")
 

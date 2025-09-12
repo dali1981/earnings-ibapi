@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-import logging
-import contextvars
 from typing import Any, Mapping
+
+import contextvars
+import logging
 
 
 _correlation_id: contextvars.ContextVar[str | None] = contextvars.ContextVar(
@@ -42,4 +43,3 @@ class CorrelationIdAdapter(logging.LoggerAdapter):
             extra.setdefault("cid", cid)
             kwargs["extra"] = extra
         return msg, kwargs
-

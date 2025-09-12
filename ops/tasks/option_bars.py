@@ -2,26 +2,26 @@ from __future__ import annotations
 
 from app_settings.settings import get_settings
 from celery import shared_task
+from common.utils.logging_extra import (
+    CorrelationIdAdapter,
+    set_correlation_id,
+)
 from datetime import datetime
+
+# Typed models and logging helpers
+from ops.schemas.option_contracts import (
+    HistoricalResult,
+    OptionHistoricalArgs,
+    OptionSelection,
+    SaveContractsResult,
+    SelectedContracts,
+)
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import pandas as pd
 import pyarrow as pa
 import pyarrow.compute as pc
-
-# Typed models and logging helpers
-from ops.schemas.option_contracts import (
-    OptionSelection,
-    OptionHistoricalArgs,
-    SelectedContracts,
-    HistoricalResult,
-    SaveContractsResult,
-)
-from common.utils.logging_extra import (
-    set_correlation_id,
-    CorrelationIdAdapter,
-)
 
 
 @shared_task(
@@ -46,7 +46,9 @@ def get_option_contracts_for_bars_task(
     moneyness_targets: Optional[List[float]] = None,
     delta_targets: Optional[List[float]] = None,
     iv_assumption: Optional[float] = None,
-    use_underlying_iv: Optional[bool] = None,  # reserved for future if underlying IV index stored
+    use_underlying_iv: Optional[
+        bool
+    ] = None,  # reserved for future if underlying IV index stored
     root: str | None = None,
 ) -> dict:
     """
@@ -63,7 +65,7 @@ def get_option_contracts_for_bars_task(
     assert selection is not None
     # from celery.contrib import rdb; rdb.set_trace()
     # assert isinstance(selection, OptionSelection)
-    if  not isinstance(selection, OptionSelection):
+    if not isinstance(selection, OptionSelection):
         try:
             selection = OptionSelection(**selection)  # type: ignore[arg-type]
         except Exception:
@@ -96,14 +98,17 @@ def get_option_contracts_for_bars_task(
         # Select snapshot date (as_of) with explicit repo filters
         if snapshot_date:
             as_of = datetime.fromisoformat(snapshot_date).date()
-            tbl = repo.load(filters=[("underlying", "==", symbol), ("as_of", "==", as_of)])
+            tbl = repo.load(
+                filters=[("underlying", "==", symbol), ("as_of", "==", as_of)]
+            )
         else:
             tbl = repo.load(filters=[("underlying", "==", symbol)])
             if tbl.num_rows > 0:
                 latest_scalar = pc.max(tbl.column("as_of"))
                 latest_date = latest_scalar.as_py()
                 mask = pc.equal(
-                    tbl.column("as_of"), pa.scalar(latest_date, type=tbl.schema.field("as_of").type)
+                    tbl.column("as_of"),
+                    pa.scalar(latest_date, type=tbl.schema.field("as_of").type),
                 )
                 idx = pc.indices_nonzero(mask)
                 tbl = tbl.take(idx)
@@ -111,7 +116,9 @@ def get_option_contracts_for_bars_task(
 
         if tbl.num_rows == 0:
             logger.warning(f"📊 No option chain data found for {symbol}")
-            return SelectedContracts(symbol=symbol, contracts=[], contract_count=0).model_dump()
+            return SelectedContracts(
+                symbol=symbol, contracts=[], contract_count=0
+            ).model_dump()
 
         # Collapse lists across rows
         exp_lists = tbl.column("expirations").to_pylist()
@@ -125,7 +132,9 @@ def get_option_contracts_for_bars_task(
             else []
         )
         multipliers = (
-            tbl.column("multiplier").to_pylist() if "multiplier" in tbl.column_names else []
+            tbl.column("multiplier").to_pylist()
+            if "multiplier" in tbl.column_names
+            else []
         )
 
         all_exps = sorted({e for lst in exp_lists for e in (lst or [])})
@@ -133,7 +142,9 @@ def get_option_contracts_for_bars_task(
 
         if not all_exps or not all_strikes:
             logger.warning(f"📊 No expirations/strikes present for {symbol}")
-            return SelectedContracts(symbol=symbol, contracts=[], contract_count=0).model_dump()
+            return SelectedContracts(
+                symbol=symbol, contracts=[], contract_count=0
+            ).model_dump()
 
         # Choose expiries
         desired_exp_count = max(1, int(expiry_count or 1))
@@ -157,11 +168,15 @@ def get_option_contracts_for_bars_task(
         else:
             try:
                 from common.repositories.equity_bars import EquityBarRepository
+
                 e_repo = EquityBarRepository(base)
                 tbe = e_repo.load(symbol=symbol)
                 if tbe and tbe.num_rows > 0 and "close" in tbe.column_names:
                     latest = pc.max(tbe.column("date")).as_py()
-                    mask = pc.equal(tbe.column("date"), pa.scalar(latest, type=tbe.schema.field("date").type))
+                    mask = pc.equal(
+                        tbe.column("date"),
+                        pa.scalar(latest, type=tbe.schema.field("date").type),
+                    )
                     tbe2 = tbe.take(pc.indices_nonzero(mask))
                     if tbe2.num_rows > 0:
                         S = float(tbe2.column("close")[0].as_py())
@@ -170,37 +185,47 @@ def get_option_contracts_for_bars_task(
         if S is None:
             # Fallback to middle strike
             try:
-                S = float(all_strikes[len(all_strikes)//2])
-                logger.warning(f"📊 Spot unavailable; using median strike {S} for {symbol}")
+                S = float(all_strikes[len(all_strikes) // 2])
+                logger.warning(
+                    f"📊 Spot unavailable; using median strike {S} for {symbol}"
+                )
             except Exception:
                 S = float(all_strikes[0])
 
         # Selection modes
         mode = (selection_mode or "count").lower().strip()
         sel_strikes_by_exp: Dict[str, List[float]] = {}
-        import math, statistics
+        import math
+        import statistics
+
         def _norm_cdf(x: float) -> float:
             return 0.5 * (1.0 + math.erf(x / math.sqrt(2.0)))
+
         def _d1(s, k, sigma, T):
             if sigma <= 0 or T <= 0:
-                return float('inf') if s>k else float('-inf')
-            return (math.log(max(s,1e-12)/max(k,1e-12)) + 0.5*sigma*sigma*T) / (sigma*math.sqrt(T))
+                return float("inf") if s > k else float("-inf")
+            return (
+                math.log(max(s, 1e-12) / max(k, 1e-12)) + 0.5 * sigma * sigma * T
+            ) / (sigma * math.sqrt(T))
+
         def _T(as_of_iso: str, exp_iso: str) -> float:
             try:
                 a = pd.to_datetime(as_of_iso).date()
                 e = pd.to_datetime(exp_iso).date()
-                return max((e - a).days, 1)/365.0
+                return max((e - a).days, 1) / 365.0
             except Exception:
-                return 30/365.0
+                return 30 / 365.0
 
         # Use snapshot as_of for T reference
         as_of_val = tbl.column("as_of")[0].as_py()
-        as_of_iso = as_of_val.isoformat() if hasattr(as_of_val, 'isoformat') else str(as_of_val)
+        as_of_iso = (
+            as_of_val.isoformat() if hasattr(as_of_val, "isoformat") else str(as_of_val)
+        )
 
         if mode == "moneyness":
             mts = [float(x) for x in (moneyness_targets or [1.0]) if x is not None]
             for exp in chosen_exps:
-                targets = [S*m for m in mts]
+                targets = [S * m for m in mts]
                 ordered = sorted(all_strikes)
                 chosen: List[float] = []
                 for t in targets:
@@ -228,7 +253,7 @@ def get_option_contracts_for_bars_task(
                             chosen.append(v)
                 sel_strikes_by_exp[exp] = chosen
         else:  # count around spot
-            take_side = int(strikes_per_side or max(1, max_contracts//max(1, (2))))
+            take_side = int(strikes_per_side or max(1, max_contracts // max(1, (2))))
             for exp in chosen_exps:
                 ordered = sorted(all_strikes, key=lambda x: abs(x - S))
                 sel = []
@@ -245,7 +270,9 @@ def get_option_contracts_for_bars_task(
 
         contracts: List[Dict[str, Any]] = []
         # Rights selection
-        rts = [r.upper() for r in (rights or ["C", "P"]) if r and r.upper() in ("C", "P")]
+        rts = [
+            r.upper() for r in (rights or ["C", "P"]) if r and r.upper() in ("C", "P")
+        ]
         if not rts:
             rts = ["C", "P"]
 
@@ -313,7 +340,8 @@ def get_option_contracts_for_bars_task(
         ).model_dump()
 
 
-@shared_task(pydantic=True,
+@shared_task(
+    pydantic=True,
     bind=True,
     name="option_chains.fetch_option_historical_data",
     queue="option_chains",
@@ -344,7 +372,9 @@ def fetch_option_historical_data_task(
         logger.warning(
             f"📊 No option contracts available for historical data: {symbol}"
         )
-        return HistoricalResult(symbol=symbol, processed=0, saved=0, failed=0, results=[]).model_dump()
+        return HistoricalResult(
+            symbol=symbol, processed=0, saved=0, failed=0, results=[]
+        ).model_dump()
 
     logger.info(
         f"📊 OPTION BARS: Fetching historical data for {len(contracts)} option contracts of {symbol}"
@@ -382,7 +412,12 @@ def fetch_option_historical_data_task(
     ).model_dump()
 
 
-@shared_task(pydantic=True, bind=True, name="option_chains.process_historical_option_data", queue="option_chains")
+@shared_task(
+    pydantic=True,
+    bind=True,
+    name="option_chains.process_historical_option_data",
+    queue="option_chains",
+)
 def process_historical_option_data_task(self, request: OptionHistoricalArgs) -> dict:
     """
     Complete historical option data workflow for a symbol.
@@ -397,7 +432,9 @@ def process_historical_option_data_task(self, request: OptionHistoricalArgs) -> 
         request = OptionHistoricalArgs(**request)
 
     set_correlation_id(request.correlation_id)
-    logger = CorrelationIdAdapter(logging.getLogger(__name__), {"cid": request.correlation_id})
+    logger = CorrelationIdAdapter(
+        logging.getLogger(__name__), {"cid": request.correlation_id}
+    )
     symbol = request.symbol
     logger.info(f"🔄 STARTING: Historical option data processing for {symbol}")
 
@@ -460,7 +497,8 @@ def process_historical_option_data_task(self, request: OptionHistoricalArgs) -> 
     ).model_dump()
 
 
-@shared_task(pydantic=True,
+@shared_task(
+    pydantic=True,
     bind=True,
     name="option_chains.save_selected_option_contracts",
     queue="option_chains",
@@ -476,8 +514,9 @@ def save_selected_option_contracts_to_repo_task(
     Does not fetch from IB. Intended to persist details that were already known
     (e.g., from prior enrichment) so other flows can read from the contracts repo.
     """
-    import pandas as pd
     import logging
+    import pandas as pd
+
     logger = logging.getLogger(__name__)
 
     # Coerce dict payloads into model if needed
@@ -488,6 +527,7 @@ def save_selected_option_contracts_to_repo_task(
         return SaveContractsResult(saved=0, skipped=0, missing_conid=0).model_dump()
 
     from app_settings.settings import get_settings
+
     settings = get_settings()
     base = Path(root) if root else settings.paths.data_root
 
@@ -516,24 +556,30 @@ def save_selected_option_contracts_to_repo_task(
                 expiry_dt = None
         if expiry_dt is None:
             import re
+
             ls = c.get("localSymbol") or c.get("local_symbol")
             if ls:
                 m = re.search(r"(\d{6})([CP])(\d{8})", str(ls))
                 if m:
                     yymmdd = m.group(1)
                     try:
-                        expiry_dt = pd.to_datetime("20" + yymmdd, format="%Y%m%d").date()
+                        expiry_dt = pd.to_datetime(
+                            "20" + yymmdd, format="%Y%m%d"
+                        ).date()
                     except Exception:
                         pass
         # Derive right/strike from payload or localSymbol
         right_val = c.get("right")
         strike_val = c.get("strike")
-        if (right_val is None or str(right_val).strip().lower() in ("", "none", "nan")) or (
+        if (
+            right_val is None or str(right_val).strip().lower() in ("", "none", "nan")
+        ) or (
             strike_val is None or str(strike_val).strip().lower() in ("", "none", "nan")
         ):
             ls = c.get("localSymbol") or c.get("local_symbol")
             if ls:
                 import re
+
                 m = re.search(r"(\d{6})([CP])(\d{8})", str(ls))
                 if m:
                     if not right_val:
@@ -550,7 +596,8 @@ def save_selected_option_contracts_to_repo_task(
                 "sec_type": "OPT",
                 "currency": c.get("currency", "USD"),
                 "exchange": c.get("exchange"),
-                "primary_exchange": c.get("primaryExchange") or c.get("primary_exchange"),
+                "primary_exchange": c.get("primaryExchange")
+                or c.get("primary_exchange"),
                 "local_symbol": c.get("localSymbol") or c.get("local_symbol"),
                 "trading_class": c.get("tradingClass") or c.get("trading_class"),
                 "multiplier": int(c.get("multiplier") or 100),
@@ -559,7 +606,9 @@ def save_selected_option_contracts_to_repo_task(
                 "expiry": expiry_dt,
                 "expiry_raw": str(expiry_raw) if expiry_raw else None,
                 # Optional IB metadata
-                "min_tick": (float(c.get("minTick")) if c.get("minTick") is not None else None),
+                "min_tick": (
+                    float(c.get("minTick")) if c.get("minTick") is not None else None
+                ),
                 "valid_exchanges": c.get("validExchanges") or c.get("valid_exchanges"),
                 "long_name": c.get("longName") or c.get("long_name"),
                 "category": c.get("category"),
@@ -577,12 +626,15 @@ def save_selected_option_contracts_to_repo_task(
         )
 
     if not rows:
-        return SaveContractsResult(saved=0, skipped=0, missing_conid=missing).model_dump()
+        return SaveContractsResult(
+            saved=0, skipped=0, missing_conid=missing
+        ).model_dump()
 
     df = pd.DataFrame(rows)
     # Ensure all repository schema columns exist for option contracts repo
     try:
         from common.repositories.option_contracts import OptionContractsRepository
+
         schema = OptionContractsRepository(base)._create_schema()
         for f in schema:
             if f.name not in df.columns:
@@ -590,17 +642,23 @@ def save_selected_option_contracts_to_repo_task(
     except Exception:
         pass
     from common.repositories.option_contracts import OptionContractsRepository
+
     repo = OptionContractsRepository(base)
     try:
         repo.save(df)
         logger.info(f"Saved {len(df)} option contracts into option_contracts repo")
-        return SaveContractsResult(saved=len(df), skipped=0, missing_conid=missing).model_dump()
+        return SaveContractsResult(
+            saved=len(df), skipped=0, missing_conid=missing
+        ).model_dump()
     except Exception as e:
         logger.error(f"Error saving option contracts: {e}")
-        return SaveContractsResult(saved=0, skipped=0, missing_conid=missing, error=str(e)).model_dump()
+        return SaveContractsResult(
+            saved=0, skipped=0, missing_conid=missing, error=str(e)
+        ).model_dump()
 
 
-@shared_task(pydantic=True,
+@shared_task(
+    pydantic=True,
     bind=True,
     name="option_chains.fetch_option_contract_details",
     queue="option_chains",
@@ -617,7 +675,9 @@ def fetch_option_contract_details_task(
     contracts. This uses the IB API service and is NOT called automatically to
     honor the no-fallback policy; orchestrator can invoke it explicitly.
     """
-    import logging, httpx
+    import httpx
+    import logging
+
     logger = logging.getLogger(__name__)
 
     # Coerce dict payloads into model if needed
@@ -625,9 +685,16 @@ def fetch_option_contract_details_task(
         contracts_result = SelectedContracts(**contracts_result)
     contracts = contracts_result.contracts or []
     if not contracts:
-        return SelectedContracts(symbol=contracts_result.symbol, contracts=[], contract_count=0, snapshot_date=contracts_result.snapshot_date, correlation_id=None).model_dump()
+        return SelectedContracts(
+            symbol=contracts_result.symbol,
+            contracts=[],
+            contract_count=0,
+            snapshot_date=contracts_result.snapshot_date,
+            correlation_id=None,
+        ).model_dump()
 
     from app_settings.settings import get_settings
+
     settings = get_settings()
     base_url = api_base or str(settings.api.services.ib_api.url)
 
@@ -649,10 +716,16 @@ def fetch_option_contract_details_task(
                     d = details[0]
                     # Extract common fields
                     conid = d.get("contract", {}).get("conId") or d.get("conId")
-                    local_symbol = d.get("contract", {}).get("localSymbol") or d.get("localSymbol")
-                    trading_class = d.get("contract", {}).get("tradingClass") or d.get("tradingClass")
+                    local_symbol = d.get("contract", {}).get("localSymbol") or d.get(
+                        "localSymbol"
+                    )
+                    trading_class = d.get("contract", {}).get("tradingClass") or d.get(
+                        "tradingClass"
+                    )
                     # Optional metadata from details
-                    primary_exchange = d.get("contract", {}).get("primaryExchange") or d.get("primaryExchange")
+                    primary_exchange = d.get("contract", {}).get(
+                        "primaryExchange"
+                    ) or d.get("primaryExchange")
                     min_tick = d.get("minTick")
                     valid_exchanges = d.get("validExchanges")
                     long_name = d.get("longName")
@@ -664,7 +737,9 @@ def fetch_option_contract_details_task(
                     liquid_hours = d.get("liquidHours")
                     market_rule_ids = d.get("marketRuleIds")
                     contract_month = d.get("contractMonth")
-                    last_trade_or_month = d.get("contract", {}).get("lastTradeDateOrContractMonth") or d.get("lastTradeDateOrContractMonth")
+                    last_trade_or_month = d.get("contract", {}).get(
+                        "lastTradeDateOrContractMonth"
+                    ) or d.get("lastTradeDateOrContractMonth")
                     if conid:
                         c["conId"] = int(conid)
                     if local_symbol:

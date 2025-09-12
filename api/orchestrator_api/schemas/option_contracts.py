@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+from ops.schemas.option_contracts import SelectedContracts
 from pydantic import BaseModel, Field
 from typing import Any, Dict, List, Optional
-from ops.schemas.option_contracts import SelectedContracts
 
 
 class SelectionRequest(BaseModel):
@@ -23,9 +23,7 @@ class SelectionRequest(BaseModel):
     moneyness_targets: Optional[List[float]] = Field(
         None, description="e.g. [0.9,1.0,1.1]"
     )
-    delta_targets: Optional[List[float]] = Field(
-        None, description="e.g. [0.25,0.5]"
-    )
+    delta_targets: Optional[List[float]] = Field(None, description="e.g. [0.25,0.5]")
     iv_assumption: Optional[float] = Field(None, description="e.g. 0.25")
     use_underlying_iv: Optional[bool] = Field(
         None, description="use IV index if present"

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from ibx_flows.resample import resample_option_minute_to_daily
 from common.repositories.option_bars import OptionBarRepository
+from ibx_flows.resample import resample_option_minute_to_daily
 from pathlib import Path
 
 import argparse

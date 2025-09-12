@@ -1,7 +1,9 @@
-import React, { useMemo, useState } from 'react'
+import React, { useMemo, useState, useEffect } from 'react'
+import { useDataPersistence } from '../contexts/DataContext'
 import { api } from '../apiClient'
 
 export default function Calendar() {
+  const { cacheData, getCachedData, getMetadata, clearCache } = useDataPersistence()
   const [daysGet, setDaysGet] = useState(7)
   const [symbolsGet, setSymbolsGet] = useState('')
   const [daysFetch, setDaysFetch] = useState(7)
@@ -14,10 +16,23 @@ export default function Calendar() {
 
   const cols = useMemo(() => ['symbol','company_name','earnings_date','time','eps_estimate','revenue_estimate','source'], [])
 
+  // Load cached data and metadata on component mount
+  useEffect(() => {
+    const cachedData = getCachedData('calendar', { days: daysGet, symbols: symbolsGet })
+    const cachedMeta = getMetadata('calendar', { days: daysGet, symbols: symbolsGet })
+    
+    if (cachedData) {
+      setData(cachedData)
+    }
+    setMeta(cachedMeta)
+  }, [daysGet, symbolsGet, getCachedData, getMetadata])
+
   const setMetaFromRes = (res) => {
     const src = res.headers.get('X-Calendar-Source') || '-'
     const col = res.headers.get('X-Calendar-Collection-Date') || '-'
-    setMeta({ src, col })
+    const newMeta = { src, col }
+    setMeta(newMeta)
+    return newMeta
   }
 
   async function onGet(e) {
@@ -25,8 +40,12 @@ export default function Calendar() {
     setLoading(true)
     try {
       const { data, res } = await api.calendar.getUpcoming(daysGet, symbolsGet)
-      setMetaFromRes(res)
+      const newMeta = setMetaFromRes(res)
       setData(data)
+      
+      // Cache the data and metadata
+      const params = { days: daysGet, symbols: symbolsGet }
+      cacheData('calendar', params, data, newMeta)
     } finally { setLoading(false) }
   }
 
@@ -36,8 +55,15 @@ export default function Calendar() {
     setLoading(true)
     try {
       const { data, res } = await api.calendar.fetchUpcoming(daysFetch, source, symbolsFetch)
-      setMetaFromRes(res)
+      const newMeta = setMetaFromRes(res)
       setData(data)
+      
+      // Cache the fetched data
+      const params = { days: daysFetch, symbols: symbolsFetch, source }
+      cacheData('calendar', params, data, newMeta)
+      
+      // Clear old cache since we have new data
+      clearCache('calendar', { days: daysGet, symbols: symbolsGet })
     } finally { setLoading(false) }
   }
 
@@ -55,10 +81,36 @@ export default function Calendar() {
     )
   }
 
+  const cachedData = getCachedData('calendar', { days: daysGet, symbols: symbolsGet })
+  const isCached = !!cachedData
+
   return (
     <section>
       <h2>Calendar Service (React)</h2>
-      <div className="muted">Last collection: {meta.col} | Source: {meta.src}</div>
+      <div className="muted">
+        Last collection: {meta.col} | Source: {meta.src} | 
+        {isCached ? (
+          <span style={{ color: 'var(--accent)' }}> ⚡ Cached data</span>
+        ) : (
+          <span> 📡 Fresh data</span>
+        )}
+        {isCached && (
+          <button 
+            onClick={() => clearCache('calendar', { days: daysGet, symbols: symbolsGet })}
+            style={{ 
+              marginLeft: '0.5rem', 
+              padding: '2px 6px', 
+              fontSize: '0.8rem',
+              background: 'var(--line)',
+              border: 'none',
+              borderRadius: '3px',
+              cursor: 'pointer'
+            }}
+          >
+            Clear Cache
+          </button>
+        )}
+      </div>
       <form onSubmit={onGet} style={{marginTop:'.25rem'}}>
         <label>Days Ahead <input type="number" min={0} max={180} value={daysGet} onChange={e=>setDaysGet(Number(e.target.value))}/></label>
         <label>Symbols <input value={symbolsGet} onChange={e=>setSymbolsGet(e.target.value)} placeholder="(optional) AAPL,MSFT"/></label>

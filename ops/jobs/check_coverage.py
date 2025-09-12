@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from ibx_flows.windows import missing_windows
 from common.repositories.equity_bars import EquityBarRepository
 from common.repositories.option_bars import OptionBarRepository
 from common.repositories.option_chains import OptionChainSnapshotRepository
+from ibx_flows.windows import missing_windows
 from pathlib import Path
 
 import argparse

@@ -2,8 +2,11 @@
 Unit tests for ContractDescriptionsRepository.
 """
 
+from common.repositories.contract_descriptions import (
+    ContractDescriptionsRepository,
+    DataValidationException,
+)
 from datetime import date, datetime
-from common.repositories.contract_descriptions import ContractDescriptionsRepository, DataValidationException
 
 import pandas as pd
 import pyarrow as pa
@@ -34,15 +37,15 @@ class TestContractDescriptionsRepository:
             "symbol",
             "sec_type",
             "currency",
-            'sec_id',
-            'sec_id_type',
+            "sec_id",
+            "sec_id_type",
             "primary_exchange",
             "derivative_sec_types",
             "created_at",
         }
 
         schema_fields = {field.name for field in schema}
-        assert  schema_fields == expected_fields
+        assert schema_fields == expected_fields
 
     @pytest.mark.skip(reason="REQUIRED is not implemented yet/will not be.")
     def test_required_fields_constant(self):
@@ -402,35 +405,38 @@ class TestContractDescriptionsRepository:
         repo.save(test_data)
         loaded_data = repo.load(
             filters=[
-                ("symbol", "in", ["DERIV_TEST1", "DERIV_TEST2", "DERIV_TEST3", "DERIV_TEST4"])
-        ]
+                (
+                    "symbol",
+                    "in",
+                    ["DERIV_TEST1", "DERIV_TEST2", "DERIV_TEST3", "DERIV_TEST4"],
+                )
+            ]
         )
 
         assert loaded_data.num_rows > 0, "No data loaded"
 
         assert loaded_data["derivative_sec_types"].type == pa.list_(pa.string())
-        assert ( loaded_data.filter(pc.field('symbol') == 'DERIV_TEST1').select(["derivative_sec_types"]).to_pylist()
-                 == [{'derivative_sec_types': ['OPT', 'FUT', 'WAR']}]
-            )
-        assert (loaded_data.filter(pc.field('symbol') == 'DERIV_TEST2').select(["derivative_sec_types"]).to_pylist()
-                == [{'derivative_sec_types': ['OPT', 'FUT']}]
-                )
-        assert (loaded_data.filter(pc.field('symbol') == 'DERIV_TEST3').select(["derivative_sec_types"]).to_pylist()
-                == [{'derivative_sec_types': []}]
-                )
-        assert (loaded_data.filter(pc.field('symbol') == 'DERIV_TEST4').select(["derivative_sec_types"]).to_pylist()
-                == [{'derivative_sec_types': ['OPT']}]
-                )
+        assert loaded_data.filter(pc.field("symbol") == "DERIV_TEST1").select(
+            ["derivative_sec_types"]
+        ).to_pylist() == [{"derivative_sec_types": ["OPT", "FUT", "WAR"]}]
+        assert loaded_data.filter(pc.field("symbol") == "DERIV_TEST2").select(
+            ["derivative_sec_types"]
+        ).to_pylist() == [{"derivative_sec_types": ["OPT", "FUT"]}]
+        assert loaded_data.filter(pc.field("symbol") == "DERIV_TEST3").select(
+            ["derivative_sec_types"]
+        ).to_pylist() == [{"derivative_sec_types": []}]
+        assert loaded_data.filter(pc.field("symbol") == "DERIV_TEST4").select(
+            ["derivative_sec_types"]
+        ).to_pylist() == [{"derivative_sec_types": ["OPT"]}]
 
         symbol = "DERIV_TEST1"
-        expected = ['OPT', 'FUT', 'WAR']
+        expected = ["OPT", "FUT", "WAR"]
         t = loaded_data.filter(pc.field("symbol") == symbol)
         assert t.num_rows == 1
 
         # value check (pure Arrow, no dict conversion)
         val = t.column("derivative_sec_types").combine_chunks()[0].as_py()
         assert val == expected
-
 
     def test_as_of_date_handling(self, temp_data_dir):
         """Test as_of_date field handling."""
@@ -476,19 +482,21 @@ class TestContractDescriptionsRepository:
 
         assert loaded_data.num_rows > 0, "No data loaded"
 
-
-        assert loaded_data["created_at"].type == pa.timestamp('s', 'UTC')
-
+        assert loaded_data["created_at"].type == pa.timestamp("s", "UTC")
 
         data_df = loaded_data.to_pandas()
         # All records should have created_at as timestamp
         for _, row in data_df.iterrows():
             assert "created_at" in row
             assert pd.notna(row["created_at"])
-            
+
             # Extract date from timestamp for comparison
-            created_date = row["created_at"].date() if hasattr(row["created_at"], 'date') else row["created_at"]
-            
+            created_date = (
+                row["created_at"].date()
+                if hasattr(row["created_at"], "date")
+                else row["created_at"]
+            )
+
             # Check specific dates
             if row["symbol"] == "DATE_TEST1":
                 assert created_date == date(2024, 2, 15)

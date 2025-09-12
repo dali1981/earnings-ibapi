@@ -1,14 +1,13 @@
 from __future__ import annotations
 
+from app_settings.settings import get_settings
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pathlib import Path
 
 import os
-from app_settings.settings import get_settings
-from fastapi.responses import FileResponse
 
 
 app = FastAPI(title="Trading Frontend", version="0.1.0")

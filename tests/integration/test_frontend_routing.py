@@ -25,14 +25,14 @@ def test_frontend_injects_custom_bases(monkeypatch):
     assert "http://svc-equity:2345" in html
     assert "http://svc-chains:3456" in html
     # Verify the page wires modules and actions (migrated away from inline fetch templates)
-    assert 'window.__BASES__' in html
+    assert "window.__BASES__" in html
     assert 'data-action="calendar.get"' in html
     assert 'data-action="calendar.fetch"' in html
     assert 'data-action="equity.fetch"' in html
     assert 'data-action="chains.latest"' in html
-    assert '/static/js/apiClient.js' in html
-    assert '/static/js/controllers.js' in html
-    assert '/static/js/bootstrap.js' in html
+    assert "/static/js/apiClient.js" in html
+    assert "/static/js/controllers.js" in html
+    assert "/static/js/bootstrap.js" in html
 
 
 def test_frontend_buttons_have_actions():

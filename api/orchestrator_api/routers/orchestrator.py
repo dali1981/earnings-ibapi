@@ -10,16 +10,17 @@ from ..schemas.contracts import (
     SymbolBatch,
 )
 from app_settings.settings import get_settings
-from fastapi import APIRouter, HTTPException, Query
-from typing import Optional
 from celery import group
+from fastapi import APIRouter, HTTPException, Query
 from ops.tasks.option_chains import (
-    check_has_options_task,
-    get_underlying_contract_task,
-    fetch_option_params_task,
     build_chain_snapshot_task,
+    check_has_options_task,
+    fetch_option_params_task,
+    get_underlying_contract_task,
     save_chain_snapshot_task,
 )
+from typing import Optional
+
 import uuid
 
 
