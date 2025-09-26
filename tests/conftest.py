@@ -22,7 +22,7 @@ import pytest
 import numpy as np
 
 # Set test environment
-os.environ['APP_ENV'] = 'test'
+os.environ['APP_ENV'] = 'testing'
 os.environ['ALLOW_PROD_WRITES'] = '1'
 
 # ============================================================================

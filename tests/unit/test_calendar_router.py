@@ -24,23 +24,26 @@ def _mk_event(symbol: str = "AAPL"):
 
 
 def test_calendar_upcoming_route(monkeypatch):
-    # Monkeypatch EarningsService used by the router to avoid network
+    # Monkeypatch CalendarService used by the get-upcoming router to avoid DB access
     from services.calendar_api.app import app
-    from services.calendar_api.routers import calendar as cal_module
+    from services.calendar_api.routers import core as core_module
 
-    class FakeSvc:
-        async def get_upcoming(self, *, days_ahead: int, symbols=None):
+    class FakeCalendarService:
+        def get_upcoming_events(self, *, days_ahead: int, symbols=None):
             assert days_ahead == 14
             assert symbols == ["AAPL", "MSFT"]
             return [_mk_event("AAPL"), _mk_event("MSFT")]
 
-    # Service renamed to EarningsFetcherService
+        def get_latest_collection_date_str(self):
+            return "2025-01-01"
+
+    # Mock CalendarService for the get-upcoming endpoint (now in core module)
     monkeypatch.setattr(
-        cal_module, "EarningsFetcherService", lambda: FakeSvc(), raising=True
+        core_module, "CalendarService", lambda: FakeCalendarService(), raising=True
     )
 
     c = TestClient(app)
-    r = c.get("/calendar/upcoming", params={"days": 14, "symbols": "AAPL,MSFT"})
+    r = c.get("/calendar/get-upcoming", params={"days": 14, "symbols": "AAPL,MSFT"})
     assert r.status_code == 200
     payload = r.json()
     assert isinstance(payload, list) and len(payload) == 2

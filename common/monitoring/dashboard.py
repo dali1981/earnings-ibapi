@@ -733,18 +733,40 @@ if WEB_DASHBOARD_AVAILABLE:
 
             return json.dumps(fig, cls=PlotlyJSONEncoder)
 
+        @app.route("/api/observability/metrics")
+        def api_observability_metrics():
+            """Get observability metrics from Sentry integration."""
+            try:
+                from common.observability.metrics import get_trading_metrics
+                metrics = get_trading_metrics()
+                hours = request.args.get("hours", 24, type=int)
+                data = metrics.get_dashboard_data(hours=hours)
+                return jsonify(data)
+            except Exception as e:
+                return jsonify({"error": f"Failed to get observability metrics: {e}"}), 500
+
         @app.route("/api/config")
         def api_config():
             """Return selected config values and portfolio.yaml content."""
             from pathlib import Path as _P
+            from app_settings.settings import get_settings
 
+            settings = get_settings()
             cfg = {
-                "PROJECT_ROOT": str(config.PROJECT_ROOT),
-                "DATA_ROOT": str(config.DATA_ROOT),
-                "CACHE_PATH": str(config.CACHE_PATH),
-                "LOGS_PATH": str(config.LOGS_PATH),
-                "IB_HOST": getattr(config, "IB_HOST", None),
-                "IB_PORT": getattr(config, "IB_PORT", None),
+                "PROJECT_ROOT": str(settings.paths.project_root),
+                "DATA_ROOT": str(settings.paths.data_root),
+                "CACHE_PATH": str(settings.paths.cache),
+                "LOGS_PATH": str(settings.paths.logs),
+                "IB_HOST": settings.ib.host,
+                "IB_PORT": settings.ib.port,
+                "SENTRY_ENABLED": bool(settings.observability.sentry_dsn),
+                "OBSERVABILITY_CONFIG": {
+                    "error_tracking": settings.observability.enable_error_tracking,
+                    "performance_monitoring": settings.observability.enable_performance_monitoring,
+                    "distributed_tracing": settings.observability.enable_distributed_tracing,
+                    "celery_monitoring": settings.observability.enable_celery_monitoring,
+                    "custom_metrics": settings.observability.enable_custom_metrics,
+                }
             }
             portfolio_path = _P("config") / "portfolio.yaml"
             try:

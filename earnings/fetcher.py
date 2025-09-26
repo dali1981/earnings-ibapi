@@ -617,10 +617,10 @@ class EarningsCalendarFetcher:
     def _fetch_nasdaq_single_day(
         self, target_date: date, symbols: Optional[List[str]]
     ) -> List[EarningsEvent]:
-        """Fetch NASDAQ earnings for a single day."""
+        """Fetch NASDAQ earnings for a single day with pagination support."""
 
         url = "https://api.nasdaq.com/api/calendar/earnings"
-        params = {"date": target_date.strftime("%Y-%m-%d")}
+        base_params = {"date": target_date.strftime("%Y-%m-%d")}
 
         headers = {
             "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
@@ -630,61 +630,183 @@ class EarningsCalendarFetcher:
             "Origin": "https://www.nasdaq.com",
         }
 
+        all_earnings = []
+        page = 0
+        max_pages = 10  # Safety limit to prevent infinite loops
+        page_size = 100  # Try different page sizes
+
+        logger.debug(f"Fetching NASDAQ earnings for {target_date} with pagination awareness")
+
         try:
-            data = self._get_json(url, params, timeout=30, headers=headers)
-            daily_earnings = []
+            # First, try to get data without pagination parameters
+            data = self._get_json(url, base_params, timeout=30, headers=headers)
 
-            # Parse NASDAQ response format
             if "data" in data and data["data"] and "rows" in data["data"]:
-                for row in data["data"]["rows"]:
-                    symbol = row.get("symbol", "").strip().upper()
+                rows = data["data"]["rows"]
+                initial_count = len(rows)
+                logger.debug(f"Initial NASDAQ fetch returned {initial_count} rows for {target_date}")
 
-                    # Filter by symbols if specified
-                    if symbols and symbol not in symbols:
-                        continue
+                # Process first page of results
+                page_earnings = self._process_nasdaq_rows(rows, target_date, symbols)
+                all_earnings.extend(page_earnings)
 
-                    # Skip invalid symbols
-                    if (
-                        not symbol
-                        or not symbol.replace(".", "").replace("-", "").isalnum()
-                    ):
-                        continue
+                # Check for pagination indicators in response
+                has_more_data = self._detect_nasdaq_pagination(data, initial_count)
 
-                    # Parse earnings time
-                    time_str = row.get("time", "").lower()
-                    if "pre-market" in time_str or "pre" in time_str:
-                        timing = "bmo"  # Before market open
-                    elif "after" in time_str or "post" in time_str:
-                        timing = "amc"  # After market close
+                if has_more_data:
+                    logger.info(f"Detected potential pagination for NASDAQ {target_date}, attempting to fetch additional pages")
+
+                    # Try different pagination strategies
+                    pagination_strategies = [
+                        {"offset": initial_count, "limit": page_size},
+                        {"page": 1, "pageSize": page_size},
+                        {"start": initial_count, "rows": page_size},
+                        {"skip": initial_count, "take": page_size}
+                    ]
+
+                    for strategy in pagination_strategies:
+                        logger.debug(f"Trying pagination strategy: {strategy}")
+                        additional_earnings = self._try_nasdaq_pagination_strategy(
+                            url, base_params, headers, strategy, target_date, symbols, max_pages
+                        )
+                        if additional_earnings:
+                            all_earnings.extend(additional_earnings)
+                            logger.info(f"Successfully fetched {len(additional_earnings)} additional earnings using {strategy}")
+                            break  # Use first successful strategy
                     else:
-                        timing = "dmt"  # During market hours
+                        logger.warning(f"No pagination strategy worked for NASDAQ {target_date}")
 
-                    # Parse EPS forecast
-                    eps_forecast = self._safe_float(row.get("epsForecast"))
-
-                    # Parse market cap for filtering
-                    market_cap_str = row.get("marketCap", "")
-                    market_cap = self._parse_market_cap(market_cap_str)
-
-                    earnings_event = EarningsEvent(
-                        symbol=symbol,
-                        company_name=row.get("name", symbol),
-                        earnings_date=target_date,
-                        time=timing,
-                        eps_estimate=eps_forecast,
-                        source=EarningsSource.NASDAQ.value,
-                    )
-
-                    # Add market cap as custom attribute for filtering
-                    earnings_event.market_cap = market_cap
-
-                    daily_earnings.append(earnings_event)
-
-            return daily_earnings
+            logger.info(f"Total NASDAQ earnings fetched for {target_date}: {len(all_earnings)}")
+            return all_earnings
 
         except Exception as e:
             logger.error(f"NASDAQ single day fetch failed for {target_date}: {e}")
             return []
+
+    def _detect_nasdaq_pagination(self, data: dict, row_count: int) -> bool:
+        """Detect if NASDAQ response might have more pages available."""
+        # Check for pagination metadata in response
+        pagination_indicators = [
+            "totalRecords", "totalRows", "total", "hasMore", "nextPage",
+            "pagination", "pageInfo", "more", "hasNextPage"
+        ]
+
+        # Check top level and data level for pagination indicators
+        for indicator in pagination_indicators:
+            if indicator in data or (data.get("data") and indicator in data["data"]):
+                logger.debug(f"Found pagination indicator: {indicator}")
+                return True
+
+        # Heuristic: if we got exactly 25, 50, 100, or 250 results (common page sizes)
+        # there might be more pages
+        common_page_sizes = [25, 50, 100, 250]
+        if row_count in common_page_sizes:
+            logger.debug(f"Row count ({row_count}) matches common page size, suggesting pagination")
+            return True
+
+        return False
+
+    def _try_nasdaq_pagination_strategy(
+        self, url: str, base_params: dict, headers: dict,
+        strategy: dict, target_date: date, symbols: Optional[List[str]],
+        max_pages: int
+    ) -> List[EarningsEvent]:
+        """Try a specific pagination strategy for NASDAQ API."""
+        additional_earnings = []
+
+        for page_num in range(1, max_pages + 1):
+            try:
+                # Build pagination parameters
+                params = base_params.copy()
+                if "offset" in strategy:
+                    params["offset"] = strategy["offset"] + (page_num - 1) * strategy["limit"]
+                    params["limit"] = strategy["limit"]
+                elif "page" in strategy:
+                    params["page"] = page_num
+                    params["pageSize"] = strategy["pageSize"]
+                elif "start" in strategy:
+                    params["start"] = strategy["start"] + (page_num - 1) * strategy["rows"]
+                    params["rows"] = strategy["rows"]
+                elif "skip" in strategy:
+                    params["skip"] = strategy["skip"] + (page_num - 1) * strategy["take"]
+                    params["take"] = strategy["take"]
+
+                logger.debug(f"Trying page {page_num} with params: {params}")
+                data = self._get_json(url, params, timeout=30, headers=headers)
+
+                if "data" in data and data["data"] and "rows" in data["data"]:
+                    rows = data["data"]["rows"]
+                    if not rows:  # No more data
+                        break
+
+                    page_earnings = self._process_nasdaq_rows(rows, target_date, symbols)
+                    additional_earnings.extend(page_earnings)
+                    logger.debug(f"Page {page_num} returned {len(page_earnings)} earnings")
+
+                    # If we got fewer results than expected, we've reached the end
+                    expected_size = strategy.get("limit") or strategy.get("pageSize") or strategy.get("rows") or strategy.get("take")
+                    if len(rows) < expected_size:
+                        break
+                else:
+                    break  # Invalid response, stop pagination
+
+            except Exception as e:
+                logger.debug(f"Pagination page {page_num} failed: {e}")
+                break
+
+        return additional_earnings
+
+    def _process_nasdaq_rows(
+        self, rows: list, target_date: date, symbols: Optional[List[str]]
+    ) -> List[EarningsEvent]:
+        """Process NASDAQ API rows into EarningsEvent objects."""
+        earnings = []
+
+        for row in rows:
+            symbol = row.get("symbol", "").strip().upper()
+
+            # Filter by symbols if specified
+            if symbols and symbol not in symbols:
+                continue
+
+            # Skip invalid symbols
+            if (
+                not symbol
+                or not symbol.replace(".", "").replace("-", "").isalnum()
+            ):
+                continue
+
+            # Parse earnings time
+            time_str = row.get("time", "").lower()
+            if "pre-market" in time_str or "pre" in time_str:
+                timing = "bmo"  # Before market open
+            elif "after" in time_str or "post" in time_str:
+                timing = "amc"  # After market close
+            else:
+                timing = "dmt"  # During market hours
+
+            # Parse EPS forecast
+            eps_forecast = self._safe_float(row.get("epsForecast"))
+
+            # Parse market cap for filtering
+            market_cap_str = row.get("marketCap", "")
+            market_cap = self._parse_market_cap(market_cap_str)
+
+            earnings_event = EarningsEvent(
+                symbol=symbol,
+                company_name=row.get("name", symbol),
+                earnings_date=target_date,
+                time=timing,
+                eps_estimate=eps_forecast,
+                source=EarningsSource.NASDAQ.value,
+            )
+
+            # Add market cap as custom attribute for filtering
+            earnings_event.market_cap = market_cap
+
+            earnings.append(earnings_event)
+
+        return earnings
 
     def _parse_market_cap(self, market_cap_str: str) -> Optional[float]:
         """Parse market cap string to float value."""

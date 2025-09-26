@@ -9,6 +9,16 @@ services:
     ports: ["9001:9001"]
     environment:
       - SERVICE_NAME=calendar
+      - APP_PATHS__DATA_ROOT=/app/data
+      - APP_PATHS__PROJECT_ROOT=/app
+      - APP_PATHS__EQUITY_BARS=/app/data/equity_bars
+      - APP_PATHS__OPTION_BARS=/app/data/option_bars
+      - APP_PATHS__OPTION_CHAINS=/app/data/option_chains
+      - APP_PATHS__CONTRACTS=/app/data/contracts
+      - APP_PATHS__EARNINGS=/app/data/earnings
+      - APP_PATHS__EXPORTS=/app/data/exports
+      - APP_PATHS__CACHE=/app/cache
+      - APP_PATHS__LOGS=/app/logs
     volumes:
       - .:/app
       - ./data:/app/data
@@ -21,6 +31,16 @@ services:
     ports: ["9002:9002"]
     environment:
       - SERVICE_NAME=equity
+      - APP_PATHS__DATA_ROOT=/app/data
+      - APP_PATHS__PROJECT_ROOT=/app
+      - APP_PATHS__EQUITY_BARS=/app/data/equity_bars
+      - APP_PATHS__OPTION_BARS=/app/data/option_bars
+      - APP_PATHS__OPTION_CHAINS=/app/data/option_chains
+      - APP_PATHS__CONTRACTS=/app/data/contracts
+      - APP_PATHS__EARNINGS=/app/data/earnings
+      - APP_PATHS__EXPORTS=/app/data/exports
+      - APP_PATHS__CACHE=/app/cache
+      - APP_PATHS__LOGS=/app/logs
     volumes:
       - .:/app
       - ./data:/app/data
@@ -33,6 +53,16 @@ services:
     ports: ["9003:9003"]
     environment:
       - SERVICE_NAME=options
+      - APP_PATHS__DATA_ROOT=/app/data
+      - APP_PATHS__PROJECT_ROOT=/app
+      - APP_PATHS__EQUITY_BARS=/app/data/equity_bars
+      - APP_PATHS__OPTION_BARS=/app/data/option_bars
+      - APP_PATHS__OPTION_CHAINS=/app/data/option_chains
+      - APP_PATHS__CONTRACTS=/app/data/contracts
+      - APP_PATHS__EARNINGS=/app/data/earnings
+      - APP_PATHS__EXPORTS=/app/data/exports
+      - APP_PATHS__CACHE=/app/cache
+      - APP_PATHS__LOGS=/app/logs
     volumes:
       - .:/app
       - ./data:/app/data
@@ -45,6 +75,16 @@ services:
     ports: ["9004:9004"]
     environment:
       - SERVICE_NAME=chains
+      - APP_PATHS__DATA_ROOT=/app/data
+      - APP_PATHS__PROJECT_ROOT=/app
+      - APP_PATHS__EQUITY_BARS=/app/data/equity_bars
+      - APP_PATHS__OPTION_BARS=/app/data/option_bars
+      - APP_PATHS__OPTION_CHAINS=/app/data/option_chains
+      - APP_PATHS__CONTRACTS=/app/data/contracts
+      - APP_PATHS__EARNINGS=/app/data/earnings
+      - APP_PATHS__EXPORTS=/app/data/exports
+      - APP_PATHS__CACHE=/app/cache
+      - APP_PATHS__LOGS=/app/logs
     volumes:
       - .:/app
       - ./data:/app/data
@@ -67,6 +107,8 @@ services:
     ports: ["9005:9005"]
     environment:
       - SERVICE_NAME=orchestrator
+      - APP_PATHS__DATA_ROOT=/app/data
+      - APP_PATHS__PROJECT_ROOT=/app
       - APP_API__SERVICES__IB_API__HOST=ib_api
       - APP_API__SERVICES__IB_API__PORT=9010
     volumes:
@@ -83,6 +125,8 @@ services:
     ports: ["9010:9010"]
     environment:
       - SERVICE_NAME=ib_api
+      - APP_PATHS__DATA_ROOT=/app/data
+      - APP_PATHS__PROJECT_ROOT=/app
       - APP_IB__HOST=${APP_IB__HOST:-host.docker.internal}
       - APP_IB__PORT=${APP_IB__PORT:-4002}
       - APP_IB__CLIENT_IDS__contracts_backfill=${APP_IB__CLIENT_IDS__contracts_backfill:-101}

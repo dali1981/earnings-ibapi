@@ -18,16 +18,18 @@ class AppEnv(StrEnum):
 
 
 class PathsSettings(BaseModel):
-    project_root: Path = Path(__file__).resolve().parents[2]
-    data_root: Path = Field(default_factory=lambda: Path("./data"))
-    equity_bars: Path = Field(default_factory=lambda: Path("./data/equity_bars"))
-    option_bars: Path = Field(default_factory=lambda: Path("./data/option_bars"))
-    option_chains: Path = Field(default_factory=lambda: Path("./data/option_chains"))
-    contracts: Path = Field(default_factory=lambda: Path("./data/contracts"))
-    earnings: Path = Field(default_factory=lambda: Path("./data/earnings"))
-    exports: Path = Field(default_factory=lambda: Path("./data/exports"))
-    cache: Path = Field(default_factory=lambda: Path("./data/cache"))
-    logs: Path = Field(default_factory=lambda: Path("./data/logs"))
+    # Hardcoded absolute paths - environment-specific
+    # Override via environment variables APP_PATHS__DATA_ROOT etc.
+    project_root: Path = Path("/Users/mohamedali/trading_project/earnings_ibapi")
+    data_root: Path = Path("/Users/mohamedali/trading_project/earnings_ibapi/data")
+    equity_bars: Path = Path("/Users/mohamedali/trading_project/earnings_ibapi/data/equity_bars")
+    option_bars: Path = Path("/Users/mohamedali/trading_project/earnings_ibapi/data/option_bars")
+    option_chains: Path = Path("/Users/mohamedali/trading_project/earnings_ibapi/data/option_chains")
+    contracts: Path = Path("/Users/mohamedali/trading_project/earnings_ibapi/data/contracts")
+    earnings: Path = Path("/Users/mohamedali/trading_project/earnings_ibapi/data/earnings")
+    exports: Path = Path("/Users/mohamedali/trading_project/earnings_ibapi/data/exports")
+    cache: Path = Path("/Users/mohamedali/trading_project/earnings_ibapi/cache")
+    logs: Path = Path("/Users/mohamedali/trading_project/earnings_ibapi/logs")
 
 
 class IBSettings(BaseModel):
@@ -76,6 +78,7 @@ class ServicesConfig(BaseModel):
         default_factory=lambda: ServiceConfig(port=9005)
     )
     ib_api: ServiceConfig = Field(default_factory=lambda: ServiceConfig(port=9010))
+    trading: ServiceConfig = Field(default_factory=lambda: ServiceConfig(port=9011))
 
 
 class APISettings(BaseModel):
@@ -161,6 +164,37 @@ class DiscoverySettings(BaseModel):
     good_threshold: float = 75.0
 
 
+class ObservabilitySettings(BaseModel):
+    """Sentry and observability configuration"""
+    
+    # Sentry configuration
+    sentry_dsn: Optional[str] = None
+    sentry_environment: Optional[str] = None
+    sentry_release: Optional[str] = None
+    sentry_sample_rate: float = 1.0
+    sentry_traces_sample_rate: float = 0.1
+    sentry_profiles_sample_rate: float = 0.1
+    sentry_max_breadcrumbs: int = 50
+    sentry_attach_stacktrace: bool = True
+    sentry_send_default_pii: bool = False
+    sentry_debug: bool = False
+    
+    # Feature flags
+    enable_error_tracking: bool = True
+    enable_performance_monitoring: bool = True
+    enable_profiling: bool = True
+    enable_distributed_tracing: bool = True
+    enable_celery_monitoring: bool = True
+    
+    # Custom metrics settings
+    enable_custom_metrics: bool = True
+    metrics_sample_rate: float = 1.0
+    
+    # Alert settings
+    enable_alerts: bool = True
+    alert_email_recipients: list[str] = []
+
+
 class LoggingSettings(BaseModel):
     def build_config(self, logs_path: Path) -> dict:
         # Bracketed, timestamped format; colored for console, plain for file
@@ -212,6 +246,7 @@ class Settings(BaseSettings):
     celery: CelerySettings = CelerySettings()
     earnings: EarningsSettings = EarningsSettings()
     discovery: DiscoverySettings = DiscoverySettings()
+    observability: ObservabilitySettings = ObservabilitySettings()
     logging: LoggingSettings = LoggingSettings()
 
 

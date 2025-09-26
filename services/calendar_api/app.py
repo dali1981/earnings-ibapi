@@ -1,4 +1,5 @@
 from .routers.calendar import router as calendar_router
+from common.observability import init_observability
 from common.utils.logging_setup import disable_noisy_loggers, setup_logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -21,6 +22,10 @@ app.add_middleware(
 
 @app.on_event("startup")
 async def _configure_logging():
+    # Initialize observability first
+    init_observability(service_name="calendar-api", service_version="0.2.0")
+    
+    # Then configure logging
     setup_logging(level=os.environ.get("APP_LOG_LEVEL", "INFO"))
     disable_noisy_loggers()
     for name in ("uvicorn", "uvicorn.error", "uvicorn.access"):

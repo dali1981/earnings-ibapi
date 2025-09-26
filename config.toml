@@ -70,17 +70,21 @@ queue = "symbol-search"
 fetch_rate = "2/s"  # IB API rate limit for historical data
 queue = "historical"
 
-# Data Paths
+# Data Paths - Environment Specific Hardcoded Paths
+# DEV: Uses hardcoded paths in PathsSettings
+# DOCKER: Override with APP_PATHS__DATA_ROOT=/app/data etc.
+# PROD: Override with APP_PATHS__DATA_ROOT=/opt/trading/data etc.
 [paths]
-data_root = "./data"
-equity_bars = "./data/equity_bars"
-option_bars = "./data/option_bars"
-option_chains = "./data/option_chains"
-contracts = "./data/contracts"
-earnings = "./data/earnings"
-exports = "./data/exports"
-cache = "./data/cache"
-logs = "./data/logs"
+# These values are ignored - paths are hardcoded per environment in PathsSettings
+data_root = "/Users/mohamedali/trading_project/earnings_ibapi/data"
+equity_bars = "/Users/mohamedali/trading_project/earnings_ibapi/data/equity_bars"
+option_bars = "/Users/mohamedali/trading_project/earnings_ibapi/data/option_bars"
+option_chains = "/Users/mohamedali/trading_project/earnings_ibapi/data/option_chains"
+contracts = "/Users/mohamedali/trading_project/earnings_ibapi/data/contracts"
+earnings = "/Users/mohamedali/trading_project/earnings_ibapi/data/earnings"
+exports = "/Users/mohamedali/trading_project/earnings_ibapi/data/exports"
+cache = "/Users/mohamedali/trading_project/earnings_ibapi/cache"
+logs = "/Users/mohamedali/trading_project/earnings_ibapi/logs"
 
 # Earnings Configuration
 [earnings]

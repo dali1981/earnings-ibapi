@@ -21,15 +21,15 @@ def _mk_event(symbol: str = "AAPL"):
     )
 
 
-def test_earnings_service_calls_fetcher(monkeypatch):
-    from services.calendar_api.service.earnings_service import EarningsService
+def test_earnings_fetcher_service_calls_fetcher(monkeypatch):
+    from services.calendar_api.service.earnings_fetcher_service import EarningsFetcherService
 
-    import earnings.fetcher as fetch_mod
+    import earnings.async_fetcher as fetch_mod
 
     calls = {}
 
-    async def fake_async_get_upcoming_earnings(
-        self, *, symbols=None, days_ahead=14, sources=None
+    async def fake_a_get_upcoming_earnings(
+        self, *, symbols=None, days_ahead=7, sources=None
     ):
         calls["args"] = {
             "symbols": symbols,
@@ -39,13 +39,13 @@ def test_earnings_service_calls_fetcher(monkeypatch):
         return [_mk_event("AAPL"), _mk_event("MSFT")]
 
     monkeypatch.setattr(
-        fetch_mod.EarningsCalendarFetcher,
-        "async_get_upcoming_earnings",
-        fake_async_get_upcoming_earnings,
+        fetch_mod.AsyncEarningsCalendarFetcher,
+        "a_get_upcoming_earnings",
+        fake_a_get_upcoming_earnings,
         raising=True,
     )
 
-    svc = EarningsService()
+    svc = EarningsFetcherService()
     events = asyncio.run(svc.get_upcoming(days_ahead=7, symbols=["AAPL", "MSFT"]))
     assert len(events) == 2
     assert calls["args"]["symbols"] == ["AAPL", "MSFT"]

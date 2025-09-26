@@ -32,6 +32,14 @@ make test-events      # Event bus tests
 make test-frontend    # Frontend tests
 make test-calendar    # Calendar service tests
 
+# Run trading engine tests
+pytest tests/unit/trading/ -v                           # All trading tests
+pytest tests/unit/trading/test_trading_api.py -v       # Trading API tests
+pytest tests/unit/trading/test_strategy_engine.py -v   # Strategy engine tests
+pytest tests/unit/trading/test_order_manager.py -v     # Order management tests
+pytest tests/unit/trading/test_position_manager.py -v  # Position management tests
+pytest tests/unit/trading/test_risk_manager.py -v      # Risk management tests
+
 # Run all tests with coverage
 make coverage
 ```
@@ -52,9 +60,10 @@ make run-calendar   # Calendar API on :9001
 make run-equity     # Equity API on :9002
 make run-options    # Option history API on :9003
 make run-chains     # Option chain API on :9004
-make run-frontend   # Frontend on :9000
+make run-frontend   # Next.js Frontend (port from APP_API__SERVICES__FRONTEND__PORT or 9000)
 make run-orchestrator # Orchestrator API on :9005
 make run-ib         # IB API on :9010
+make run-trading    # Trading API on :9011
 make run-flower     # Flower monitoring on :5555
 
 # Run all backend APIs in parallel
@@ -123,6 +132,7 @@ services/             # FastAPI microservices
 ├── option_history_api/ # Option historical data
 ├── option_chain_api/ # Option chain snapshots
 ├── orchestrator_api/ # High-level async workflows
+├── trading_api/      # Live trading operations
 └── frontend/         # Web UI
 
 ops/
@@ -136,6 +146,7 @@ data/                # All persisted data (Parquet)
 ├── option_bars/     # Option price history
 ├── option_chains/   # Option chain snapshots
 ├── contracts/       # Contract descriptions
+├── trading/         # Trading data (orders, positions, executions)
 └── cache/          
     ├── events/      # JSONL event log
     └── state/       # Consumer checkpoints
@@ -146,6 +157,9 @@ data/                # All persisted data (Parquet)
 - `equity_bars` - Equity bar data written
 - `option_chains` - Option chain snapshots saved
 - `option_bars` - Option bar history stored
+- `trading_orders` - Order events (submitted, filled, cancelled)
+- `trading_positions` - Position events (opened, updated, closed)
+- `trading_strategies` - Strategy events (signals generated, executed)
 - Add `.demo` suffix for demo/test data (e.g., `option_chains.demo`)
 
 ### Key Python Patterns
@@ -188,6 +202,34 @@ for event in consumer.read(service="my-service", limit=100):
     if not index.is_processed(key):
         # Process event
         index.mark_processed(key)
+```
+
+#### Trading Operations
+```python
+from common.trading import OrderManagerFactory, PositionManagerFactory, StrategyFactory
+
+# Create order
+order_manager = OrderManagerFactory.create_order_manager()
+order = await order_manager.create_order(
+    contract=EquityContract(symbol="AAPL", sec_type=SecType.STOCK),
+    action=OrderAction.BUY,
+    quantity=100,
+    order_type=OrderType.MARKET
+)
+
+# Track positions
+position_manager = PositionManagerFactory.create_position_manager()
+positions = position_manager.get_all_positions()
+portfolio_summary = position_manager.get_portfolio_summary()
+
+# Strategy execution
+strategy_manager = StrategyFactory.create_strategy_manager(
+    strategy_engine=strategy_engine,
+    market_data_manager=market_data_manager,
+    order_manager=order_manager,
+    risk_manager=risk_manager
+)
+results = await strategy_manager.run_strategies()
 ```
 
 ### Environment Variables
@@ -323,7 +365,7 @@ npm run build        # Build for production
 npm run start        # Start production server
 
 # Commands from root
-make run-frontend    # Legacy frontend on :9000
+make run-frontend    # Next.js frontend (port from APP_API__SERVICES__FRONTEND__PORT or 9000)
 ```
 
 #### **Features:**
@@ -404,6 +446,7 @@ const services = [
   { title: 'Option Chains', href: '/chains', icon: Database },
   { title: 'Option Workflow', href: '/options', icon: Building2 },
   { title: 'Option History', href: '/history', icon: History },
+  { title: 'Trading Engine', href: '/trading', icon: ShoppingCart },
 ];
 ```
 
@@ -469,7 +512,7 @@ make run-backend     # All APIs on respective ports
 # Frontend (choose one)
 cd frontend-nextjs && npm run dev    # Modern Next.js (recommended)
 # OR
-make run-frontend    # Legacy React frontend
+make run-frontend    # Next.js frontend (uses APP_API__SERVICES__FRONTEND__PORT or 9000)
 ```
 
 #### **Frontend Development Commands:**
@@ -669,6 +712,86 @@ curl -X POST http://localhost:9005/orchestrator/historical/bars \
   }'
 ```
 
+### **Trading API** (Port 9011) - Live Trading Service
+**Purpose**: Real-time trading operations with comprehensive order, position, and risk management
+
+#### Trading Endpoints:
+- **POST** `/orders` - Create new trading orders with validation
+- **GET** `/orders/{order_id}/status` - Get order status and fill information
+- **DELETE** `/orders/{order_id}` - Cancel existing orders
+- **GET** `/positions` - Get all current positions
+- **GET** `/positions/{symbol}` - Get position for specific symbol
+- **GET** `/portfolio/summary` - Get portfolio summary with P&L metrics
+
+#### Strategy Management:
+- **GET** `/strategies/status` - Get all strategy status and metrics
+- **POST** `/strategies/signals/generate` - Manual signal generation
+- **POST** `/strategies/{name}/enable` - Enable specific strategies
+- **POST** `/strategies/{name}/disable` - Disable specific strategies
+- **PUT** `/strategies/{name}/parameters` - Update strategy parameters
+
+#### Risk Management:
+- **POST** `/risk/assess` - Assess trade risk before execution
+- **GET** `/risk/limits` - Get current risk limits and usage
+- **PUT** `/risk/limits` - Update risk limits (admin operation)
+
+#### Health & Status:
+- **GET** `/health` - Service health check with dependency status
+- **GET** `/status` - Detailed service status with metrics
+
+#### Key Schemas:
+```python
+class CreateOrderRequest(BaseModel):
+    contract: Union[EquityContract, OptionContract]
+    action: OrderAction  # BUY, SELL
+    quantity: int
+    order_type: OrderType  # MKT, LMT, STP, STP LMT
+    limit_price: Optional[Decimal] = None
+    stop_price: Optional[Decimal] = None
+    time_in_force: TimeInForce = TimeInForce.DAY
+
+class PositionResponse(BaseModel):
+    contract: Union[EquityContract, OptionContract]
+    position_size: int
+    avg_cost: Decimal
+    market_price: Decimal
+    unrealized_pnl: Decimal
+    realized_pnl: Decimal
+
+class RiskAssessmentResponse(BaseModel):
+    approved: bool
+    max_loss: Decimal
+    portfolio_heat: Optional[float]
+    risk_message: Optional[str]
+```
+
+#### Usage Examples:
+```bash
+# Create a market order
+curl -X POST http://localhost:9011/orders \
+  -H "Content-Type: application/json" \
+  -d '{
+    "contract": {"symbol": "AAPL", "sec_type": "STK", "exchange": "SMART"},
+    "action": "BUY",
+    "quantity": 100,
+    "order_type": "MKT"
+  }'
+
+# Get portfolio summary
+curl http://localhost:9011/portfolio/summary
+
+# Check strategy status
+curl http://localhost:9011/strategies/status
+
+# Assess trade risk
+curl -X POST http://localhost:9011/risk/assess \
+  -H "Content-Type: application/json" \
+  -d '{
+    "positions": [{"contract": {"symbol": "AAPL", "sec_type": "STK"}, "target_quantity": 100}],
+    "portfolio_value": 100000.0
+  }'
+```
+
 ### **Recommended Workflow**:
 
 1. **Data Collection**: Use `Orchestrator` to fetch new data from IB API
@@ -683,6 +806,7 @@ curl -X POST http://localhost:9005/orchestrator/historical/bars \
 ### **No Functional Overlap**: 
 - **Orchestrator**: Write-heavy async operations (data ingestion)
 - **Equity API**: Read-heavy sync operations (data retrieval)
+- **Trading API**: Live trading operations (orders, positions, risk, strategies)
 
 ### Important Configuration Files
 - `app_settings/settings.py` - Central configuration using Pydantic

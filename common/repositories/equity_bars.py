@@ -14,8 +14,8 @@ import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-
 from common.exceptions import DataValidationException
+from common.observability import monitor_repository_operation
 
 
 class EquityBarRepository(BaseRepository):
@@ -241,6 +241,15 @@ class EquityBarRepository(BaseRepository):
         self.save(df, symbol=symbol, bar_size=bar_size, data_type=data_type)
 
     # Override save to route to the correct sub-dataset with new partitions
+    @monitor_repository_operation(
+        "equity_bars_save",
+        extract_symbol=lambda args, kwargs: kwargs.get('symbol'),
+        extract_metadata=lambda args, kwargs: {
+            'bar_size': kwargs.get('bar_size'),
+            'data_type': kwargs.get('data_type', 'TRADES'),
+            'records_count': len(args[1]) if len(args) > 1 and hasattr(args[1], '__len__') else 0
+        }
+    )
     def save(self, df: pd.DataFrame, **kwargs) -> None:  # type: ignore[override]
         if df is None or df.empty:
             self.logger.warning("Attempting to save empty DataFrame")

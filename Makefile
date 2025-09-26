@@ -47,7 +47,8 @@ help:
 	@echo "  run-frontend-next   Run Next.js frontend locally (next dev)"
 	@echo "  run-orchestrator Run orchestrator API locally (uvicorn)"
 	@echo "  run-ib         Run IBX service API locally (uvicorn)"
-	@echo "  run-backend    Run all backend APIs (calendar, equity, options, chains, orchestrator, ib)"
+	@echo "  run-trading    Run trading API locally (uvicorn)"
+	@echo "  run-backend    Run all backend APIs (calendar, equity, options, chains, orchestrator, ib, trading)"
 	@echo "  run-flower     Run Flower monitoring for Celery (flower)"
 	@echo "  test-frontend  Run frontend unit/integration tests (pytest)"
 	@echo "  test-frontend-e2e  Run browser E2E tests (Playwright)"
@@ -200,7 +201,7 @@ run-chains:
 	uvicorn api.option_chain_api.app:app --host 0.0.0.0 --port 9004 --reload
 
 run-frontend:
-	uvicorn frontend.main:app --host 0.0.0.0 --port 9000 --reload
+	./scripts/launch-frontend.sh
 
 run-frontend-react:
 	cd frontend-react && npm run dev
@@ -217,6 +218,9 @@ run-orchestrator:
 run-ib:
 	uvicorn api.ib_api.app:app --host 0.0.0.0 --port 9010 --reload
 
+run-trading:
+	uvicorn services.trading_api.app:app --host 0.0.0.0 --port 9011 --reload
+
 run-backend:
 	@echo "Starting all backend APIs..."
 	@echo "Calendar API: http://localhost:9001"
@@ -225,6 +229,7 @@ run-backend:
 	@echo "Chains API: http://localhost:9004"
 	@echo "Orchestrator API: http://localhost:9005"
 	@echo "IB API: http://localhost:9010"
+	@echo "Trading API: http://localhost:9011"
 	@echo ""
 	uvicorn services.calendar_api.app:app --host 0.0.0.0 --port 9001 --reload & \
 	uvicorn services.equity_api.app:app --host 0.0.0.0 --port 9002 --reload & \
@@ -232,6 +237,7 @@ run-backend:
 	uvicorn api.option_chain_api.app:app --host 0.0.0.0 --port 9004 --reload & \
 	uvicorn api.orchestrator_api.app:app --host 0.0.0.0 --port 9005 --reload & \
 	uvicorn api.ib_api.app:app --host 0.0.0.0 --port 9010 --reload & \
+	uvicorn services.trading_api.app:app --host 0.0.0.0 --port 9011 --reload & \
 	wait
 
 run-flower:

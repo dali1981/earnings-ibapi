@@ -1,573 +1,400 @@
-"""Tests for trading domain schemas."""
+"""
+Unit tests for trading domain schemas and validation.
+Following TDD approach - these tests will drive the implementation.
+"""
 
 import pytest
-from datetime import date, datetime
 from decimal import Decimal
-import pandas as pd
+from datetime import datetime, date
+from typing import Optional
+from pydantic import ValidationError
 
+# These imports will fail initially (Red phase)
 from common.schemas.trading import (
-    ContractBase,
-    EquityContract,
-    OptionContract,
-    EquityBar,
-    OptionBar,
-    OptionChain,
-    OptionQuote
+    Order, OrderAction, OrderType, TimeInForce, OrderStatus,
+    ExecutionReport, Position, PortfolioSummary,
+    EquityContract, OptionContract, OptionRight,
+    TradeSignal, SignalType, PositionTarget, RiskAssessment
 )
-from common.constants import SecType, OptionRight, Exchange
 
 
-class TestContractBase:
-    """Test base contract schema."""
+@pytest.mark.unit
+@pytest.mark.trading
+class TestOrderAction:
+    """Test OrderAction enum."""
     
-    def test_contract_base_creation(self):
-        """Test ContractBase creation with valid data."""
-        contract = ContractBase(
-            symbol="AAPL",
-            sec_type=SecType.STOCK,
-            exchange=Exchange.SMART,
-            currency="USD"
+    def test_order_action_values(self):
+        """Test OrderAction enum has correct values."""
+        assert OrderAction.BUY == "BUY"
+        assert OrderAction.SELL == "SELL"
+
+
+@pytest.mark.unit
+@pytest.mark.trading
+class TestOrderType:
+    """Test OrderType enum."""
+    
+    def test_order_type_values(self):
+        """Test OrderType enum has correct values."""
+        assert OrderType.MARKET == "MKT"
+        assert OrderType.LIMIT == "LMT" 
+        assert OrderType.STOP == "STP"
+        assert OrderType.STOP_LIMIT == "STP LMT"
+        assert OrderType.BRACKET == "BRACKET"
+
+
+@pytest.mark.unit
+@pytest.mark.trading
+class TestOrder:
+    """Test Order schema validation and behavior."""
+    
+    def test_order_creation_with_valid_data(self):
+        """Test creating order with all required fields."""
+        contract = EquityContract(symbol="AAPL")
+        order = Order(
+            client_order_id="test-123",
+            contract=contract,
+            action=OrderAction.BUY,
+            quantity=100,
+            order_type=OrderType.MARKET
         )
         
-        assert contract.symbol == "AAPL"
-        assert contract.sec_type == SecType.STOCK
-        assert contract.exchange == Exchange.SMART
-        assert contract.currency == "USD"
+        assert order.client_order_id == "test-123"
+        assert order.contract.symbol == "AAPL"
+        assert order.action == OrderAction.BUY
+        assert order.quantity == 100
+        assert order.order_type == OrderType.MARKET
+        assert order.time_in_force == TimeInForce.DAY  # Default
+        assert order.order_id is None  # Not set initially
+        assert isinstance(order.created_at, datetime)
     
-    def test_contract_validation(self):
-        """Test contract validation."""
-        # Test invalid currency
-        with pytest.raises(ValueError):
-            ContractBase(
-                symbol="AAPL",
-                sec_type=SecType.STOCK,
-                exchange=Exchange.SMART,
-                currency="INVALID"
-            )
-        
-        # Test invalid symbol (too short)
-        with pytest.raises(ValueError):
-            ContractBase(
-                symbol="A",
-                sec_type=SecType.STOCK,
-                exchange=Exchange.SMART,
-                currency="USD"
-            )
-
-
-class TestEquityContract:
-    """Test equity contract schema."""
-    
-    def test_equity_contract_creation(self):
-        """Test EquityContract creation."""
-        contract = EquityContract(
-            symbol="GOOGL",
-            exchange=Exchange.NASDAQ,
-            currency="USD"
-        )
-        
-        assert contract.symbol == "GOOGL"
-        assert contract.sec_type == SecType.STOCK  # Should default to STOCK
-        assert contract.exchange == Exchange.NASDAQ
-    
-    def test_to_ib_contract_dict(self):
-        """Test conversion to IB contract dictionary."""
-        contract = EquityContract(
-            symbol="MSFT",
-            exchange=Exchange.SMART,
-            currency="USD"
-        )
-        
-        ib_dict = contract.to_ib_contract_dict()
-        
-        assert ib_dict["symbol"] == "MSFT"
-        assert ib_dict["secType"] == "STK"
-        assert ib_dict["exchange"] == "SMART"
-        assert ib_dict["currency"] == "USD"
-    
-    def test_equity_contract_immutable_sec_type(self):
-        """Test that sec_type is immutable for equity contracts."""
+    def test_order_validation_fails_with_zero_quantity(self):
+        """Test order validation fails with zero quantity."""
         contract = EquityContract(symbol="AAPL")
         
-        # sec_type should be frozen
-        with pytest.raises(ValueError):
-            contract.sec_type = SecType.OPTION
+        with pytest.raises(ValidationError) as exc_info:
+            Order(
+                client_order_id="test-123",
+                contract=contract,
+                action=OrderAction.BUY,
+                quantity=0,  # Invalid
+                order_type=OrderType.MARKET
+            )
+        
+        assert "quantity" in str(exc_info.value)
+    
+    def test_order_validation_fails_with_negative_quantity(self):
+        """Test order validation fails with negative quantity."""
+        contract = EquityContract(symbol="AAPL")
+        
+        with pytest.raises(ValidationError) as exc_info:
+            Order(
+                client_order_id="test-123",
+                contract=contract,
+                action=OrderAction.BUY,
+                quantity=-10,  # Invalid
+                order_type=OrderType.MARKET
+            )
+        
+        assert "quantity" in str(exc_info.value)
+    
+    def test_limit_order_requires_limit_price(self):
+        """Test limit order validation requires limit price."""
+        contract = EquityContract(symbol="AAPL")
+        
+        with pytest.raises(ValidationError) as exc_info:
+            Order(
+                client_order_id="test-123",
+                contract=contract,
+                action=OrderAction.BUY,
+                quantity=100,
+                order_type=OrderType.LIMIT,
+                # limit_price missing
+            )
+        
+        assert "Limit price required" in str(exc_info.value)
+    
+    def test_stop_order_requires_stop_price(self):
+        """Test stop order validation requires stop price."""
+        contract = EquityContract(symbol="AAPL")
+        
+        with pytest.raises(ValidationError) as exc_info:
+            Order(
+                client_order_id="test-123",
+                contract=contract,
+                action=OrderAction.BUY,
+                quantity=100,
+                order_type=OrderType.STOP,
+                # stop_price missing
+            )
+        
+        assert "Stop price required" in str(exc_info.value)
+    
+    def test_stop_limit_order_requires_both_prices(self):
+        """Test stop-limit order requires both stop and limit prices."""
+        contract = EquityContract(symbol="AAPL")
+        
+        with pytest.raises(ValidationError) as exc_info:
+            Order(
+                client_order_id="test-123",
+                contract=contract,
+                action=OrderAction.BUY,
+                quantity=100,
+                order_type=OrderType.STOP_LIMIT,
+                limit_price=Decimal("150.00"),
+                # stop_price missing
+            )
+        
+        assert "Stop price required" in str(exc_info.value)
+    
+    def test_market_order_accepts_no_prices(self):
+        """Test market order doesn't require limit or stop prices."""
+        contract = EquityContract(symbol="AAPL")
+        
+        order = Order(
+            client_order_id="test-123",
+            contract=contract,
+            action=OrderAction.BUY,
+            quantity=100,
+            order_type=OrderType.MARKET
+            # No prices required
+        )
+        
+        assert order.limit_price is None
+        assert order.stop_price is None
+    
+    def test_order_to_ib_order_dict_conversion(self):
+        """Test conversion to IB API order dictionary format."""
+        contract = EquityContract(symbol="AAPL")
+        order = Order(
+            client_order_id="test-123",
+            contract=contract,
+            action=OrderAction.BUY,
+            quantity=100,
+            order_type=OrderType.LIMIT,
+            limit_price=Decimal("150.00"),
+            time_in_force=TimeInForce.GTC
+        )
+        
+        ib_order_dict = order.to_ib_order_dict()
+        
+        assert ib_order_dict["action"] == "BUY"
+        assert ib_order_dict["totalQuantity"] == 100
+        assert ib_order_dict["orderType"] == "LMT"
+        assert ib_order_dict["lmtPrice"] == 150.00
+        assert ib_order_dict["tif"] == "GTC"
+        assert "auxPrice" not in ib_order_dict  # No stop price
 
 
+@pytest.mark.unit
+@pytest.mark.trading
+class TestExecutionReport:
+    """Test ExecutionReport schema."""
+    
+    def test_execution_report_creation(self):
+        """Test creating execution report with valid data."""
+        contract = EquityContract(symbol="AAPL")
+        execution = ExecutionReport(
+            execution_id="exec-123",
+            order_id=12345,
+            contract=contract,
+            action=OrderAction.BUY,
+            quantity=100,
+            price=Decimal("150.50"),
+            commission=Decimal("1.00")
+        )
+        
+        assert execution.execution_id == "exec-123"
+        assert execution.order_id == 12345
+        assert execution.quantity == 100
+        assert execution.price == Decimal("150.50")
+        assert execution.commission == Decimal("1.00")
+        assert isinstance(execution.timestamp, datetime)
+    
+    def test_execution_report_validation_positive_price(self):
+        """Test execution report requires positive price."""
+        contract = EquityContract(symbol="AAPL")
+        
+        with pytest.raises(ValidationError) as exc_info:
+            ExecutionReport(
+                execution_id="exec-123",
+                order_id=12345,
+                contract=contract,
+                action=OrderAction.BUY,
+                quantity=100,
+                price=Decimal("-10.00"),  # Invalid negative price
+                commission=Decimal("1.00")
+            )
+        
+        assert "price" in str(exc_info.value)
+
+
+@pytest.mark.unit
+@pytest.mark.trading  
+class TestPosition:
+    """Test Position schema."""
+    
+    def test_position_creation_long(self):
+        """Test creating long position."""
+        contract = EquityContract(symbol="AAPL")
+        position = Position(
+            contract=contract,
+            position_size=100,
+            avg_cost=Decimal("150.00"),
+            market_price=Decimal("155.00"),
+            market_value=Decimal("15500.00"),
+            unrealized_pnl=Decimal("500.00")
+        )
+        
+        assert position.position_size == 100
+        assert position.is_long is True
+        assert position.is_short is False
+        assert position.avg_cost == Decimal("150.00")
+        assert position.unrealized_pnl == Decimal("500.00")
+    
+    def test_position_creation_short(self):
+        """Test creating short position."""
+        contract = EquityContract(symbol="AAPL")
+        position = Position(
+            contract=contract,
+            position_size=-100,
+            avg_cost=Decimal("150.00"),
+            market_price=Decimal("145.00"),
+            market_value=Decimal("-14500.00"),
+            unrealized_pnl=Decimal("500.00")  # Profit from short
+        )
+        
+        assert position.position_size == -100
+        assert position.is_long is False
+        assert position.is_short is True
+        assert position.unrealized_pnl == Decimal("500.00")
+    
+    def test_position_update_market_price(self):
+        """Test updating position market price."""
+        contract = EquityContract(symbol="AAPL")
+        position = Position(
+            contract=contract,
+            position_size=100,
+            avg_cost=Decimal("150.00"),
+            market_price=Decimal("155.00"),
+            market_value=Decimal("15500.00"),
+            unrealized_pnl=Decimal("500.00")
+        )
+        
+        position.update_market_price(Decimal("160.00"))
+        
+        assert position.market_price == Decimal("160.00")
+        assert position.market_value == Decimal("16000.00")  # 100 * 160
+        assert position.unrealized_pnl == Decimal("1000.00")  # (160 - 150) * 100
+
+
+@pytest.mark.unit
+@pytest.mark.trading
 class TestOptionContract:
-    """Test option contract schema."""
+    """Test OptionContract schema."""
     
     def test_option_contract_creation(self):
-        """Test OptionContract creation."""
-        contract = OptionContract(
+        """Test creating option contract."""
+        option = OptionContract(
             symbol="AAPL",
-            expiry=date(2024, 3, 15),
-            strike=150.0,
+            expiry=date(2024, 1, 19),
+            strike=Decimal("150.00"),
             right=OptionRight.CALL,
-            exchange=Exchange.SMART,
-            currency="USD"
+            multiplier="100"
         )
         
-        assert contract.symbol == "AAPL"
-        assert contract.sec_type == SecType.OPTION
-        assert contract.expiry == date(2024, 3, 15)
-        assert contract.strike == 150.0
-        assert contract.right == OptionRight.CALL
+        assert option.symbol == "AAPL"
+        assert option.expiry == date(2024, 1, 19)
+        assert option.strike == Decimal("150.00")
+        assert option.right == OptionRight.CALL
+        assert option.multiplier == "100"
     
-    def test_option_contract_validation(self):
-        """Test option contract validation."""
-        # Test negative strike
-        with pytest.raises(ValueError):
-            OptionContract(
-                symbol="AAPL",
-                expiry=date(2024, 3, 15),
-                strike=-10.0,
-                right=OptionRight.CALL
-            )
-        
-        # Test past expiry date
-        with pytest.raises(ValueError):
-            OptionContract(
-                symbol="AAPL", 
-                expiry=date(2020, 1, 1),  # Past date
-                strike=150.0,
-                right=OptionRight.CALL
-            )
-    
-    def test_to_ib_contract_dict(self):
-        """Test option contract to IB dictionary conversion."""
-        contract = OptionContract(
+    def test_option_symbol_generation(self):
+        """Test standardized option symbol generation."""
+        option = OptionContract(
             symbol="AAPL",
-            expiry=date(2024, 3, 15),
-            strike=150.0,
-            right=OptionRight.PUT,
-            exchange=Exchange.SMART,
-            currency="USD"
-        )
-        
-        ib_dict = contract.to_ib_contract_dict()
-        
-        assert ib_dict["symbol"] == "AAPL"
-        assert ib_dict["secType"] == "OPT"
-        assert ib_dict["lastTradeDateOrContractMonth"] == "20240315"
-        assert ib_dict["strike"] == 150.0
-        assert ib_dict["right"] == "P"
-
-
-class TestEquityBar:
-    """Test equity bar schema."""
-    
-    def test_equity_bar_creation(self):
-        """Test EquityBar creation."""
-        bar = EquityBar(
-            symbol="AAPL",
-            date=date(2024, 1, 15),
-            open=150.0,
-            high=155.0,
-            low=149.0,
-            close=154.0,
-            volume=1000000,
-            bar_size="1 day"
-        )
-        
-        assert bar.symbol == "AAPL"
-        assert bar.date == date(2024, 1, 15)
-        assert bar.open == 150.0
-        assert bar.high == 155.0
-        assert bar.low == 149.0
-        assert bar.close == 154.0
-        assert bar.volume == 1000000
-    
-    def test_equity_bar_validation(self):
-        """Test equity bar validation."""
-        # Test invalid OHLC relationship (high < low)
-        with pytest.raises(ValueError):
-            EquityBar(
-                symbol="AAPL",
-                date=date(2024, 1, 15),
-                open=150.0,
-                high=148.0,  # High less than low
-                low=149.0,
-                close=150.0,
-                volume=1000000,
-                bar_size="1 day"
-            )
-        
-        # Test negative volume
-        with pytest.raises(ValueError):
-            EquityBar(
-                symbol="AAPL",
-                date=date(2024, 1, 15),
-                open=150.0,
-                high=155.0,
-                low=149.0,
-                close=154.0,
-                volume=-1000,  # Negative volume
-                bar_size="1 day"
-            )
-    
-    def test_to_dict(self):
-        """Test equity bar to dictionary conversion."""
-        bar = EquityBar(
-            symbol="AAPL",
-            date=date(2024, 1, 15),
-            open=150.0,
-            high=155.0,
-            low=149.0,
-            close=154.0,
-            volume=1000000,
-            bar_size="1 day"
-        )
-        
-        bar_dict = bar.to_dict()
-        
-        assert bar_dict["symbol"] == "AAPL"
-        assert bar_dict["date"] == date(2024, 1, 15)
-        assert bar_dict["open"] == 150.0
-        assert bar_dict["volume"] == 1000000
-
-
-class TestOptionBar:
-    """Test option bar schema."""
-    
-    def test_option_bar_creation(self):
-        """Test OptionBar creation."""
-        bar = OptionBar(
-            symbol="AAPL",
-            expiry=date(2024, 3, 15),
-            strike=150.0,
-            right=OptionRight.CALL,
-            date=date(2024, 1, 15),
-            open=5.0,
-            high=5.5,
-            low=4.8,
-            close=5.2,
-            volume=500,
-            bar_size="1 day"
-        )
-        
-        assert bar.symbol == "AAPL"
-        assert bar.expiry == date(2024, 3, 15)
-        assert bar.strike == 150.0
-        assert bar.right == OptionRight.CALL
-        assert bar.open == 5.0
-        assert bar.volume == 500
-    
-    def test_option_key_property(self):
-        """Test option key property."""
-        bar = OptionBar(
-            symbol="AAPL",
-            expiry=date(2024, 3, 15),
-            strike=150.0,
-            right=OptionRight.CALL,
-            date=date(2024, 1, 15),
-            open=5.0,
-            high=5.5,
-            low=4.8,
-            close=5.2,
-            volume=500,
-            bar_size="1 day"
-        )
-        
-        expected_key = "AAPL_20240315_150.0_CALL"
-        assert bar.option_key == expected_key
-
-
-class TestOptionChain:
-    """Test option chain schema."""
-    
-    def test_option_chain_creation(self):
-        """Test OptionChain creation."""
-        quotes = [
-            OptionQuote(
-                strike=150.0,
-                right=OptionRight.CALL,
-                bid=5.0,
-                ask=5.2,
-                last=5.1,
-                volume=100,
-                open_interest=1000,
-                implied_volatility=0.25
-            ),
-            OptionQuote(
-                strike=150.0,
-                right=OptionRight.PUT,
-                bid=3.0,
-                ask=3.2,
-                last=3.1,
-                volume=50,
-                open_interest=800,
-                implied_volatility=0.28
-            )
-        ]
-        
-        chain = OptionChain(
-            symbol="AAPL",
-            expiry=date(2024, 3, 15),
-            underlying_price=151.0,
-            quotes=quotes,
-            timestamp=datetime.now()
-        )
-        
-        assert chain.symbol == "AAPL"
-        assert chain.expiry == date(2024, 3, 15)
-        assert chain.underlying_price == 151.0
-        assert len(chain.quotes) == 2
-    
-    def test_get_calls_and_puts(self):
-        """Test filtering calls and puts from chain."""
-        quotes = [
-            OptionQuote(
-                strike=150.0,
-                right=OptionRight.CALL,
-                bid=5.0,
-                ask=5.2,
-                last=5.1
-            ),
-            OptionQuote(
-                strike=155.0,
-                right=OptionRight.CALL,
-                bid=3.0,
-                ask=3.2,
-                last=3.1
-            ),
-            OptionQuote(
-                strike=150.0,
-                right=OptionRight.PUT,
-                bid=2.0,
-                ask=2.2,
-                last=2.1
-            )
-        ]
-        
-        chain = OptionChain(
-            symbol="AAPL",
-            expiry=date(2024, 3, 15),
-            underlying_price=152.0,
-            quotes=quotes
-        )
-        
-        calls = chain.get_calls()
-        puts = chain.get_puts()
-        
-        assert len(calls) == 2
-        assert len(puts) == 1
-        assert all(quote.right == OptionRight.CALL for quote in calls)
-        assert all(quote.right == OptionRight.PUT for quote in puts)
-    
-    def test_get_strike_range(self):
-        """Test getting strike range from chain."""
-        quotes = [
-            OptionQuote(strike=140.0, right=OptionRight.CALL, bid=8.0, ask=8.2),
-            OptionQuote(strike=150.0, right=OptionRight.CALL, bid=5.0, ask=5.2),
-            OptionQuote(strike=160.0, right=OptionRight.CALL, bid=2.0, ask=2.2)
-        ]
-        
-        chain = OptionChain(
-            symbol="AAPL",
-            expiry=date(2024, 3, 15),
-            underlying_price=150.0,
-            quotes=quotes
-        )
-        
-        min_strike, max_strike = chain.get_strike_range()
-        
-        assert min_strike == 140.0
-        assert max_strike == 160.0
-
-
-class TestOptionQuote:
-    """Test option quote schema."""
-    
-    def test_option_quote_creation(self):
-        """Test OptionQuote creation."""
-        quote = OptionQuote(
-            strike=150.0,
-            right=OptionRight.CALL,
-            bid=5.0,
-            ask=5.2,
-            last=5.1,
-            volume=100,
-            open_interest=1000,
-            implied_volatility=0.25,
-            delta=0.6,
-            gamma=0.05,
-            theta=-0.02,
-            vega=0.15
-        )
-        
-        assert quote.strike == 150.0
-        assert quote.right == OptionRight.CALL
-        assert quote.bid == 5.0
-        assert quote.ask == 5.2
-        assert quote.last == 5.1
-        assert quote.volume == 100
-        assert quote.delta == 0.6
-    
-    def test_option_quote_validation(self):
-        """Test option quote validation."""
-        # Test bid > ask
-        with pytest.raises(ValueError):
-            OptionQuote(
-                strike=150.0,
-                right=OptionRight.CALL,
-                bid=5.2,  # Bid higher than ask
-                ask=5.0,
-                last=5.1
-            )
-        
-        # Test negative implied volatility
-        with pytest.raises(ValueError):
-            OptionQuote(
-                strike=150.0,
-                right=OptionRight.CALL,
-                bid=5.0,
-                ask=5.2,
-                implied_volatility=-0.1  # Negative IV
-            )
-    
-    def test_spread_calculation(self):
-        """Test bid-ask spread calculation."""
-        quote = OptionQuote(
-            strike=150.0,
-            right=OptionRight.CALL,
-            bid=5.0,
-            ask=5.4,
-            last=5.2
-        )
-        
-        assert quote.spread == 0.4  # 5.4 - 5.0
-    
-    def test_mid_price_calculation(self):
-        """Test mid price calculation."""
-        quote = OptionQuote(
-            strike=150.0,
-            right=OptionRight.CALL,
-            bid=5.0,
-            ask=5.4,
-            last=5.2
-        )
-        
-        assert quote.mid_price == 5.2  # (5.0 + 5.4) / 2
-    
-    def test_moneyness_calculation(self):
-        """Test moneyness calculation."""
-        quote = OptionQuote(
-            strike=150.0,
-            right=OptionRight.CALL,
-            bid=5.0,
-            ask=5.2
-        )
-        
-        # ITM call
-        assert quote.moneyness(160.0) == "ITM"
-        
-        # ATM call
-        assert quote.moneyness(150.0) == "ATM" 
-        
-        # OTM call
-        assert quote.moneyness(140.0) == "OTM"
-        
-        # Test put moneyness
-        put_quote = OptionQuote(
-            strike=150.0,
-            right=OptionRight.PUT,
-            bid=3.0,
-            ask=3.2
-        )
-        
-        # ITM put
-        assert put_quote.moneyness(140.0) == "ITM"
-        
-        # OTM put  
-        assert put_quote.moneyness(160.0) == "OTM"
-
-
-class TestSchemaIntegration:
-    """Test integration between different schemas."""
-    
-    def test_contract_to_bar_consistency(self):
-        """Test consistency between contracts and bars."""
-        # Create equity contract
-        contract = EquityContract(symbol="AAPL", exchange=Exchange.SMART)
-        
-        # Create corresponding bar
-        bar = EquityBar(
-            symbol=contract.symbol,
-            date=date(2024, 1, 15),
-            open=150.0,
-            high=155.0,
-            low=149.0,
-            close=154.0,
-            volume=1000000,
-            bar_size="1 day"
-        )
-        
-        # Symbols should match
-        assert contract.symbol == bar.symbol
-    
-    def test_option_contract_to_chain_consistency(self):
-        """Test consistency between option contracts and chains."""
-        # Create option contract
-        contract = OptionContract(
-            symbol="AAPL",
-            expiry=date(2024, 3, 15),
-            strike=150.0,
+            expiry=date(2024, 1, 19),
+            strike=Decimal("150.00"),
             right=OptionRight.CALL
         )
         
-        # Create quote for same option
-        quote = OptionQuote(
-            strike=contract.strike,
-            right=contract.right,
-            bid=5.0,
-            ask=5.2,
-            last=5.1
-        )
+        option_symbol = option.option_symbol
         
-        # Create chain
-        chain = OptionChain(
-            symbol=contract.symbol,
-            expiry=contract.expiry,
-            underlying_price=151.0,
-            quotes=[quote]
-        )
-        
-        # Verify consistency
-        assert contract.symbol == chain.symbol
-        assert contract.expiry == chain.expiry
-        assert contract.strike == quote.strike
-        assert contract.right == quote.right
+        # Format: AAPL240119C00150000
+        assert option_symbol.startswith("AAPL")
+        assert "240119" in option_symbol  # Date format
+        assert "C" in option_symbol  # Call
+        assert "150000" in option_symbol  # Strike format
     
-    def test_dataframe_conversion(self):
-        """Test conversion of schemas to DataFrame format."""
-        bars = [
-            EquityBar(
+    def test_option_to_ib_contract_dict(self):
+        """Test conversion to IB API contract dictionary."""
+        option = OptionContract(
+            symbol="AAPL",
+            expiry=date(2024, 1, 19),
+            strike=Decimal("150.00"),
+            right=OptionRight.PUT,
+            multiplier="100"
+        )
+        
+        ib_dict = option.to_ib_contract_dict()
+        
+        assert ib_dict["symbol"] == "AAPL"
+        assert ib_dict["secType"] == "OPT"
+        assert ib_dict["lastTradeDateOrContractMonth"] == "20240119"
+        assert ib_dict["strike"] == 150.0
+        assert ib_dict["right"] == "P"
+        assert ib_dict["multiplier"] == "100"
+
+
+@pytest.mark.unit
+@pytest.mark.trading
+class TestTradeSignal:
+    """Test TradeSignal schema."""
+    
+    def test_trade_signal_creation(self):
+        """Test creating trade signal."""
+        target_position = PositionTarget(
+            contract=EquityContract(symbol="AAPL"),
+            target_quantity=100,
+            entry_price_range=(Decimal("149.00"), Decimal("151.00")),
+            stop_loss=Decimal("140.00"),
+            profit_target=Decimal("160.00")
+        )
+        
+        risk_assessment = RiskAssessment(
+            max_loss=Decimal("1000.00"),
+            win_probability=0.65,
+            risk_reward_ratio=2.5
+        )
+        
+        signal = TradeSignal(
+            signal_id="signal-123",
+            strategy_name="earnings_straddle",
+            symbol="AAPL",
+            signal_type=SignalType.ENTRY,
+            confidence=0.8,
+            target_positions=[target_position],
+            risk_metrics=risk_assessment
+        )
+        
+        assert signal.signal_id == "signal-123"
+        assert signal.strategy_name == "earnings_straddle"
+        assert signal.symbol == "AAPL"
+        assert signal.confidence == 0.8
+        assert len(signal.target_positions) == 1
+        assert isinstance(signal.generated_at, datetime)
+    
+    def test_signal_validation_confidence_range(self):
+        """Test signal confidence must be between 0 and 1."""
+        with pytest.raises(ValidationError) as exc_info:
+            TradeSignal(
+                signal_id="signal-123",
+                strategy_name="test",
                 symbol="AAPL",
-                date=date(2024, 1, 15),
-                open=150.0,
-                high=155.0,
-                low=149.0,
-                close=154.0,
-                volume=1000000,
-                bar_size="1 day"
-            ),
-            EquityBar(
-                symbol="AAPL", 
-                date=date(2024, 1, 16),
-                open=154.0,
-                high=157.0,
-                low=153.0,
-                close=156.0,
-                volume=1200000,
-                bar_size="1 day"
+                signal_type=SignalType.ENTRY,
+                confidence=1.5,  # Invalid > 1.0
+                target_positions=[],
+                risk_metrics=RiskAssessment(max_loss=Decimal("100"))
             )
-        ]
         
-        # Convert to DataFrame
-        df_data = [bar.to_dict() for bar in bars]
-        df = pd.DataFrame(df_data)
-        
-        assert len(df) == 2
-        assert list(df['symbol'].unique()) == ["AAPL"]
-        assert df['close'].tolist() == [154.0, 156.0]
+        assert "confidence" in str(exc_info.value)

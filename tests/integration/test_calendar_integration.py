@@ -24,26 +24,41 @@ def _mk_event(symbol: str = "AAPL"):
     )
 
 
-def test_calendar_integration_monkeypatch_fetcher(monkeypatch):
-    # Patch the underlying fetcher coroutine used by EarningsService
-    import earnings.fetcher as fetch_mod
+def test_calendar_integration_fetch_upcoming(monkeypatch):
+    # Patch the underlying async fetcher used by EarningsFetcherService
+    import earnings.async_fetcher as fetch_mod
+    import pandas as pd
 
-    async def fake_async_get_upcoming_earnings(
-        self, *, symbols=None, days_ahead=14, sources=None
+    async def fake_a_get_upcoming_earnings(
+        self, *, symbols=None, days_ahead=7, sources=None
     ):
         return [_mk_event("AAPL"), _mk_event("MSFT")]
 
     monkeypatch.setattr(
-        fetch_mod.EarningsCalendarFetcher,
-        "async_get_upcoming_earnings",
-        fake_async_get_upcoming_earnings,
+        fetch_mod.AsyncEarningsCalendarFetcher,
+        "a_get_upcoming_earnings",
+        fake_a_get_upcoming_earnings,
         raising=True,
     )
+
+    # Mock repository to avoid file system access
+    from services.calendar_api.routers import calendar as cal_mod
+
+    class FakeRepo:
+        def get_earnings_by_date_range(self, start_date, end_date, symbols=None, sources=None):
+            return pd.DataFrame()  # Return empty to simulate no existing data
+
+    class FakeCalService:
+        def save_events(self, events):
+            return len(events)
+
+    monkeypatch.setattr(cal_mod, "EarningsCalendarRepository", lambda: FakeRepo(), raising=True)
+    monkeypatch.setattr(cal_mod, "CalendarService", lambda: FakeCalService(), raising=True)
 
     from services.calendar_api.app import app
 
     c = TestClient(app)
-    r = c.get("/calendar/upcoming", params={"days": 7, "symbols": "AAPL,MSFT"})
+    r = c.post("/calendar/fetch-upcoming", params={"days": 7, "symbols": "AAPL,MSFT"})
     assert r.status_code == 200
     data = r.json()
     assert [e["symbol"] for e in data] == ["AAPL", "MSFT"]

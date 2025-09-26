@@ -12,7 +12,7 @@ class DatabaseConfig(BaseSettings):
     model_config = SettingsConfigDict(
         env_prefix="DB_",
         env_file=".env",
-        extra="forbid"
+        extra="ignore"
     )
     
     data_root: Path = Field(default=Path("data"), description="Root directory for data storage")
@@ -50,7 +50,8 @@ class IBAPIConfig(BaseSettings):
     
     model_config = SettingsConfigDict(
         env_prefix="IBAPI_",
-        env_file=".env"
+        env_file=".env",
+        extra="ignore"
     )
     
     host: str = Field(default="127.0.0.1", description="IB Gateway/TWS host")
@@ -83,7 +84,8 @@ class APIConfig(BaseSettings):
     
     model_config = SettingsConfigDict(
         env_prefix="API_",
-        env_file=".env"
+        env_file=".env",
+        extra="ignore"
     )
     
     host: str = Field(default="0.0.0.0", description="API server host")
@@ -121,7 +123,8 @@ class CeleryConfig(BaseSettings):
     
     model_config = SettingsConfigDict(
         env_prefix="CELERY_",
-        env_file=".env"
+        env_file=".env",
+        extra="ignore"
     )
     
     broker_url: str = Field(default="redis://localhost:6379/0", description="Message broker URL")
@@ -155,7 +158,8 @@ class LoggingConfig(BaseSettings):
     
     model_config = SettingsConfigDict(
         env_prefix="LOG_",
-        env_file=".env"
+        env_file=".env",
+        extra="ignore"
     )
     
     level: str = Field(default="INFO", description="Global logging level")
@@ -201,7 +205,8 @@ class SecurityConfig(BaseSettings):
     
     model_config = SettingsConfigDict(
         env_prefix="SECURITY_",
-        env_file=".env"
+        env_file=".env",
+        extra="ignore"
     )
     
     # API Keys
@@ -238,7 +243,8 @@ class AppConfig(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
-        case_sensitive=False
+        case_sensitive=False,
+        extra="ignore"
     )
     
     # Environment
