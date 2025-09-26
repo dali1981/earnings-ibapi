@@ -24,52 +24,48 @@ export FINNHUB_API_KEY=your_finnhub_key
 
 ## ⚡ Quick Start - 3 Commands
 
-### 1. Discover Earnings Opportunities
+### 1. Discover Earnings (Pure Discovery)
 ```bash
-python -m earnings_trading.discovery
+python -m earnings.discovery
 ```
 
-**Expected Output:**
-```
-🔍 EARNINGS DISCOVERY SYSTEM TEST
-============================================================
-
-✅ Found 1,122 total earnings events
-📊 229 candidates passed basic filters
-🎯 229 high-quality opportunities identified
-
-TOP OPPORTUNITIES:
- 1. HD     - 2025-08-19 (+7 days) - 100 pts - strangle
- 2. MDT    - 2025-08-19 (+7 days) - 100 pts - strangle
- 3. PANW   - 2025-08-18 (+6 days) - 100 pts - strangle
-
-💾 Opportunities exported to: data/exports/earnings_opportunities_2025-08-12.csv
-```
+Expected output highlights:
+- Raw events stored under `data/earnings/collection_date=YYYY-MM-DD/source=<provider>/earnings_*.parquet`
+- Earning-date CSV exported to `data/exports/earnings_discoveries_YYYY-MM-DD.csv`
 
 ### 2. Test Earnings Data Fetcher
 ```bash
 python -m earnings.fetcher
 ```
 
-### 3. Compare Data Sources
+### 3. Compare Data Sources (optional)
 ```bash
-python scripts/compare_earnings_sources.py
+python ops/scripts/compare_earnings_sources.py
 ```
 
-## 📊 Understanding the Results
+## 📊 Understanding the Results (pure collection)
 
-### Opportunity Scoring
+- CSV columns: `symbol`, `company_name`, `earnings_date`, `time`, `days_until`, `market_cap`, `eps_estimate`, `quality_score`, `discovery_date`, `source`.
+- Sorting: by `days_until` asc and `market_cap` desc.
+- No filtering: everything collected is stored (parquet) and exported (CSV).
+- Recent data: use `EarningsDiscoveryEngine.get_recent_discoveries(max_age_days=1)`.
+
+Time field
+- Normalization: Recognized values are normalized to `bmo` (before market open) or `amc` (after market close).
+- Preservation: Otherwise the provider label is preserved (e.g., `dmt`, `during market`); if missing, `unknown`.
+
+### (removed)
 - **100 pts**: Excellent opportunity, earnings within 7 days
 - **80 pts**: Very good opportunity, good timing
 - **60 pts**: Good opportunity, reasonable timing
 - **50 pts**: Consider opportunity, adequate timing
 
-### Strategy Recommendations
+### (removed)
 - **strangle**: High volatility expected, suitable for directional moves
 - **calendar_spread**: Time decay play, good for range-bound movement
 - **straddle**: Maximum volatility play, best for binary events
 
-### Priority Classifications
+### (removed)
 - **HIGH**: Earnings within 7 days, score 75+
 - **MEDIUM**: Earnings within 14 days, score 60+
 - **LOW**: Earnings >14 days, score 50+
@@ -78,65 +74,52 @@ python scripts/compare_earnings_sources.py
 
 ### Programmatic Discovery
 ```python
-from earnings_trading.discovery import EarningsDiscoveryEngine
+from earnings.discovery import EarningsDiscoveryEngine
 
 # Initialize engine
 engine = EarningsDiscoveryEngine()
 
-# Discover opportunities for next 21 days
-opportunities = engine.discover_earnings_opportunities(
-    days_ahead=21,
-    min_score=60.0  # Only high-quality opportunities
-)
+# Discover and store earnings (pure discovery)
+discoveries = engine.discover_and_store_earnings(days_ahead=21, days_back=0)
 
-# Show top 5 opportunities
-for opp in opportunities[:5]:
-    print(f"{opp.symbol}: {opp.best_strategy.value} - {opp.total_score:.0f} pts")
+# Load recent discoveries as a DataFrame
+df = engine.get_recent_discoveries(max_age_days=1)
+print(df.head())
 ```
 
 ### Custom Filtering
 ```python
 # Filter for specific market cap range
 engine.min_market_cap = 5e9  # $5B minimum
-engine.max_days_ahead = 14   # Only next 2 weeks
+engine.discovery_max_days = 14   # Only next 2 weeks
 
-opportunities = engine.discover_earnings_opportunities()
+discoveries = engine.discover_and_store_earnings(days_ahead=14)
+df = engine.get_recent_discoveries(max_age_days=1)
 ```
 
 ### Export to CSV
-```python
-# Export with custom filename
-export_file = engine.export_opportunities(
-    opportunities,
-    output_file=Path("my_opportunities.csv")
-)
-```
+Discovery automatically exports a daily CSV to `data/exports/earnings_discoveries_YYYY-MM-DD.csv`.
 
 ## 🔍 Exploring Results
 
 ### View Exported CSV
 ```bash
-# Open exported opportunities
-open data/exports/earnings_opportunities_2025-08-12.csv
+# Open exported CSV
+open data/exports/earnings_discoveries_2025-08-12.csv
 
 # Or view in terminal
-head -10 data/exports/earnings_opportunities_2025-08-12.csv
+head -10 data/exports/earnings_discoveries_2025-08-12.csv
 ```
 
-**CSV Structure:**
+CSV sample columns:
 ```
-Symbol,Company,Earnings_Date,Time,Days_Until,Best_Strategy,Total_Score,Calendar_Score,Straddle_Score,Strangle_Score,Priority,Action_Needed
-HD,"Home Depot, Inc. (The)",2025-08-19,bmo,7,strangle,100.0,80.0,90.0,100.0,🔥 EXCELLENT,GET_OPTION_CHAIN | GET_IV_DATA | ANALYZE_STRANGLE
+symbol,company_name,earnings_date,time,days_until,market_cap,eps_estimate,quality_score,discovery_date,source
+AAPL,Apple Inc.,2025-08-20,amc,8,3.2e12,2.50,80.0,2025-08-12,nasdaq
 ```
-
-### Understanding Action Items
-- **GET_OPTION_CHAIN**: Need to collect options data for this symbol
-- **GET_IV_DATA**: Need implied volatility historical data
-- **ANALYZE_STRANGLE**: Perform detailed strangle analysis
 
 ## 🛠️ Configuration
 
-### Basic Settings (earnings_trading/discovery.py)
+### Basic Settings (earnings/discovery.py)
 ```python
 # Market filters
 self.min_market_cap = 1e9      # $1B minimum
@@ -145,42 +128,71 @@ self.min_price = 10.0          # $10 minimum stock price
 self.max_price = 1000.0        # $1000 maximum stock price
 
 # Timing windows  
-self.min_days_ahead = 1        # At least 1 day ahead
-self.max_days_ahead = 60       # Within 2 months
+self.discovery_min_days = 1        # At least 1 day ahead
+self.discovery_max_days = 60       # Within 2 months
 ```
 
-### Strategy Scoring Weights
-```python
-# Modify strategy multipliers for different preferences
-def _strangle_multiplier(self, candidate) -> float:
-    if candidate.days_until_earnings <= 7:
-        return 1.0  # Perfect timing
-    elif candidate.days_until_earnings <= 14:
-        return 0.8  # Good timing
-    else:
-        return 0.6  # Adequate timing
+## 🔧 Bootstrap From Earnings
+
+### What is a Dry Run?
+A "dry run" is a no-op preview that plans and prints what would happen without making any external requests or writing data:
+- Reads latest earning-date CSV to list target symbols
+- Prints planned steps per symbol (contracts → chains → equity → options)
+- Shows key parameters (lookback window, bar sizes, symbol list)
+- Makes NO IB Gateway/TWS calls
+- Writes NO data to filesystem
+
+### Bootstrap Data Collection
+```bash
+# Preview what will be collected (dry run)
+make from-earnings-dry
+
+# Actually run the bootstrap
+make from-earnings
+
+# Custom bootstrap with specific parameters
+python ops/jobs/run_from_earnings.py --max-symbols 10 --lookback-days 365 --option-bar-size "1 min"
+
+# Bootstrap specific symbols
+python ops/jobs/run_from_earnings.py --symbols AAPL,MSFT,NVDA --lookback-days 180
 ```
 
-## 📈 Next Steps
+### Bootstrap Process
+For each symbol, the bootstrap will:
+1. **Contracts**: Targeted backfill if missing
+2. **Chain snapshot**: Refresh if >24h old  
+3. **Equity bars**: Backfill 1-day bars over lookback window
+4. **Option bars**: Backfill 1-minute bars (default) over lookback window
+
+### Data Storage Locations
+- Contracts: `data/contracts/`
+- Option chains: `data/option_chains/`
+- Equity bars: `data/equity_bars/`
+- Option bars: `data/option_bars/`
+
+## 📈 Next Steps (optional)
 
 ### 1. Data Collection Setup
 Once you have identified opportunities, set up data collection:
 ```bash
 # Run comprehensive data pipeline
-python -m jobs.run_earnings_pipeline
+# optional later when trading is enabled
+# python -m jobs.run_earnings_pipeline
 ```
 
 ### 2. Options Chain Analysis
 For detailed options analysis:
 ```bash
 # Get option chains for top opportunities
-python examples/complete_workflow_example.py
+# optional later when trading is enabled
+# python ops/examples/complete_workflow_example.py
 ```
 
 ### 3. Historical Analysis
 Compare current opportunities with historical patterns:
 ```bash
-python scripts/compare_earnings_sources.py --compare-historical 30
+# requires enabling extra sources via EARNINGS_ALLOWED_SOURCES
+python ops/scripts/compare_earnings_sources.py --compare-historical 30
 ```
 
 ## 🚨 Troubleshooting

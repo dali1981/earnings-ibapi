@@ -1,230 +1,49 @@
-# Earnings-Driven Options Trading System
+# Documentation Index
 
-🎯 **Automated market-wide earnings discovery and options trading opportunities identification system**
+This repo implements a local-first data architecture with an event-driven bus, clear separation between examples, scripts, and jobs, and repositories as the single source of truth.
 
-This system scans **ALL** upcoming earnings across the market, analyzes options strategies (calendar spreads, strangles, straddles), and prioritizes data collection for the most promising opportunities.
+## Core Concepts
+- Local-first persistence: All producers write to Parquet repositories under repo-root `data/…` before anything else.
+- Event bus: A simple filesystem JSONL bus advertises dataset availability (`data.available` events). See Data Ingestion.
+- Consumers: Services read from the JSONL bus with checkpoints and process idempotently; they always read from repositories, never forward API responses.
+ - Correlation IDs: Events carry `payload.correlation_id` propagated from job IDs or logging context for end-to-end tracing.
 
-## 🚀 Quick Start
+## Doc Map
+- Architecture: High-level flows and prerequisites
+  - `DATA_FLOW_ARCHITECTURE.md` — dependencies (contracts → chains + equity → option bars), historical vs streaming sequences, deterministic writes.
+- Data Ingestion: Local-first policy and event bus
+  - `data_ingestion.md` — event topics, JSONL consumer + checkpoints, idempotency index, recovery & catch-up, systemd sample.
+- Jobs Overview
+  - `jobs.md` — taxonomy (examples vs scripts vs jobs), active jobs, deprecated jobs, usage notes.
+- Contributor Guide
+  - `../AGENTS.md` — repository guidelines, coding/testing/style, architecture & ingestion pointers.
 
-```bash
-# Run earnings discovery (no API keys required)
-python -m earnings_trading.discovery
+## Quick Actions (Make)
+- View upcoming earnings (local): `make show-earnings`
+- Deduplicate earnings partitions: `make dedup-earnings`
+- Consume option chain events and backfill bars: `make consume-option-chains`
 
-# Run comprehensive data pipeline
-python -m jobs.run_earnings_pipeline
+## Taxonomy (TL;DR)
+- examples/: read-only demos (no network, no side effects)
+- scripts/: local utilities working on repo data only
+- jobs/: operational workflows (may call IB/APIs), scheduled, emit events
 
-# Compare earnings data sources
-python scripts/compare_earnings_sources.py
-```
+## Services (FastAPI)
+- Calendar Service (earnings): `http://localhost:9001`
+  - `GET /calendar/upcoming?days=14&symbols=AAPL,MSFT`
+- Equity History: `http://localhost:9002`
+  - `GET /equity/{symbol}/bars?start=YYYY-MM-DD&end=YYYY-MM-DD&bar_size=1%20day`
+- Option History: `http://localhost:9003`
+  - `GET /options/{underlying}/bars?...` and `GET /options/{underlying}/contracts`
+- Option Chains: `http://localhost:9004`
+  - `GET /chains/{symbol}/latest`
+- Frontend: `http://localhost:9000` (simple UI to call the services)
 
-## 📊 Key Features
+### Dev Compose
+- `docker compose -f docker-compose.dev.yml up --build`
+- Open the frontend at `http://localhost:9000`
 
-- **Market-Wide Earnings Discovery**: Scans entire market using free NASDAQ API (1,122+ events)
-- **Options Strategy Analysis**: Scores candidates for calendar spreads, strangles, straddles
-- **Dynamic Symbol Selection**: Replaces fixed portfolios with opportunity-driven selection
-- **Multi-Source Data**: Fallback from FMP → Finnhub → NASDAQ → Yahoo Finance
-- **Priority-Based Collection**: Focuses resources on highest-value opportunities
-- **Real-Time Filtering**: Market cap, timing, liquidity, and options-tradability filters
+Note: The legacy Flask monitoring dashboard remains available at `monitoring/dashboard.py` but is not used in the new service layout.
 
-## 🎯 System Overview
-
-```
-Market Data → Earnings Discovery → Strategy Scoring → Data Collection → Trading Opportunities
-    ↓              ↓                    ↓               ↓              ↓
- NASDAQ API   →  ALL Earnings    →   Calendar/     →  Options    →   Prioritized
- (Free)          (1,122+)           Straddle/        Chains          Symbols
-                                   Strangle
-```
-
-## 📁 Project Structure
-
-```
-earnings_ibapi/
-├── README.md                    # This file
-├── docs/                       # Documentation
-│   ├── architecture/           # System design docs
-│   ├── guides/                # User guides  
-│   └── api/                   # API references
-├── earnings/                  # Earnings data acquisition
-│   ├── fetcher.py            # Multi-source earnings fetcher
-│   └── scheduler.py          # Priority-based scheduling
-├── earnings_trading/         # Core trading logic
-│   ├── discovery.py          # Market-wide opportunity discovery
-│   └── data_pipeline.py      # Dynamic data collection
-├── scripts/                  # Utility scripts
-│   └── compare_earnings_sources.py  # Data source comparison
-├── examples/                 # Usage examples
-├── repositories/             # Data storage layer
-├── reliability/              # Circuit breakers, retry logic
-├── lineage/                  # Data lineage tracking
-└── tests/                    # Test suite
-```
-
-## 🔍 Core Components
-
-### 1. Earnings Discovery Engine (`earnings_trading/discovery.py`)
-- **Market-wide scanning**: Discovers ALL earnings events (no fixed portfolios)
-- **Strategy scoring**: Evaluates calendar spreads, strangles, straddles
-- **Intelligent filtering**: Market cap, timing, options liquidity requirements
-- **Priority classification**: HIGH/MEDIUM/LOW opportunity groups
-
-### 2. Multi-Source Data Fetcher (`earnings/fetcher.py`)
-- **Primary**: Financial Modeling Prep (FMP) - Premium features
-- **Secondary**: Finnhub - Good coverage
-- **Fallback**: NASDAQ API - Free, reliable (currently active)
-- **Emergency**: Yahoo Finance scraping
-
-### 3. Dynamic Data Pipeline (`earnings_trading/data_pipeline.py`)
-- **Opportunity-driven**: Collects data based on discovered opportunities
-- **Priority scheduling**: Focuses on highest-value symbols first
-- **Adaptive resource allocation**: Scales collection based on earnings proximity
-
-## 🎯 Recent Test Results
-
-```
-🔍 EARNINGS DISCOVERY SYSTEM TEST
-============================================================
-
-✅ Found 1,122 total earnings events
-📊 229 candidates passed basic filters  
-🎯 229 high-quality opportunities identified
-
-TOP OPPORTUNITIES:
-1. HD     - 2025-08-19 (+7 days) - 100 pts - strangle
-2. MDT    - 2025-08-19 (+7 days) - 100 pts - strangle  
-3. PANW   - 2025-08-18 (+6 days) - 100 pts - strangle
-4. WMT    - 2025-08-21 (+9 days) - 80 pts - calendar_spread
-5. NVDA   - 2025-08-28 (+16 days) - 60 pts - calendar_spread
-```
-
-## 📚 Documentation
-
-| Category | Documents |
-|----------|-----------|
-| **Getting Started** | [Quick Start Guide](docs/guides/quickstart.md) |
-| **Architecture** | [System Design](docs/architecture/system-design.md) |
-| **Data Sources** | [Earnings APIs](docs/architecture/data-sources.md) |
-| **User Guides** | [Discovery Engine](docs/guides/discovery-engine.md) |
-| **API Reference** | [Earnings Fetcher](docs/api/earnings-fetcher.md) |
-| **Operations** | [Daily Pipeline](docs/guides/daily-pipeline.md) |
-
-## 🛠️ Configuration
-
-### Environment Variables
-```bash
-# Optional API keys (system works without them using NASDAQ fallback)
-export FMP_API_KEY=your_fmp_key
-export FINNHUB_API_KEY=your_finnhub_key
-
-# Data paths
-export DATA_PATH=/path/to/trading/data
-export CACHE_PATH=/path/to/cache
-```
-
-### Key Settings
-- **Min Market Cap**: $1B (configurable in `earnings_trading/discovery.py`)
-- **Time Window**: 1-60 days ahead (configurable)
-- **Strategy Thresholds**: 50+ score minimum (adjustable)
-
-## 🎯 Usage Examples
-
-### Basic Earnings Discovery
-```python
-from earnings_trading.discovery import EarningsDiscoveryEngine
-
-engine = EarningsDiscoveryEngine()
-opportunities = engine.discover_earnings_opportunities(
-    days_ahead=21,
-    min_score=60.0
-)
-
-for opp in opportunities[:5]:
-    print(f"{opp.symbol}: {opp.best_strategy} - {opp.total_score:.0f} pts")
-```
-
-### Data Source Comparison
-```bash
-# Compare NASDAQ vs Yahoo earnings data
-python scripts/compare_earnings_sources.py --days-ahead 14 --compare-historical 7
-```
-
-## 🚀 Recent Major Updates
-
-### NASDAQ API Integration (Latest)
-- ✅ **Free market-wide coverage**: 1,122+ earnings events without API keys
-- ✅ **Enhanced multi-day fetching**: Covers full date ranges efficiently  
-- ✅ **Market cap parsing**: Automatic filtering for options-tradeable symbols
-- ✅ **Production-ready**: Handles weekends, rate limiting, error recovery
-
-### Earnings-Driven Architecture 
-- ✅ **Replaced fixed portfolios** with dynamic opportunity discovery
-- ✅ **Market-wide scanning** instead of predefined symbol lists
-- ✅ **Strategy-specific scoring** for calendar spreads, strangles, straddles
-- ✅ **Priority-based data collection** focusing on highest-value opportunities
-
-## 🧪 Testing & Validation
-
-```bash
-# Run discovery system test
-python -m earnings_trading.discovery
-
-# Test earnings data fetcher
-python -m earnings.fetcher
-
-# Run data source comparison
-python scripts/compare_earnings_sources.py
-
-# Full test suite
-pytest tests/
-```
-
-## 🔧 Troubleshooting
-
-### Common Issues
-
-1. **No earnings data found**
-   - Check internet connection
-   - NASDAQ API might be temporarily down
-   - Verify date ranges (weekends have no data)
-
-2. **API rate limits**
-   - System automatically falls back to NASDAQ (free)
-   - Add delays between requests if needed
-   - Consider upgrading API plans for higher volume
-
-3. **Memory usage with large datasets**
-   - Adjust `max_symbols` parameter in discovery
-   - Use chunked processing for large date ranges
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create feature branch (`git checkout -b feature/amazing-feature`)
-3. Follow existing code patterns and add tests
-4. Update relevant documentation
-5. Submit pull request
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🙏 Acknowledgments
-
-- **NASDAQ**: For providing free earnings calendar API
-- **Interactive Brokers**: For comprehensive options data via TWS API
-- **Financial data providers**: FMP, Finnhub for premium earnings feeds
-
----
-
-## 📈 Performance Metrics (Latest Run)
-
-| Metric | Value |
-|--------|-------|
-| **Total Earnings Events** | 1,122 |
-| **Filtered Opportunities** | 229 |
-| **Processing Time** | <30 seconds |
-| **Memory Usage** | ~150MB |
-| **Success Rate** | 99.9% |
-| **Data Sources Active** | 1 (NASDAQ) |
-
-**Last Updated**: August 12, 2025
+## Directory Layout
+- See `docs/SERVICES.md` for the service structure, layering, and run/test guidance.

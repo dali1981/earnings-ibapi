@@ -1,0 +1,30 @@
+# syntax=docker/dockerfile:1
+FROM python:3.11-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PYTHONPATH=/app \
+    FLASK_ENV=development
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+# Only install runtime deps needed for the dashboard + repos
+COPY requirements-local.txt requirements-dashboard.txt requirements-api.txt ./
+RUN pip install --upgrade pip && \
+    pip install -r requirements-local.txt && \
+    pip install -r requirements-dashboard.txt && \
+    pip install -r requirements-api.txt
+
+# Mount source at runtime for live reload
+COPY . .
+
+# Install local vendored packages as editable installs for development
+RUN pip install -e ibx-0.1.1
+
+EXPOSE 9090
+CMD ["python", "common/monitoring/dashboard.py", "--port", "9090", "--debug"]

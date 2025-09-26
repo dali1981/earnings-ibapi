@@ -1,0 +1,289 @@
+from __future__ import annotations
+
+from enum import StrEnum
+from functools import lru_cache
+from pathlib import Path
+from pydantic import AnyHttpUrl, BaseModel, Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
+from typing import Dict, Optional
+
+import os
+import tomllib
+
+
+class AppEnv(StrEnum):
+    dev = "dev"
+    test = "test"
+    prod = "prod"
+
+
+class PathsSettings(BaseModel):
+    # Hardcoded absolute paths - environment-specific
+    # Override via environment variables APP_PATHS__DATA_ROOT etc.
+    project_root: Path = Path("/Users/mohamedali/trading_project/earnings_ibapi")
+    data_root: Path = Path("/Users/mohamedali/trading_project/earnings_ibapi/data")
+    equity_bars: Path = Path("/Users/mohamedali/trading_project/earnings_ibapi/data/equity_bars")
+    option_bars: Path = Path("/Users/mohamedali/trading_project/earnings_ibapi/data/option_bars")
+    option_chains: Path = Path("/Users/mohamedali/trading_project/earnings_ibapi/data/option_chains")
+    contracts: Path = Path("/Users/mohamedali/trading_project/earnings_ibapi/data/contracts")
+    earnings: Path = Path("/Users/mohamedali/trading_project/earnings_ibapi/data/earnings")
+    exports: Path = Path("/Users/mohamedali/trading_project/earnings_ibapi/data/exports")
+    cache: Path = Path("/Users/mohamedali/trading_project/earnings_ibapi/cache")
+    logs: Path = Path("/Users/mohamedali/trading_project/earnings_ibapi/logs")
+
+
+class IBSettings(BaseModel):
+    host: str = "127.0.0.1"
+    port: int = 4002
+    client_ids: Dict[str, int] = {
+        "default": 77,
+        "streamer": 17,
+        "contract_details_backfill": 8,
+        "ib_source": 101,
+        "contracts_backfill": 1,
+        "fundamental_data": 200,
+    }
+
+    @property
+    def client_id_default(self) -> int:
+        return self.client_ids.get("default", 77)
+
+    @property
+    def client_id_contracts(self) -> int:
+        return self.client_ids.get("contracts_backfill", self.client_id_default)
+
+
+class ServiceConfig(BaseModel):
+    """Configuration for a single service"""
+
+    host: str = Field(default="localhost")
+    port: int
+    protocol: str = Field(default="http")
+
+    @property
+    def url(self) -> str:
+        """Construct the full URL from components"""
+        return f"{self.protocol}://{self.host}:{self.port}"
+
+
+class ServicesConfig(BaseModel):
+    """Configuration for all services"""
+
+    frontend: ServiceConfig = Field(default_factory=lambda: ServiceConfig(port=9000))
+    calendar: ServiceConfig = Field(default_factory=lambda: ServiceConfig(port=9001))
+    equity: ServiceConfig = Field(default_factory=lambda: ServiceConfig(port=9002))
+    options: ServiceConfig = Field(default_factory=lambda: ServiceConfig(port=9003))
+    chains: ServiceConfig = Field(default_factory=lambda: ServiceConfig(port=9004))
+    orchestrator: ServiceConfig = Field(
+        default_factory=lambda: ServiceConfig(port=9005)
+    )
+    ib_api: ServiceConfig = Field(default_factory=lambda: ServiceConfig(port=9010))
+    trading: ServiceConfig = Field(default_factory=lambda: ServiceConfig(port=9011))
+
+
+class APISettings(BaseModel):
+    # Service configurations
+    services: ServicesConfig = Field(default_factory=ServicesConfig)
+
+    @property
+    def ib_api_base(self) -> str:
+        """Backward compatibility for contracts service"""
+        return self.services.ib_api.url
+
+
+class CeleryContractsLimits(BaseModel):
+    fetch_rate: str = "10/m"
+    queue: str = "contracts"
+
+
+class CelerySearchLimits(BaseModel):
+    queue: str = "symbol-search"
+
+
+class CeleryHistoricalLimits(BaseModel):
+    fetch_rate: str = "2/s"  # IB API rate limit for historical data
+    queue: str = "historical"
+
+
+class CelerySettings(BaseModel):
+    broker_url: Optional[str] = "amqp://localhost:5672/"
+    result_backend: Optional[str] = "redis://localhost:6379/0"
+    contracts: CeleryContractsLimits = CeleryContractsLimits()
+    search: CelerySearchLimits = CelerySearchLimits()
+    historical: CeleryHistoricalLimits = CeleryHistoricalLimits()
+
+
+class EarningsSettings(BaseModel):
+    default_days_ahead: int = 3
+    default_days_back: int = 360
+    max_days_ahead: int = 60
+    collection_hour: int = 6
+    data_sources: list[str] = ["nasdaq"]
+    primary_source: str = "nasdaq"
+    retention_days: int = 365
+    cache_hours: int = 6
+    api_delays: Dict[str, float] = {"nasdaq": 0.3, "fmp": 0.25, "finnhub": 1.0}
+
+
+class DiscoverySettings(BaseModel):
+    min_market_cap: int = 1_000_000_000
+    max_market_cap: int = 2_000_000_000_000
+    min_avg_volume: int = 1_000_000
+    min_price: float = 10.0
+    max_price: float = 1000.0
+    discovery_min_days: int = 1
+    discovery_max_days: int = 60
+    data_collection: Dict[str, int] = {
+        "pre_earnings_days": 3,
+        "post_earnings_days": 2,
+        "lookback_days": 30,
+        "iv_history_days": 90,
+    }
+    strategy_optimal_start: int = 7
+    strategy_optimal_end: int = 14
+    require_weekly_options: bool = False
+    require_liquid_options: bool = False
+    min_iv_rank: int = 20
+    timing_weights: Dict[str, float] = {
+        "optimal": 100.0,
+        "good": 80.0,
+        "fair": 60.0,
+        "poor": 40.0,
+    }
+    strategy_multipliers: Dict[str, Dict[str, float]] = {
+        "calendar_spread": {
+            "14_plus_days": 1.0,
+            "7_to_14_days": 0.8,
+            "under_7_days": 0.5,
+        },
+        "straddle": {"under_5_days": 1.0, "5_to_10_days": 0.9, "over_10_days": 0.7},
+        "strangle": {"under_7_days": 1.0, "7_to_14_days": 0.8, "over_14_days": 0.6},
+    }
+    min_opportunity_score: float = 50.0
+    excellent_threshold: float = 90.0
+    good_threshold: float = 75.0
+
+
+class ObservabilitySettings(BaseModel):
+    """Sentry and observability configuration"""
+    
+    # Sentry configuration
+    sentry_dsn: Optional[str] = None
+    sentry_environment: Optional[str] = None
+    sentry_release: Optional[str] = None
+    sentry_sample_rate: float = 1.0
+    sentry_traces_sample_rate: float = 0.1
+    sentry_profiles_sample_rate: float = 0.1
+    sentry_max_breadcrumbs: int = 50
+    sentry_attach_stacktrace: bool = True
+    sentry_send_default_pii: bool = False
+    sentry_debug: bool = False
+    
+    # Feature flags
+    enable_error_tracking: bool = True
+    enable_performance_monitoring: bool = True
+    enable_profiling: bool = True
+    enable_distributed_tracing: bool = True
+    enable_celery_monitoring: bool = True
+    
+    # Custom metrics settings
+    enable_custom_metrics: bool = True
+    metrics_sample_rate: float = 1.0
+    
+    # Alert settings
+    enable_alerts: bool = True
+    alert_email_recipients: list[str] = []
+
+
+class LoggingSettings(BaseModel):
+    def build_config(self, logs_path: Path) -> dict:
+        # Bracketed, timestamped format; colored for console, plain for file
+        fmt = "%(asctime)s [%(levelname)s] [%(name)s] %(message)s"
+        datefmt = "%Y-%m-%d %H:%M:%S"
+        return {
+            "version": 1,
+            "disable_existing_loggers": False,
+            "formatters": {
+                "color": {
+                    "()": "app_settings.logging_formatters.ColorFormatter",
+                    "format": fmt,
+                    "datefmt": datefmt,
+                },
+                "plain": {
+                    "format": fmt,
+                    "datefmt": datefmt,
+                },
+            },
+            "handlers": {
+                "console": {"class": "logging.StreamHandler", "formatter": "color"},
+                "file": {
+                    "class": "logging.handlers.RotatingFileHandler",
+                    "formatter": "plain",
+                    "filename": str(logs_path / "app.log"),
+                    "maxBytes": 5 * 1024 * 1024,
+                    "backupCount": 5,
+                },
+            },
+            "root": {"level": "INFO", "handlers": ["console", "file"]},
+        }
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_prefix="APP_",
+        env_nested_delimiter="__",
+        extra="ignore",
+        env_file=".env",
+        env_file_encoding="utf-8",
+        toml_file="config.toml",  # Load from TOML file
+        # Priority order: env vars > .env file > config.toml > defaults
+    )
+
+    env: AppEnv = AppEnv.dev
+    paths: PathsSettings = PathsSettings()
+    ib: IBSettings = IBSettings()
+    api: APISettings = APISettings()
+    celery: CelerySettings = CelerySettings()
+    earnings: EarningsSettings = EarningsSettings()
+    discovery: DiscoverySettings = DiscoverySettings()
+    observability: ObservabilitySettings = ObservabilitySettings()
+    logging: LoggingSettings = LoggingSettings()
+
+
+def _load_env_files(env: AppEnv) -> None:
+    try:
+        from dotenv import load_dotenv  # type: ignore
+    except Exception:
+        return
+    load_dotenv(".env", override=False)
+    env_file = f".env.{env}"
+    if Path(env_file).exists():
+        load_dotenv(env_file, override=True)
+
+
+@lru_cache(maxsize=1)
+def get_settings() -> Settings:
+    provisional = Settings()
+    _load_env_files(provisional.env)
+    s = Settings()
+    # Environment-specific defaults
+    if s.env == AppEnv.dev:
+        # Use RabbitMQ locally unless explicitly overridden
+        if not s.celery.broker_url:
+            s.celery.broker_url = "amqp://guest:guest@127.0.0.1:5672//"
+        if not s.celery.result_backend:
+            s.celery.result_backend = "rpc://"
+    # Ensure directories exist
+    s.paths.data_root.mkdir(parents=True, exist_ok=True)
+    for p in [
+        s.paths.equity_bars,
+        s.paths.option_bars,
+        s.paths.option_chains,
+        s.paths.contracts,
+        s.paths.earnings,
+        s.paths.exports,
+        s.paths.cache,
+        s.paths.logs,
+    ]:
+        Path(p).mkdir(parents=True, exist_ok=True)
+    return s

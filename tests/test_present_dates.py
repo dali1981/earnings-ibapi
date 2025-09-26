@@ -1,7 +1,8 @@
-import pandas as pd
 from datetime import date
 from ibx_repos.equity_bars import EquityBarRepository
 from ibx_repos.option_bars import OptionBarRepository, OptionMeta
+
+import pandas as pd
 
 
 def test_equity_present_dates(tmp_path):

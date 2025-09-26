@@ -1,0 +1,1 @@
+celery -A ibx_celery.app worker -l info -Q contracts,option_chains,historical,symbol-search

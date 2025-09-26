@@ -1,0 +1,51 @@
+from fastapi.testclient import TestClient
+from types import SimpleNamespace
+
+import pytest
+
+
+pytestmark = [pytest.mark.unit, pytest.mark.calendar]
+
+
+def _mk_event(symbol: str = "AAPL"):
+    from datetime import date
+
+    return SimpleNamespace(
+        symbol=symbol,
+        company_name="Apple",
+        earnings_date=date(2025, 1, 1),
+        time="amc",
+        eps_estimate=None,
+        eps_actual=None,
+        revenue_estimate=None,
+        revenue_actual=None,
+        source="test",
+    )
+
+
+def test_calendar_upcoming_route(monkeypatch):
+    # Monkeypatch CalendarService used by the get-upcoming router to avoid DB access
+    from services.calendar_api.app import app
+    from services.calendar_api.routers import core as core_module
+
+    class FakeCalendarService:
+        def get_upcoming_events(self, *, days_ahead: int, symbols=None):
+            assert days_ahead == 14
+            assert symbols == ["AAPL", "MSFT"]
+            return [_mk_event("AAPL"), _mk_event("MSFT")]
+
+        def get_latest_collection_date_str(self):
+            return "2025-01-01"
+
+    # Mock CalendarService for the get-upcoming endpoint (now in core module)
+    monkeypatch.setattr(
+        core_module, "CalendarService", lambda: FakeCalendarService(), raising=True
+    )
+
+    c = TestClient(app)
+    r = c.get("/calendar/get-upcoming", params={"days": 14, "symbols": "AAPL,MSFT"})
+    assert r.status_code == 200
+    payload = r.json()
+    assert isinstance(payload, list) and len(payload) == 2
+    assert payload[0]["symbol"] == "AAPL"
+    assert payload[1]["symbol"] == "MSFT"

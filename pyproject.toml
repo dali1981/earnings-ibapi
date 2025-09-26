@@ -1,0 +1,102 @@
+[project]
+name = "earnings-ibapi"
+version = "1.0.0"
+description = "Trading platform with IB API integration and earnings calendar"
+authors = [{name = "Trading Team"}]
+requires-python = ">=3.9"
+dependencies = [
+    # Core API dependencies
+    "fastapi>=0.111",
+    "uvicorn[standard]>=0.30",
+    "pydantic>=2.7",
+    # Data processing
+    "numpy>=1.24.0,<2.0",
+    "pandas>=2.0.0,<2.3",
+    # HTTP client and async
+    "httpx>=0.27",
+    # Task queue and worker
+    "celery>=5.3",
+    "flower>=2.0.1",
+    # Configuration management
+    "pydantic-settings>=2.2",
+    "python-dotenv>=1.0",
+    "psutil>=7.0.0",
+    "sentry-sdk[celery,fastapi,httpx,loguru]>=2.37.1",
+]
+
+[project.optional-dependencies]
+api = [
+    "fastapi>=0.111",
+    "uvicorn[standard]>=0.30",
+    "pydantic>=2.7",
+]
+dashboard = [
+    "flask>=2.3",
+    "plotly>=5.20",
+]
+test = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "pytest-mock>=3.10.0",
+    "pytest-xdist>=3.0.0",
+    "pytest-timeout>=2.1.0",
+    "pytest-html>=3.1.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-benchmark>=4.0.0",
+    "pandera>=0.15.0",
+    "factory-boy>=3.2.0",
+    "freezegun>=1.2.0",
+    "responses>=0.23.0",
+    "memory-profiler>=0.60.0",
+    "psutil>=5.9.0",
+    "hypothesis>=6.68.0",
+    "faker>=18.0.0",
+    "pytest-playwright>=0.5.0",
+    "playwright>=1.44.0",
+]
+dev = [
+    "black>=22.0.0",
+    "isort>=5.0.0",
+    "flake8>=6.0.0",
+    "mypy>=1.0.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["common", "services", "ops", "config"]
+
+[tool.uv]
+dev-dependencies = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "pytest-mock>=3.10.0",
+    "pytest-asyncio>=0.21.0",
+    "black>=22.0.0",
+    "isort>=5.0.0",
+    "flake8>=6.0.0",
+]
+
+[tool.black]
+target-version = ["py310"]
+line-length = 88
+exclude = '''
+(
+  ^/(\.venv|venv|env)/
+  | ^/build/
+  | ^/dist/
+  | ^/htmlcov/
+  | ^/\.git/
+  | ^/labs/
+)
+'''
+
+[tool.isort]
+profile = "black"
+py_version = 310
+skip = [".venv", "venv", "env"]
+skip_glob = [".venv/*", "venv/*", "env/*"]
+force_alphabetical_sort = true
+lines_after_imports = 2

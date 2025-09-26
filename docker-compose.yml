@@ -1,0 +1,19 @@
+version: "3.9"
+
+services:
+  app:
+    build: .
+    container_name: trading_app
+    command: ["python", "common/monitoring/dashboard.py", "--port", "9090", "--db-path", "/var/db/monitoring.db"]
+    ports:
+      - "9090:9090"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - PYTHONPATH=/app
+    volumes:
+      - .:/app
+      - monitoring_db:/var/db
+
+volumes:
+  monitoring_db:
+    driver: local

@@ -1,0 +1,69 @@
+[project]
+name = "earnings-ibapi"
+version = "1.0.0"
+description = "Trading platform with IB API integration"
+authors = [{name = "Trading Team"}]
+requires-python = ">=3.9"
+dependencies = [
+    "fastapi>=0.111",
+    "uvicorn[standard]>=0.30",
+    "pydantic>=2.7",
+    "numpy==2.0.2", 
+    "pandas==2.2.2",
+    "pyarrow==16.1.0",
+    "httpx>=0.27",
+    "celery>=5.3",
+    "flower>=2.0.1",
+    "pydantic-settings>=2.2",
+    "python-dotenv>=1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0", 
+    "pytest-mock>=3.10.0",
+    "pytest-asyncio>=0.21.0",
+    "black>=22.0.0",
+    "isort>=5.0.0",
+]
+dashboard = [
+    "flask>=2.3",
+    "plotly>=5.20",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.uv]
+dev-dependencies = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0", 
+    "pytest-mock>=3.10.0",
+    "pytest-asyncio>=0.21.0",
+    "black>=22.0.0",
+    "isort>=5.0.0",
+]
+
+[tool.black]
+target-version = ["py310"]
+line-length = 88
+exclude = '''
+(
+  ^/(\.venv|venv|env)/
+  | ^/build/
+  | ^/dist/
+  | ^/htmlcov/
+  | ^/\.git/
+  | ^/labs/
+)
+'''
+
+[tool.isort]
+profile = "black"
+py_version = 310
+skip = [".venv", "venv", "env"]
+skip_glob = [".venv/*", "venv/*", "env/*"]
+force_alphabetical_sort = true
+lines_after_imports = 2

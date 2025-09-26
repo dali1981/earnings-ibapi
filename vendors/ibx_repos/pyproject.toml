@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ibx-repos"
+version = "0.1.1"
+description = "IB repositories (vendor shim)"
+authors = [{ name = "Vendor" }]
+requires-python = ">=3.10"
+readme = "README.md"
+dependencies = ["pyarrow", "pandas"]
+
+[tool.setuptools]
+packages = ["ibx_repos"]
+
+[tool.setuptools.package-dir]
+ibx_repos = "."
+

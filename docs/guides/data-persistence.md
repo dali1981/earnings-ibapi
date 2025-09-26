@@ -32,7 +32,7 @@ Daily Collection → Storage Repository → Query Interface
    - Automatic deduplication and data quality scoring
    - Metadata tracking for data lineage
 
-2. **DailyEarningsCollector** (`jobs/daily_earnings_collection.py`)
+2. **DailyEarningsCollector** (`ops/jobs/daily_earnings_collection.py`)
    - Automated daily data collection job
    - Multi-source fallback (NASDAQ → FMP → Finnhub)
    - Circuit breakers for resilient operation
@@ -56,21 +56,22 @@ Daily Collection → Storage Repository → Query Interface
 ### Manual Collection
 ```bash
 # Collect earnings data for next 30 days
-python jobs/daily_earnings_collection.py --days-ahead 30
+python ops/jobs/daily_earnings_collection.py --days-ahead 30
 
 # Force refresh even with recent data
-python jobs/daily_earnings_collection.py --force-refresh
+python ops/jobs/daily_earnings_collection.py --force-refresh
 
 # Validate existing data only
-python jobs/daily_earnings_collection.py --validate-only
+python ops/jobs/daily_earnings_collection.py --validate-only
 ```
 
 ### Programmatic Access
+
 ```python
-from repositories.earnings import EarningsRepository
+from repositories.earnings import EarningsCalendarRepository
 from datetime import date, timedelta
 
-repo = EarningsRepository()
+repo = EarningsCalendarRepository()
 
 # Get latest collection
 latest_data = repo.get_latest_collection()
@@ -113,7 +114,7 @@ print(f"Collections: {stats['total_collections']}")
 **Cron Job (Recommended)**
 ```bash
 # Every day at 6 AM
-0 6 * * * cd /path/to/earnings_ibapi && python jobs/daily_earnings_collection.py
+0 6 * * * cd /path/to/earnings_ibapi && python ops/jobs/daily_earnings_collection.py
 ```
 
 **Systemd Timer**
@@ -136,7 +137,7 @@ FROM python:3.11-slim
 COPY . /app
 WORKDIR /app
 RUN pip install -r requirements.txt
-CMD ["python", "jobs/daily_earnings_collection.py"]
+CMD ["python", "ops/jobs/daily_earnings_collection.py"]
 ```
 
 ## 📁 Data Storage Details
@@ -268,10 +269,10 @@ Test the complete system:
 python -m repositories.earnings
 
 # 2. Run daily collection
-python jobs/daily_earnings_collection.py --days-ahead 7 --force-refresh
+python ops/jobs/daily_earnings_collection.py --days-ahead 7 --force-refresh
 
 # 3. Demonstrate complete system
-python scripts/demonstrate_persistence.py
+python ops/scripts/demonstrate_persistence.py
 
 # 4. Check storage stats
 python -c "
@@ -303,10 +304,10 @@ print(f'System operational: {stats[\"total_events\"]} events stored')
 ### Debug Commands
 ```bash
 # Enable verbose logging
-python jobs/daily_earnings_collection.py --verbose
+python ops/jobs/daily_earnings_collection.py --verbose
 
 # Validate data only
-python jobs/daily_earnings_collection.py --validate-only
+python ops/jobs/daily_earnings_collection.py --validate-only
 
 # Check circuit breaker states
 python -c "

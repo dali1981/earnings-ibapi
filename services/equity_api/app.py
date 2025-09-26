@@ -1,0 +1,35 @@
+from .routers.equity import router as equity_router
+from common.observability import init_observability
+from common.utils.logging_setup import disable_noisy_loggers, setup_logging
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+import logging
+import os
+
+
+app = FastAPI(title="Equity History Service", version="0.2.0")
+app.include_router(equity_router)
+
+# Enable CORS for the frontend UI, consistent with other services
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+@app.on_event("startup")
+async def _configure_logging():
+    # Initialize observability first
+    init_observability(service_name="equity-api", service_version="0.2.0")
+    
+    # Then configure logging
+    setup_logging(level=os.environ.get("APP_LOG_LEVEL", "INFO"))
+    disable_noisy_loggers()
+    for name in ("uvicorn", "uvicorn.error", "uvicorn.access"):
+        lg = logging.getLogger(name)
+        lg.handlers = []
+        lg.propagate = True

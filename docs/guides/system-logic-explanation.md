@@ -92,7 +92,7 @@ self.min_avg_volume = 1e6      # Hardcoded!
 - **What**: ALL unfiltered NASDAQ earnings data (892 events)
 - **Where**: `data/earnings/earnings/collection_date=YYYY-MM-DD/source=nasdaq/`
 - **Format**: PyArrow/Parquet compressed
-- **Script**: `scripts/store_earnings_data.py` (pure storage, no analysis)
+- **Script**: `ops/scripts/store_earnings_data.py` (pure storage, no analysis)
 
 📊 **Analysis Output (Discovery Engine)**:
 - **What**: FILTERED opportunities with strategy recommendations (229 events)
@@ -101,16 +101,16 @@ self.min_avg_volume = 1e6      # Hardcoded!
 - **Script**: `earnings_trading/discovery.py` (analysis layer)
 
 ### **6. Simple Storage Script**
-✅ **CREATED**: `scripts/store_earnings_data.py`
+✅ **CREATED**: `ops/scripts/store_earnings_data.py`
 ```bash
 # Just store raw data, no analysis
-python scripts/store_earnings_data.py --days-ahead 30
+python ops/scripts/store_earnings_data.py --days-ahead 30
 
 # With specific symbols only
-python scripts/store_earnings_data.py --symbols AAPL,GOOGL,MSFT
+python ops/scripts/store_earnings_data.py --symbols AAPL,GOOGL,MSFT
 
 # Summary only (no new collection)
-python scripts/store_earnings_data.py --summary-only
+python ops/scripts/store_earnings_data.py --summary-only
 ```
 
 ### **7. Config.py Usage**
@@ -208,13 +208,13 @@ EARNINGS_CONFIG = {
 - `utils/logging_setup.py` - Centralized logging
 
 ### **Data Scripts**
-- `scripts/store_earnings_data.py` - **Pure storage** (no analysis)
-- `scripts/demonstrate_persistence.py` - System demonstration
-- `scripts/compare_earnings_sources.py` - Data source comparison
+- `ops/scripts/store_earnings_data.py` - **Pure storage** (no analysis)
+- `ops/scripts/demonstrate_persistence.py` - System demonstration
+- `ops/scripts/compare_earnings_sources.py` - Data source comparison
 
 ### **Analysis Scripts**
 - `earnings_trading/discovery.py` - **Filtered analysis** with scoring
-- `jobs/daily_earnings_collection.py` - Automated collection job
+- `ops/jobs/daily_earnings_collection.py` - Automated collection job
 
 ### **Data Storage**
 - `data/earnings/` - **Raw unfiltered data** (all 892 events)
@@ -236,7 +236,7 @@ EARNINGS_CONFIG = {
 ### **Store Raw Data Only**
 ```bash
 # Just store earnings data, no filtering
-python scripts/store_earnings_data.py --days-ahead 30 --source nasdaq
+python ops/scripts/store_earnings_data.py --days-ahead 30 --source nasdaq
 ```
 
 ### **Analyze for Trading Opportunities**
@@ -256,7 +256,7 @@ engine = EarningsDiscoveryEngine(config=custom_config)
 ### **Check What's Stored**
 ```bash
 # Summary of stored data
-python scripts/store_earnings_data.py --summary-only
+python ops/scripts/store_earnings_data.py --summary-only
 ```
 
 ## ⚙️ **Configuration Schema**

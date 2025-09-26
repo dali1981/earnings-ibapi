@@ -1,0 +1,174 @@
+version: "3.9"
+
+services:
+  calendar:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    command: ["uvicorn", "services.calendar_api.app:app", "--host", "0.0.0.0", "--port", "9001", "--reload"]
+    ports: ["9001:9001"]
+    environment:
+      - SERVICE_NAME=calendar
+      - APP_PATHS__DATA_ROOT=/app/data
+      - APP_PATHS__PROJECT_ROOT=/app
+      - APP_PATHS__EQUITY_BARS=/app/data/equity_bars
+      - APP_PATHS__OPTION_BARS=/app/data/option_bars
+      - APP_PATHS__OPTION_CHAINS=/app/data/option_chains
+      - APP_PATHS__CONTRACTS=/app/data/contracts
+      - APP_PATHS__EARNINGS=/app/data/earnings
+      - APP_PATHS__EXPORTS=/app/data/exports
+      - APP_PATHS__CACHE=/app/cache
+      - APP_PATHS__LOGS=/app/logs
+    volumes:
+      - .:/app
+      - ./data:/app/data
+
+  equity:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    command: ["uvicorn", "services.equity_api.app:app", "--host", "0.0.0.0", "--port", "9002", "--reload"]
+    ports: ["9002:9002"]
+    environment:
+      - SERVICE_NAME=equity
+      - APP_PATHS__DATA_ROOT=/app/data
+      - APP_PATHS__PROJECT_ROOT=/app
+      - APP_PATHS__EQUITY_BARS=/app/data/equity_bars
+      - APP_PATHS__OPTION_BARS=/app/data/option_bars
+      - APP_PATHS__OPTION_CHAINS=/app/data/option_chains
+      - APP_PATHS__CONTRACTS=/app/data/contracts
+      - APP_PATHS__EARNINGS=/app/data/earnings
+      - APP_PATHS__EXPORTS=/app/data/exports
+      - APP_PATHS__CACHE=/app/cache
+      - APP_PATHS__LOGS=/app/logs
+    volumes:
+      - .:/app
+      - ./data:/app/data
+
+  options:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    command: ["uvicorn", "services.option_history_api.app:app", "--host", "0.0.0.0", "--port", "9003", "--reload"]
+    ports: ["9003:9003"]
+    environment:
+      - SERVICE_NAME=options
+      - APP_PATHS__DATA_ROOT=/app/data
+      - APP_PATHS__PROJECT_ROOT=/app
+      - APP_PATHS__EQUITY_BARS=/app/data/equity_bars
+      - APP_PATHS__OPTION_BARS=/app/data/option_bars
+      - APP_PATHS__OPTION_CHAINS=/app/data/option_chains
+      - APP_PATHS__CONTRACTS=/app/data/contracts
+      - APP_PATHS__EARNINGS=/app/data/earnings
+      - APP_PATHS__EXPORTS=/app/data/exports
+      - APP_PATHS__CACHE=/app/cache
+      - APP_PATHS__LOGS=/app/logs
+    volumes:
+      - .:/app
+      - ./data:/app/data
+
+  chains:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    command: ["uvicorn", "services.option_chain_api.app:app", "--host", "0.0.0.0", "--port", "9004", "--reload"]
+    ports: ["9004:9004"]
+    environment:
+      - SERVICE_NAME=chains
+      - APP_PATHS__DATA_ROOT=/app/data
+      - APP_PATHS__PROJECT_ROOT=/app
+      - APP_PATHS__EQUITY_BARS=/app/data/equity_bars
+      - APP_PATHS__OPTION_BARS=/app/data/option_bars
+      - APP_PATHS__OPTION_CHAINS=/app/data/option_chains
+      - APP_PATHS__CONTRACTS=/app/data/contracts
+      - APP_PATHS__EARNINGS=/app/data/earnings
+      - APP_PATHS__EXPORTS=/app/data/exports
+      - APP_PATHS__CACHE=/app/cache
+      - APP_PATHS__LOGS=/app/logs
+    volumes:
+      - .:/app
+      - ./data:/app/data
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    command: ["uvicorn", "services.frontend.main:app", "--host", "0.0.0.0", "--port", "9000", "--reload"]
+    ports: ["9000:9000"]
+    volumes:
+      - .:/app
+      - ./data:/app/data
+
+  orchestrator:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    command: ["uvicorn", "services.orchestrator_api.app:app", "--host", "0.0.0.0", "--port", "9005", "--reload"]
+    ports: ["9005:9005"]
+    environment:
+      - SERVICE_NAME=orchestrator
+      - APP_PATHS__DATA_ROOT=/app/data
+      - APP_PATHS__PROJECT_ROOT=/app
+      - APP_API__SERVICES__IB_API__HOST=ib_api
+      - APP_API__SERVICES__IB_API__PORT=9010
+    volumes:
+      - .:/app
+      - ./data:/app/data
+    depends_on:
+      - ib_api
+
+  ib_api:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    command: ["uvicorn", "services.ib_api.app:app", "--host", "0.0.0.0", "--port", "9010", "--reload"]
+    ports: ["9010:9010"]
+    environment:
+      - SERVICE_NAME=ib_api
+      - APP_PATHS__DATA_ROOT=/app/data
+      - APP_PATHS__PROJECT_ROOT=/app
+      - APP_IB__HOST=${APP_IB__HOST:-host.docker.internal}
+      - APP_IB__PORT=${APP_IB__PORT:-4002}
+      - APP_IB__CLIENT_IDS__contracts_backfill=${APP_IB__CLIENT_IDS__contracts_backfill:-101}
+    volumes:
+      - .:/app
+      - ./data:/app/data
+
+  redis:
+    image: redis:7-alpine
+    ports: ["6379:6379"]
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+
+  celery_worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    command: ["celery", "-A", "ibx_celery.app", "worker", "--loglevel=INFO"]
+    environment:
+      - APP_CELERY__BROKER_URL=amqp://guest:guest@host.docker.internal:5672//
+      - APP_CELERY__RESULT_BACKEND=rpc://
+      - APP_API__CONTRACTS_SERVICE_BASE=http://ib_api:9010
+    depends_on:
+      - redis
+      - ib_api
+    volumes:
+      - .:/app
+
+  flower:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    command: ["celery", "-A", "ibx_celery.app", "flower", "--port=5555"]
+    ports: ["5555:5555"]
+    environment:
+      - SERVICE_NAME=flower
+      - APP_CELERY__BROKER_URL=amqp://guest:guest@host.docker.internal:5672//
+      - APP_CELERY__RESULT_BACKEND=rpc://
+      - APP_API__CONTRACTS_SERVICE_BASE=http://ib_api:9010
+    volumes:
+      - .:/app
+    depends_on:
+      - redis
+      - ib_api
+
+volumes: {}

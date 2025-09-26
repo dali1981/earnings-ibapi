@@ -1,0 +1,1 @@
+# Trading repository tests
